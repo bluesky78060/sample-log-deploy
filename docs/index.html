@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시료 접수 대장</title>
+    <!-- 폰트 preconnect 및 preload로 성능 최적화 (bundle-defer-third-party) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"></noscript>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- Tailwind 설정을 외부 파일로 분리 (CSP 보안 강화) -->
+    <script src="tailwind-config-main.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 노이즈 텍스처 오버레이 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 부유하는 파티클 효과 */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.4) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 15s infinite ease-in-out;
+        }
+
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; animation-duration: 20s; }
+        .particle:nth-child(2) { left: 20%; animation-delay: 2s; animation-duration: 18s; }
+        .particle:nth-child(3) { left: 30%; animation-delay: 4s; animation-duration: 22s; }
+        .particle:nth-child(4) { left: 40%; animation-delay: 1s; animation-duration: 16s; }
+        .particle:nth-child(5) { left: 50%; animation-delay: 3s; animation-duration: 19s; }
+        .particle:nth-child(6) { left: 60%; animation-delay: 5s; animation-duration: 21s; }
+        .particle:nth-child(7) { left: 70%; animation-delay: 2s; animation-duration: 17s; }
+        .particle:nth-child(8) { left: 80%; animation-delay: 4s; animation-duration: 23s; }
+        .particle:nth-child(9) { left: 90%; animation-delay: 1s; animation-duration: 20s; }
+        .particle:nth-child(10) { left: 15%; animation-delay: 3s; animation-duration: 18s; }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(90vh) scale(1);
+            }
+            90% {
+                opacity: 1;
+                transform: translateY(10vh) scale(1);
+            }
+            100% {
+                transform: translateY(-10vh) scale(0);
+                opacity: 0;
+            }
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1e293b 0%, #22c55e 25%, #3b82f6 50%, #f59e0b 75%, #1e293b 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientFlow 4s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.02em;
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .header h1::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #22c55e, #3b82f6, #f59e0b);
+            border-radius: 2px;
+            animation: lineWidth 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes gradientFlow {
+            0%, 100% { background-position: 0% center; }
+            50% { background-position: 100% center; }
+        }
+
+        @keyframes lineWidth {
+            0% { width: 40px; opacity: 0.7; }
+            100% { width: 80px; opacity: 1; }
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #64748b;
+            margin-top: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+        }
+
+        .sample-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .sample-type-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+            /* 스태거드 페이드인 */
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+
+        .sample-type-card:nth-child(1) { animation-delay: 0.1s; }
+        .sample-type-card:nth-child(2) { animation-delay: 0.2s; }
+        .sample-type-card:nth-child(3) { animation-delay: 0.3s; }
+        .sample-type-card:nth-child(4) { animation-delay: 0.4s; }
+        .sample-type-card:nth-child(5) { animation-delay: 0.5s; }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .sample-type-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* 카드 배경 글로우 효과 */
+        .sample-type-card::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            transition: all 0.5s ease;
+            z-index: -1;
+        }
+
+        .sample-type-card:hover::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        .sample-type-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        .sample-type-card:hover::before {
+            opacity: 1;
+        }
+
+        .sample-type-card.soil::before { background: linear-gradient(135deg, #22C55E, #16A34A); }
+        .sample-type-card.water::before { background: linear-gradient(135deg, #3B82F6, #2563EB); }
+        .sample-type-card.pesticide::before { background: linear-gradient(135deg, #F59E0B, #D97706); }
+        .sample-type-card.compost::before { background: linear-gradient(135deg, #A16207, #854D0E); }
+        .sample-type-card.heavy-metal::before { background: linear-gradient(135deg, #EF4444, #DC2626); }
+
+        .sample-type-card:hover.soil { border-color: #22C55E; box-shadow: 0 20px 50px rgba(34, 197, 94, 0.2); }
+        .sample-type-card:hover.water { border-color: #3B82F6; box-shadow: 0 20px 50px rgba(59, 130, 246, 0.2); }
+        .sample-type-card:hover.pesticide { border-color: #F59E0B; box-shadow: 0 20px 50px rgba(245, 158, 11, 0.2); }
+        .sample-type-card:hover.compost { border-color: #A16207; box-shadow: 0 20px 50px rgba(161, 98, 7, 0.2); }
+        .sample-type-card:hover.heavy-metal { border-color: #EF4444; box-shadow: 0 20px 50px rgba(239, 68, 68, 0.2); }
+
+        .card-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 아이콘 바운스 애니메이션 */
+        .sample-type-card:hover .card-icon {
+            animation: bounce 0.6s ease;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            30% { transform: translateY(-15px) scale(1.1); }
+            50% { transform: translateY(-8px) scale(1.05); }
+            70% { transform: translateY(-12px) scale(1.08); }
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .sample-type-card:hover .card-title {
+            color: #0f172a;
+        }
+
+        .card-description {
+            font-size: 0.9rem;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .card-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: 1rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .card-status.active {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .sample-type-card:hover .card-status.active {
+            background: #22c55e;
+            color: white;
+        }
+
+        .card-status.coming-soon {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .card-status.disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+        }
+
+        .sample-type-card.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .sample-type-card.disabled:hover {
+            transform: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .footer {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.875rem;
+            animation: fadeIn 1s ease-out 0.8s both;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .footer a {
+            color: #3B82F6;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .version-info {
+            font-size: 0.75rem;
+            color: #b0b8c4;
+            margin-top: 0.25rem;
+        }
+
+        /* 설정 버튼 - 우측 상단 */
+        .settings-btn {
+            position: fixed;
+            top: 20px;
+            right: 220px;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #64748b, #475569);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(100, 116, 139, 0.4);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            animation: fadeIn 1s ease-out 0.9s both;
+        }
+
+        .settings-btn:hover {
+            transform: scale(1.15);
+            box-shadow: 0 8px 25px rgba(100, 116, 139, 0.5);
+        }
+
+        .settings-btn span {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .settings-btn .tooltip {
+            position: absolute;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%) translateY(5px);
+            background: #1e293b;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        .settings-btn .tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #1e293b;
+        }
+
+        .settings-btn:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* 사용 설명서 버튼 - 오른쪽 상단 */
+        .help-btn {
+            position: fixed;
+            top: 20px;
+            right: 160px;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            animation: fadeIn 1s ease-out 1s both;
+        }
+
+        .help-btn:hover {
+            transform: scale(1.15) rotate(5deg);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
+        }
+
+        .help-btn span {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .help-btn:hover span {
+            transform: scale(1.1);
+        }
+
+        .help-btn .tooltip {
+            position: absolute;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%) translateY(5px);
+            background: #1e293b;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        .help-btn .tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #1e293b;
+        }
+
+        .help-btn:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* 반응형 조정 */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* 다크 모드 토글 스위치 */
+        .theme-toggle-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 1s ease-out 0.5s both;
+        }
+
+        .theme-toggle-btn {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: #cbd5e1;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+        }
+
+        .theme-toggle-btn::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+        }
+
+        .theme-toggle-btn.dark::before {
+            transform: translateX(20px);
+        }
+
+        .theme-toggle-btn.dark {
+            background: #6366f1;
+        }
+
+        .theme-icon {
+            font-size: 1rem;
+            transition: opacity 0.3s ease;
+        }
+
+        /* 다크 모드 스타일 */
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0c4a6e 100%);
+        }
+
+        [data-theme="dark"] body::before {
+            opacity: 0.05;
+        }
+
+        [data-theme="dark"] .particle {
+            background: radial-gradient(circle, rgba(129, 140, 248, 0.4) 0%, transparent 70%);
+        }
+
+        [data-theme="dark"] .header h1 {
+            background: linear-gradient(135deg, #f1f5f9 0%, #4ade80 25%, #60a5fa 50%, #fbbf24 75%, #f1f5f9 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        [data-theme="dark"] .header h1::after {
+            background: linear-gradient(90deg, #4ade80, #60a5fa, #fbbf24);
+        }
+
+        [data-theme="dark"] .header p {
+            color: #94a3b8;
+        }
+
+        [data-theme="dark"] .sample-type-card {
+            background: rgba(30, 41, 59, 0.9);
+            border-color: rgba(148, 163, 184, 0.2);
+        }
+
+        [data-theme="dark"] .sample-type-card::after {
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+        }
+
+        [data-theme="dark"] .sample-type-card:hover {
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .card-title {
+            color: #f1f5f9;
+        }
+
+        [data-theme="dark"] .sample-type-card:hover .card-title {
+            color: white;
+        }
+
+        [data-theme="dark"] .card-description {
+            color: #94a3b8;
+        }
+
+        [data-theme="dark"] .card-status.active {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+        }
+
+        [data-theme="dark"] .sample-type-card:hover .card-status.active {
+            background: #22c55e;
+            color: white;
+        }
+
+        [data-theme="dark"] .footer {
+            color: #64748b;
+        }
+
+        [data-theme="dark"] .version-info {
+            color: #475569;
+        }
+
+        [data-theme="dark"] .help-btn {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        [data-theme="dark"] .help-btn:hover {
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+        }
+
+        [data-theme="dark"] .help-btn .tooltip {
+            background: #1e293b;
+        }
+
+        [data-theme="dark"] .help-btn .tooltip::after {
+            border-left-color: #1e293b;
+        }
+
+        [data-theme="dark"] .theme-toggle-container {
+            background: rgba(30, 41, 59, 0.9);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .settings-btn {
+            background: linear-gradient(135deg, #475569, #334155);
+            box-shadow: 0 4px 15px rgba(71, 85, 105, 0.4);
+        }
+
+        [data-theme="dark"] .settings-btn:hover {
+            box-shadow: 0 8px 25px rgba(71, 85, 105, 0.5);
+        }
+
+        [data-theme="dark"] .settings-btn .tooltip {
+            background: #1e293b;
+        }
+
+        [data-theme="dark"] .settings-btn .tooltip::after {
+            border-left-color: #1e293b;
+        }
+
+        /* 클라우드 동기화 상태 */
+        .sync-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .sync-icon {
+            font-size: 0.875rem;
+        }
+
+        /* 동기화 버튼 */
+        .sync-btn {
+            position: fixed;
+            top: 20px;
+            right: 280px;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            animation: fadeIn 1s ease-out 0.85s both;
+            cursor: pointer;
+            border: none;
+        }
+
+        .sync-btn:hover {
+            transform: scale(1.15);
+            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.5);
+        }
+
+        .sync-btn.syncing span {
+            animation: spin 1s linear infinite;
+        }
+
+        .sync-btn.syncing {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .sync-btn span {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .sync-btn .tooltip {
+            position: absolute;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%) translateY(5px);
+            background: #1e293b;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        .sync-btn .tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #1e293b;
+        }
+
+        .sync-btn:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        [data-theme="dark"] .sync-btn {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+
+        [data-theme="dark"] .sync-btn:hover {
+            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.5);
+        }
+
+        [data-theme="dark"] .sync-btn.syncing {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        /* 동기화 결과 모달 */
+        .sync-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .sync-modal.show {
+            display: flex;
+        }
+
+        .sync-modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        [data-theme="dark"] .sync-modal-content {
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+
+        .sync-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .sync-modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sync-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #64748b;
+            transition: color 0.2s ease;
+        }
+
+        .sync-modal-close:hover {
+            color: #1e293b;
+        }
+
+        [data-theme="dark"] .sync-modal-close:hover {
+            color: #f1f5f9;
+        }
+
+        .sync-result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        [data-theme="dark"] .sync-result-item {
+            background: #334155;
+        }
+
+        .sync-result-type {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .sync-result-count {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .sync-result-count.success {
+            color: #22c55e;
+        }
+
+        .sync-result-count.error {
+            color: #ef4444;
+        }
+
+        .sync-progress {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #3b82f620, #8b5cf620);
+            border-radius: 8px;
+        }
+
+        .sync-progress-text {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        [data-theme="dark"] .sync-progress-text {
+            color: #94a3b8;
+        }
+
+        .sync-progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        [data-theme="dark"] .sync-progress-bar {
+            background: #475569;
+        }
+
+        .sync-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .sync-result-item.syncing {
+            background: linear-gradient(135deg, #fef3c720, #fef9c320);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .sync-modal-footer {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+
+        .sync-modal-btn {
+            padding: 0.75rem 2rem;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sync-modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 부유하는 파티클 -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <!-- 다크 모드 토글 -->
+    <div class="theme-toggle-container">
+        <span class="theme-icon">☀️</span>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="다크 모드 전환"></button>
+        <span class="theme-icon">🌙</span>
+    </div>
+
+    <!-- 동기화 버튼 -->
+    <button class="sync-btn" id="syncBtn">
+        <span>🔄</span>
+        <span class="tooltip">동기화</span>
+    </button>
+
+    <!-- 설정 버튼 -->
+    <a href="settings/index.html" class="settings-btn">
+        <span>⚙️</span>
+        <span class="tooltip">설정</span>
+    </a>
+
+    <!-- 사용 설명서 버튼 -->
+    <a href="manual/index.html" class="help-btn">
+        <span>📖</span>
+        <span class="tooltip">설명서</span>
+    </a>
+
+    <!-- 동기화 결과 모달 -->
+    <div class="sync-modal" id="syncModal">
+        <div class="sync-modal-content">
+            <div class="sync-modal-header">
+                <div class="sync-modal-title">
+                    <span>☁️</span>
+                    <span>동기화 결과</span>
+                </div>
+                <button class="sync-modal-close" id="syncModalClose">&times;</button>
+            </div>
+            <div class="sync-modal-body" id="syncModalBody">
+                <!-- 동기화 결과가 여기에 표시됩니다 -->
+            </div>
+            <div class="sync-modal-footer">
+                <button class="sync-modal-btn" id="syncModalOk">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>시료 접수 대장</h1>
+            <p>분석할 시료 종류를 선택해주세요</p>
+        </div>
+
+        <div class="sample-types">
+            <!-- 토양 -->
+            <a href="soil/index.html" class="sample-type-card soil">
+                <span class="card-icon">🌱</span>
+                <div class="card-title">토양</div>
+                <div class="card-description">논, 밭, 과수, 시설 토양 분석</div>
+                <span class="card-status active">● 사용 가능</span>
+            </a>
+
+            <!-- 물 (수질분석) -->
+            <a href="water/index.html" class="sample-type-card water">
+                <span class="card-icon">💧</span>
+                <div class="card-title">수질분석</div>
+                <div class="card-description">지하수, 지표수 수질 분석</div>
+                <span class="card-status active">● 사용 가능</span>
+            </a>
+
+            <!-- 잔류농약 -->
+            <a href="pesticide/index.html" class="sample-type-card pesticide">
+                <span class="card-icon">🧪</span>
+                <div class="card-title">잔류농약</div>
+                <div class="card-description">농산물 잔류농약 분석</div>
+                <span class="card-status active">● 사용 가능</span>
+            </a>
+
+            <!-- 가축분뇨퇴비 -->
+            <a href="compost/index.html" class="sample-type-card compost">
+                <span class="card-icon">🐄</span>
+                <div class="card-title">가축분뇨퇴비</div>
+                <div class="card-description">퇴비, 액비 부숙도 검사</div>
+                <span class="card-status active">● 사용 가능</span>
+            </a>
+
+            <!-- 중금속 -->
+            <a href="heavy-metal/index.html" class="sample-type-card heavy-metal">
+                <span class="card-icon">⚗️</span>
+                <div class="card-title">토양 중금속</div>
+                <div class="card-description">토양 중금속 분석</div>
+                <span class="card-status active">● 사용 가능</span>
+            </a>
+
+        </div>
+
+        <div class="footer">
+            <p>봉화군농업기술센터 안전성분석센터</p>
+            <p class="version-info" id="appVersion">v1.7.48</p>
+            <!-- 클라우드 동기화 상태 -->
+            <p class="sync-status" id="syncStatus" style="display: none;">
+                <span class="sync-icon">☁️</span>
+                <span class="sync-text">동기화됨</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (compat 버전 - Electron 호환) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <!-- 네트워크 접근 제어 (Firebase 초기화 전에 로드) -->
+    <script src="shared/logger.js"></script>
+    <script src="shared/network-config.js"></script>
+    <script src="shared/network-access.js"></script>
+    <!-- Firebase 스크립트 -->
+    <script src="shared/firebase-config.js"></script>
+    <script src="shared/firestore-db.js"></script>
+    <script src="shared/storage-manager.js"></script>
+    <script src="shared/sanitize.js"></script>
+
+    <!-- 다크 모드 스크립트 (theme.js가 자동으로 이벤트 리스너 등록) -->
+    <script src="shared/theme.js"></script>
+    <!-- 캐시 관리 -->
+    <script src="shared/cache-manager.js"></script>
+    <script>
+        // 매주 금요일 자동 캐시 클리어 체크
+        if (window.CacheManager) {
+            CacheManager.checkAndAutoClean();
+        }
+
+        // 버전 정보 자동 표시
+        (async function() {
+            const versionEl = document.getElementById('appVersion');
+            if (window.electronAPI?.getVersion) {
+                try {
+                    const version = await window.electronAPI.getVersion();
+                    if (version) versionEl.textContent = 'v' + version;
+                } catch (e) {
+                    window.logger.info('버전 정보 가져오기 실패:', e);
+                }
+            }
+        })();
+
+        // 스토리지 매니저 초기화 및 동기화 상태 표시
+        (async function() {
+            const syncStatusEl = document.getElementById('syncStatus');
+            if (window.storageManager) {
+                const mode = await window.storageManager.init();
+                if (mode === 'cloud') {
+                    syncStatusEl.style.display = 'block';
+                    updateSyncStatus();
+                }
+            }
+        })();
+
+        // 동기화 상태 업데이트
+        function updateSyncStatus() {
+            const syncStatusEl = document.getElementById('syncStatus');
+            if (!syncStatusEl || !window.storageManager) return;
+
+            const status = window.storageManager.getStatus();
+            const iconEl = syncStatusEl.querySelector('.sync-icon');
+            const textEl = syncStatusEl.querySelector('.sync-text');
+
+            if (status.isOnline) {
+                iconEl.textContent = '☁️';
+                textEl.textContent = '클라우드 동기화';
+                syncStatusEl.style.color = '#22c55e';
+            } else {
+                iconEl.textContent = '📴';
+                textEl.textContent = '오프라인 모드';
+                syncStatusEl.style.color = '#f59e0b';
+            }
+        }
+
+        // 온라인/오프라인 상태 변경 감지
+        window.addEventListener('online', updateSyncStatus);
+        window.addEventListener('offline', updateSyncStatus);
+
+        // ========================================
+        // 전체 동기화 기능
+        // ========================================
+        const SAMPLE_TYPES = [
+            { type: 'soil', name: '토양', icon: '🌱', storagePrefix: 'soilSampleLogs' },
+            { type: 'water', name: '수질분석', icon: '💧', storagePrefix: 'waterSampleLogs' },
+            { type: 'compost', name: '퇴·액비', icon: '🐄', storagePrefix: 'compostSampleLogs' },
+            { type: 'heavyMetal', name: '토양 중금속', icon: '⚗️', storagePrefix: 'heavyMetalSampleLogs' },
+            { type: 'pesticide', name: '잔류농약', icon: '🧪', storagePrefix: 'pesticideSampleLogs' }
+        ];
+
+        const MIN_YEAR = 2020;
+        const syncBtn = document.getElementById('syncBtn');
+        const syncModal = document.getElementById('syncModal');
+        const syncModalBody = document.getElementById('syncModalBody');
+        const syncModalClose = document.getElementById('syncModalClose');
+        const syncModalOk = document.getElementById('syncModalOk');
+
+        // 모달 닫기
+        function closeSyncModal() {
+            syncModal.classList.remove('show');
+        }
+
+        syncModalClose?.addEventListener('click', closeSyncModal);
+        syncModalOk?.addEventListener('click', closeSyncModal);
+        syncModal?.addEventListener('click', (e) => {
+            if (e.target === syncModal) closeSyncModal();
+        });
+
+        // 전체 동기화 실행
+        async function syncAllData() {
+            // Firebase가 아직 초기화되지 않았으면 초기화 시도
+            if (!window.firestoreDb?.isEnabled()) {
+                if (window.firebaseConfig?.initialize) {
+                    try {
+                        const initialized = await window.firebaseConfig.initialize();
+                        if (initialized) {
+                            await window.firestoreDb?.init();
+                        }
+                    } catch (err) {
+                        window.logger.warn('Firebase 초기화 실패:', err);
+                    }
+                }
+            }
+
+            // 초기화 후에도 여전히 비활성화 상태면 에러
+            if (!window.firestoreDb?.isEnabled()) {
+                alert('Firebase가 설정되지 않았습니다.\n설정 페이지에서 인증 파일을 등록해주세요.');
+                return;
+            }
+
+            syncBtn.classList.add('syncing');
+            const currentYear = new Date().getFullYear();
+            const results = [];
+            const totalSteps = SAMPLE_TYPES.length * (currentYear - MIN_YEAR + 1);
+            let completedSteps = 0;
+
+            // 진행 상태 모달 표시
+            showSyncProgress(SAMPLE_TYPES);
+
+            try {
+                for (let i = 0; i < SAMPLE_TYPES.length; i++) {
+                    const sampleType = SAMPLE_TYPES[i];
+                    let totalLoaded = 0;
+                    let yearsWithData = [];
+
+                    // 현재 시료 타입 진행 중 표시
+                    updateSyncItemStatus(i, 'syncing', '동기화 중...');
+
+                    // 모든 연도 동기화 (2020년부터 현재 연도까지)
+                    for (let year = MIN_YEAR; year <= currentYear; year++) {
+                        try {
+                            const cloudData = await window.firestoreDb.getAll(sampleType.type, year);
+                            const storageKey = `${sampleType.storagePrefix}_${year}`;
+
+                            if (cloudData && cloudData.length > 0) {
+                                // Firebase 데이터를 localStorage에 저장
+                                localStorage.setItem(storageKey, JSON.stringify(cloudData));
+                                totalLoaded += cloudData.length;
+                                yearsWithData.push({ year, count: cloudData.length });
+                            }
+                        } catch (err) {
+                            window.logger.error(`${sampleType.name} ${year}년 동기화 오류:`, err);
+                        }
+
+                        // 진행률 업데이트
+                        completedSteps++;
+                        updateSyncProgress(completedSteps, totalSteps, `${sampleType.name} ${year}년...`);
+                    }
+
+                    // 완료 상태 업데이트
+                    const statusText = totalLoaded > 0 ? `${totalLoaded}건 완료` : '데이터 없음';
+                    updateSyncItemStatus(i, totalLoaded > 0 ? 'success' : '', statusText);
+
+                    results.push({
+                        type: sampleType.type,
+                        name: sampleType.name,
+                        icon: sampleType.icon,
+                        totalCount: totalLoaded,
+                        yearsWithData: yearsWithData,
+                        success: true
+                    });
+                }
+
+                // 결과 표시
+                showSyncResults(results);
+
+            } catch (error) {
+                window.logger.error('동기화 오류:', error);
+                alert('동기화 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                syncBtn.classList.remove('syncing');
+            }
+        }
+
+        // 동기화 진행 상태 모달 표시
+        function showSyncProgress(sampleTypes) {
+            let html = `
+                <div class="sync-progress">
+                    <div class="sync-progress-text">
+                        <span id="syncProgressLabel">준비 중...</span>
+                        <span id="syncProgressPercent">0%</span>
+                    </div>
+                    <div class="sync-progress-bar">
+                        <div class="sync-progress-fill" id="syncProgressFill"></div>
+                    </div>
+                </div>
+            `;
+
+            sampleTypes.forEach((type, index) => {
+                html += `
+                    <div class="sync-result-item" id="syncItem${index}">
+                        <div class="sync-result-type">
+                            <span>${type.icon}</span>
+                            <span>${type.name}</span>
+                        </div>
+                        <div class="sync-result-count" id="syncStatus${index}">대기 중</div>
+                    </div>
+                `;
+            });
+
+            syncModalBody.innerHTML = html;
+            syncModal.classList.add('show');
+        }
+
+        // 진행률 업데이트
+        function updateSyncProgress(completed, total, label) {
+            const percent = Math.round((completed / total) * 100);
+            const progressFill = document.getElementById('syncProgressFill');
+            const progressLabel = document.getElementById('syncProgressLabel');
+            const progressPercent = document.getElementById('syncProgressPercent');
+
+            if (progressFill) progressFill.style.width = `${percent}%`;
+            if (progressLabel) progressLabel.textContent = label;
+            if (progressPercent) progressPercent.textContent = `${percent}%`;
+        }
+
+        // 개별 항목 상태 업데이트
+        function updateSyncItemStatus(index, statusClass, statusText) {
+            const item = document.getElementById(`syncItem${index}`);
+            const status = document.getElementById(`syncStatus${index}`);
+
+            if (item) {
+                item.className = `sync-result-item ${statusClass}`;
+            }
+            if (status) {
+                status.className = `sync-result-count ${statusClass}`;
+                status.textContent = statusText;
+            }
+        }
+
+        // 동기화 결과 표시
+        function showSyncResults(results) {
+            let totalItems = 0;
+            let html = '';
+
+            results.forEach(result => {
+                totalItems += result.totalCount;
+                const statusClass = result.totalCount > 0 ? 'success' : '';
+                const yearInfo = result.yearsWithData.length > 0
+                    ? result.yearsWithData.map(y => `${y.year}년: ${y.count}건`).join(', ')
+                    : '데이터 없음';
+
+                html += `
+                    <div class="sync-result-item">
+                        <div class="sync-result-type">
+                            <span>${result.icon}</span>
+                            <span>${result.name}</span>
+                        </div>
+                        <div class="sync-result-count ${statusClass}">
+                            ${result.totalCount > 0 ? `${result.totalCount}건 동기화` : '데이터 없음'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 총합 표시
+            html += `
+                <div class="sync-result-item" style="margin-top: 1rem; background: linear-gradient(135deg, #22c55e20, #3b82f620);">
+                    <div class="sync-result-type">
+                        <span>📊</span>
+                        <span><strong>총 동기화</strong></span>
+                    </div>
+                    <div class="sync-result-count success">
+                        <strong>${totalItems}건</strong>
+                    </div>
+                </div>
+            `;
+
+            syncModalBody.innerHTML = html;
+            syncModal.classList.add('show');
+        }
+
+        // 동기화 버튼 클릭 이벤트
+        syncBtn?.addEventListener('click', syncAllData);
+    </script>
+</body>
+
+</html>

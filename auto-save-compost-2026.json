@@ -1,0 +1,112 @@
+{
+  "version": "2.0",
+  "exportDate": "2026-01-19T11:44:16.993Z",
+  "totalRecords": 3,
+  "data": [
+    {
+      "id": "1767316741204",
+      "sampleType": "가축분퇴비",
+      "addressPostcode": "36234",
+      "birthDate": "590103",
+      "productionDate": "2025-12-28",
+      "name": "석희동",
+      "farmArea": "650",
+      "testResult": "pass",
+      "farmName": "영남농장",
+      "date": "2025-12-29",
+      "updatedAt": {
+        "seconds": 1768533923,
+        "nanoseconds": 686000000
+      },
+      "address": "(36234) 경북 봉화군 봉화읍 봉화로 425-4",
+      "syncedAt": {
+        "seconds": 1768533923,
+        "nanoseconds": 686000000
+      },
+      "farmAddress": "봉화군 봉화읍 문단리 432",
+      "isComplete": true,
+      "addressRoad": "경북 봉화군 봉화읍 봉화로 425-4",
+      "phoneNumber": "010-3538-4834",
+      "rawMaterials": "",
+      "farmAreaUnit": "pyeong",
+      "receptionNumber": "1",
+      "addressDetail": "",
+      "receptionMethod": "우편",
+      "applicantType": "개인",
+      "animalType": "소",
+      "corpNumber": "",
+      "sampleCount": "1",
+      "note": "",
+      "purpose": "참고용",
+      "createdAt": "2026-01-02T01:19:01.204Z"
+    },
+    {
+      "id": "1767316960352",
+      "phoneNumber": "010-3538-4834",
+      "animalType": "소",
+      "updatedAt": {
+        "seconds": 1768533923,
+        "nanoseconds": 686000000
+      },
+      "productionDate": "2025-12-28",
+      "sampleCount": "1",
+      "addressPostcode": "36234",
+      "farmArea": "720",
+      "addressDetail": "",
+      "farmAreaUnit": "pyeong",
+      "date": "2025-12-29",
+      "testResult": "pass",
+      "receptionMethod": "우편",
+      "purpose": "참고용",
+      "name": "권금자",
+      "farmAddress": "봉화군 봉화읍 문단리 284",
+      "addressRoad": "경북 봉화군 봉화읍 봉화로 425-4",
+      "sampleType": "가축분퇴비",
+      "farmName": "못골농장",
+      "createdAt": "2026-01-02T01:22:40.352Z",
+      "receptionNumber": "2",
+      "rawMaterials": "",
+      "note": "",
+      "isComplete": true,
+      "address": "(36234) 경북 봉화군 봉화읍 봉화로 425-4",
+      "syncedAt": {
+        "seconds": 1768533923,
+        "nanoseconds": 686000000
+      }
+    },
+    {
+      "id": "1767320998888",
+      "note": "",
+      "farmArea": "600",
+      "name": "이창열",
+      "syncedAt": {
+        "seconds": 1768533923,
+        "nanoseconds": 686000000
+      },
+      "sampleCount": "1",
+      "addressDetail": "",
+      "farmAreaUnit": "pyeong",
+      "sampleType": "가축분퇴비",
+      "farmAddress": "봉화군 물야면 개단리 63-7",
+      "isComplete": true,
+      "address": "(36201) 경북 봉화군 물야면 월계길 606-21",
+      "updatedAt": {
+        "seconds": 1768533923,
+        "nanoseconds": 686000000
+      },
+      "receptionNumber": "3",
+      "productionDate": "2026-01-02",
+      "testResult": "pass",
+      "date": "2026-01-02",
+      "rawMaterials": "",
+      "purpose": "참고용",
+      "phoneNumber": "010-6303-1809",
+      "createdAt": "2026-01-02T02:29:58.888Z",
+      "addressRoad": "경북 봉화군 물야면 월계길 606-21",
+      "receptionMethod": "방문",
+      "farmName": "창웅농장",
+      "addressPostcode": "36201",
+      "animalType": "소"
+    }
+  ]
+}

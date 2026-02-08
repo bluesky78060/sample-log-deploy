@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수질분석 의뢰서</title>
+    <!-- 폰트 preconnect 및 preload로 성능 최적화 (bundle-defer-third-party) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"></noscript>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>
+        tailwind.config = {
+            darkMode: ['selector', '[data-theme="dark"]'],
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3B82F6",
+                        "background-light": "#F8FAFC",
+                        "background-dark": "#18181B",
+                    },
+                    fontFamily: {
+                        display: ["Noto Sans KR", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "12px",
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="water-style.css">
+    <style>
+        /* 다크 모드 select 강제 적용 - 최우선 */
+        [data-theme="dark"] select#subCategory,
+        [data-theme="dark"] select#purpose,
+        [data-theme="dark"] select#sampleName,
+        [data-theme="dark"] .form-card .card-body select {
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+            background-color: rgba(30, 41, 59, 0.95) !important;
+            color: #93c5fd !important;
+            border-color: rgba(59, 130, 246, 0.4) !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2393c5fd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 12px center !important;
+            background-size: 16px !important;
+            padding-right: 40px !important;
+        }
+        [data-theme="dark"] select#subCategory option,
+        [data-theme="dark"] select#purpose option,
+        [data-theme="dark"] select#sampleName option,
+        [data-theme="dark"] .form-card .card-body select option {
+            background-color: #1e293b !important;
+            color: #93c5fd !important;
+        }
+    </style>
+</head>
+
+<body class="water-page">
+    <!-- 네비게이션 바 -->
+    <nav class="navbar water-navbar">
+        <!-- 뒤로가기 버튼 -->
+        <a href="../index.html" class="back-btn" title="메인으로">←</a>
+        <!-- 로고 및 파트 선택 드롭다운 -->
+        <div class="navbar-brand">
+            <div class="brand-dropdown-trigger">
+                <span class="brand-icon">💧</span>
+                <span class="brand-text">수질분석</span>
+                <span class="dropdown-arrow">▼</span>
+            </div>
+            <div class="brand-dropdown-menu">
+                <div class="dropdown-header">시료 분석 메뉴</div>
+                <a href="../soil/index.html" class="dropdown-item">
+                    <span class="item-icon">🌱</span>
+                    <span class="item-text">토양 분석</span>
+                </a>
+                <a href="../water/index.html" class="dropdown-item active">
+                    <span class="item-icon">💧</span>
+                    <span class="item-text">수질 분석</span>
+                </a>
+                <a href="../compost/index.html" class="dropdown-item">
+                    <span class="item-icon">🐄</span>
+                    <span class="item-text">퇴·액비 성분검사</span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="../pesticide/index.html" class="dropdown-item">
+                    <span class="item-icon">🧪</span>
+                    <span class="item-text">잔류농약 검사</span>
+                </a>
+                <a href="../heavy-metal/index.html" class="dropdown-item">
+                    <span class="item-icon">⚗️</span>
+                    <span class="item-text">토양 중금속</span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="../label-print/index.html" class="dropdown-item">
+                    <span class="item-icon">🏷️</span>
+                    <span class="item-text">라벨 인쇄</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 메인 네비게이션 -->
+        <div class="navbar-nav">
+            <button class="nav-btn active" data-view="form" title="시료 접수">
+                <span class="nav-btn-icon">✏️</span>
+            </button>
+            <button class="nav-btn" data-view="list" title="접수 목록">
+                <span class="nav-btn-icon">📊</span>
+            </button>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 폼 액션 -->
+        <div class="navbar-actions">
+            <button type="button" id="navResetBtn" class="action-btn-icon reset" title="초기화">
+                <span>🔄</span>
+            </button>
+            <button type="button" id="navSubmitBtn" class="action-btn-icon submit" title="접수 등록">
+                <span>✅</span>
+            </button>
+        </div>
+
+        <div class="navbar-spacer"></div>
+
+        <!-- 유틸리티 -->
+        <div class="navbar-utils">
+            <button type="button" id="exportBtn" class="util-btn" title="엑셀 내보내기">📥</button>
+            <button type="button" id="saveJsonBtn" class="util-btn" title="JSON 저장">💾</button>
+            <label for="loadJsonInput" class="util-btn" title="JSON 불러오기">
+                📂
+                <input type="file" id="loadJsonInput" accept=".json" hidden>
+            </label>
+            <button type="button" id="migrateBtn" class="util-btn" title="클라우드 마이그레이션">☁️</button>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 자동 저장 -->
+        <div class="navbar-autosave">
+            <label class="autosave-toggle" title="자동저장">
+                <input type="checkbox" id="autoSaveToggle">
+                <span class="toggle-track"></span>
+            </label>
+            <button type="button" id="selectAutoSaveFolderBtn" class="autosave-folder-btn" title="저장 폴더 변경">
+                📁
+            </button>
+            <span id="autoSaveStatus" class="autosave-status">
+                <span class="status-indicator"></span>
+            </span>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 다크 모드 토글 -->
+        <div class="theme-toggle" id="themeToggleContainer">
+            <span class="theme-icon sun">☀️</span>
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="다크 모드 전환">
+            </button>
+            <span class="theme-icon moon">🌙</span>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <!-- 시료 접수 폼 뷰 -->
+        <div id="formView" class="view active">
+
+            <form id="sampleForm" class="sample-form">
+                <div class="form-two-column">
+                    <!-- 왼쪽: 의뢰인 정보 + 목적(용도) + 비고 -->
+                    <div class="form-left-column">
+                        <!-- 의뢰인 정보 카드 -->
+                        <div class="form-card">
+                            <div class="card-header">
+                                <span class="card-icon">👤</span>
+                                <h3>의뢰인 정보</h3>
+                                <div class="year-select-wrapper">
+                                    <select id="yearSelect" class="year-select">
+                                        <option value="2025">2025년</option>
+                                        <option value="2026">2026년</option>
+                                        <option value="2027">2027년</option>
+                                        <option value="2028">2028년</option>
+                                        <option value="2029">2029년</option>
+                                        <option value="2030">2030년</option>
+                                    </select>
+                                </div>
+                                <div class="reception-method-group">
+                                    <button type="button" class="reception-method-btn" data-method="우편" title="우편">
+                                        <span class="method-icon">📮</span>
+                                    </button>
+                                    <button type="button" class="reception-method-btn" data-method="팩스" title="팩스">
+                                        <span class="method-icon">📠</span>
+                                    </button>
+                                    <button type="button" class="reception-method-btn" data-method="방문" title="방문">
+                                        <span class="method-icon">🚶</span>
+                                    </button>
+                                    <button type="button" class="reception-method-btn" data-method="이메일" title="이메일">
+                                        <span class="method-icon">📧</span>
+                                    </button>
+                                </div>
+                                <input type="hidden" id="receptionMethod" name="receptionMethod" required>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="receptionNumber">접수번호</label>
+                                        <input type="text" id="receptionNumber" name="receptionNumber"
+                                            placeholder="자동 생성">
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="date">접수일자</label>
+                                        <input type="date" id="date" name="date" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="applicantType">법인여부 <span class="required">*</span></label>
+                                        <select id="applicantType" name="applicantType" required>
+                                            <option value="개인">개인</option>
+                                            <option value="법인">법인</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field" id="birthDateField">
+                                        <label for="birthDate">생년월일</label>
+                                        <input type="text" id="birthDate" name="birthDate" placeholder="YYYYMMDD (예: 19850315)" maxlength="8" pattern="[0-9]{8}">
+                                    </div>
+                                    <div class="form-field hidden" id="corpNumberField">
+                                        <label for="corpNumber">법인번호</label>
+                                        <input type="text" id="corpNumber" name="corpNumber" placeholder="법인등록번호 13자리" maxlength="14">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="name">성명 <span class="required">*</span></label>
+                                        <input type="text" id="name" name="name" required placeholder="의뢰인 성명 (법인의 경우 대표자)" autocomplete="name">
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="phoneNumber">연락처 <span class="required">*</span></label>
+                                        <input type="tel" id="phoneNumber" name="phoneNumber" required
+                                            placeholder="010-0000-0000" autocomplete="tel">
+                                    </div>
+                                </div>
+                                <div class="form-row single">
+                                    <div class="form-field full">
+                                        <label for="addressRoad">주소 (법인소재지)</label>
+                                        <div class="address-group">
+                                            <div class="address-row">
+                                                <input type="text" id="addressRoad" name="addressRoad" readonly
+                                                    placeholder="도로명 주소" autocomplete="street-address" style="flex: 1;">
+                                                <button type="button" id="searchAddressBtn" class="btn-search">
+                                                    🔍 주소 검색
+                                                </button>
+                                            </div>
+                                            <input type="text" id="addressDetail" name="addressDetail" placeholder="상세 주소 입력" autocomplete="address-line2">
+                                        </div>
+                                        <input type="hidden" id="addressPostcode" name="addressPostcode">
+                                        <input type="hidden" id="address" name="address">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 목적(용도) 카드 -->
+                        <div class="form-card">
+                            <div class="card-header">
+                                <span class="card-icon">🎯</span>
+                                <h3>목적 (용도)</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="purpose-options">
+                                    <label class="purpose-option">
+                                        <input type="radio" name="purpose" value="참고용" checked>
+                                        <span class="purpose-label">
+                                            <span class="purpose-icon">📋</span>
+                                            <span class="purpose-text">참고용</span>
+                                        </span>
+                                    </label>
+                                    <label class="purpose-option">
+                                        <input type="radio" name="purpose" value="무농약">
+                                        <span class="purpose-label">
+                                            <span class="purpose-icon">🍃</span>
+                                            <span class="purpose-text">무농약</span>
+                                        </span>
+                                    </label>
+                                    <label class="purpose-option">
+                                        <input type="radio" name="purpose" value="유기농">
+                                        <span class="purpose-label">
+                                            <span class="purpose-icon">♻️</span>
+                                            <span class="purpose-text">유기농</span>
+                                        </span>
+                                    </label>
+                                    <label class="purpose-option">
+                                        <input type="radio" name="purpose" value="GAP">
+                                        <span class="purpose-label">
+                                            <span class="purpose-icon">✅</span>
+                                            <span class="purpose-text">GAP</span>
+                                        </span>
+                                    </label>
+                                    <label class="purpose-option">
+                                        <input type="radio" name="purpose" value="기타">
+                                        <span class="purpose-label">
+                                            <span class="purpose-icon">📦</span>
+                                            <span class="purpose-text">기타</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 비고 카드 -->
+                        <div class="form-card">
+                            <div class="card-header">
+                                <span class="card-icon">📝</span>
+                                <h3>비고</h3>
+                            </div>
+                            <div class="card-body">
+                                <textarea id="note" name="note" rows="2" placeholder="추가 메모 사항을 입력하세요"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 오른쪽: 검사항목 + 의뢰내용 -->
+                    <div class="form-right-column">
+                        <!-- 검사항목 카드 -->
+                        <div class="form-card">
+                            <div class="card-header">
+                                <span class="card-icon">🔬</span>
+                                <h3>검사항목</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="test-items-options">
+                                    <label class="test-item-option">
+                                        <input type="radio" name="testItems" value="생활용수" checked>
+                                        <span class="test-item-label">
+                                            <span class="test-item-icon">🚰</span>
+                                            <span class="test-item-info">
+                                                <span class="test-item-name">생활용수</span>
+                                                <span class="test-item-count">20항목</span>
+                                            </span>
+                                        </span>
+                                    </label>
+                                    <label class="test-item-option">
+                                        <input type="radio" name="testItems" value="농업용수">
+                                        <span class="test-item-label">
+                                            <span class="test-item-icon">🌾</span>
+                                            <span class="test-item-info">
+                                                <span class="test-item-name">농업용수</span>
+                                                <span class="test-item-count">15항목</span>
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- 의뢰내용 카드 -->
+                        <div class="form-card has-autocomplete">
+                            <div class="card-header">
+                                <span class="card-icon">💧</span>
+                                <h3>의뢰내용</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="sampleName">시료명 <span class="required">*</span></label>
+                                        <select id="sampleName" name="sampleName" required>
+                                            <option value="">선택하세요</option>
+                                            <option value="지하수">🕳️ 지하수</option>
+                                            <option value="지표수">🌊 지표수</option>
+                                            <option value="기타">📦 기타</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="sampleCount">시료수 <span class="required">*</span></label>
+                                        <div class="sample-count-group">
+                                            <input type="number" id="sampleCount" name="sampleCount" required min="1" value="1" placeholder="시료 개수">
+                                            <span class="sample-count-unit">점</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 동적 채취장소 컨테이너 -->
+                                <div class="sampling-locations-container" id="samplingLocationsContainer">
+                                    <div class="sampling-location-header">
+                                        <label>채취장소 <span class="required">*</span></label>
+                                        <div class="location-header-controls">
+                                            <button type="button" class="btn-add-location" id="btnAddLocation" title="채취장소 추가">➕</button>
+                                            <button type="button" class="btn-remove-location" id="btnRemoveLocation" title="채취장소 삭제">➖</button>
+                                            <span class="location-count-badge" id="locationCountBadge">1개</span>
+                                        </div>
+                                    </div>
+                                    <div class="sampling-locations-list" id="samplingLocationsList">
+                                        <!-- 동적으로 추가되는 채취장소 필드들 -->
+                                        <div class="sampling-location-item" data-index="0">
+                                            <span class="location-number">1</span>
+                                            <div class="location-autocomplete-wrapper">
+                                                <input type="text" class="sampling-location-input" name="samplingLocations[]" required placeholder="리+지번 입력 (예: 내성리 123)">
+                                                <ul class="location-autocomplete-list"></ul>
+                                            </div>
+                                            <input type="text" class="sampling-crop-input" name="samplingCrops[]" placeholder="주작목">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- 접수 목록 뷰 -->
+        <div id="listView" class="view">
+            <div class="view-header-top">
+                <div class="header-left">
+                    <h2 id="listViewTitle">수질분석 접수 목록</h2>
+                    <select id="listYearSelect" class="list-year-select" title="연도 선택">
+                        <option value="2025">2025년</option>
+                        <option value="2026">2026년</option>
+                        <option value="2027">2027년</option>
+                        <option value="2028">2028년</option>
+                        <option value="2029">2029년</option>
+                        <option value="2030">2030년</option>
+                    </select>
+                    <select id="completedFilter" class="purpose-filter appearance-none">
+                        <option value="">전체 상태</option>
+                        <option value="incomplete">⬜ 미완료</option>
+                        <option value="completed">✅ 완료</option>
+                    </select>
+                    <span class="record-count" id="recordCount">0건</span>
+                </div>
+                <div class="header-right">
+                    <div class="view-toggle">
+                        <button type="button" id="viewToggleBtn" class="btn-view-toggle" title="전체 보기/기본 보기">
+                            <span class="toggle-icon">👁️</span>
+                            <span class="toggle-text">전체 보기</span>
+                        </button>
+                    </div>
+                    <button type="button" id="btnStatistics" class="btn-statistics" title="통계">
+                        📊 통계
+                    </button>
+                    <button type="button" id="btnLabelPrint" class="btn-label-print" title="선택한 항목 라벨 인쇄">
+                        🏷️ 라벨 인쇄
+                    </button>
+                    <button type="button" id="btnBulkDelete" class="btn-bulk-delete" title="선택한 항목 일괄 삭제">
+                        🗑️ 선택 삭제
+                    </button>
+                    <button type="button" id="btnBulkMailDate" class="btn-bulk-mail" title="선택한 항목 우편발송일자 일괄 입력">
+                        📮 발송일자
+                    </button>
+                    <button type="button" id="openSearchModalBtn" class="btn-search-open" title="검색">
+                        🔍 검색
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="logTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-checkbox"><input type="checkbox" id="selectAll" title="전체 선택"></th>
+                            <th class="col-complete">완료</th>
+                            <th class="col-result">판정</th>
+                            <th>접수번호</th>
+                            <th>접수일자</th>
+                            <th class="col-applicant-type hidden">법인여부</th>
+                            <th class="col-birth-corp hidden">생년월일/법인번호</th>
+                            <th>성명</th>
+                            <th class="col-zipcode hidden">우편번호</th>
+                            <th>주소</th>
+                            <th>시료명</th>
+                            <th>시료수</th>
+                            <th>채취장소</th>
+                            <th>주작목</th>
+                            <th>목적</th>
+                            <th>검사항목</th>
+                            <th>연락처</th>
+                            <th>통보방법</th>
+                            <th class="col-note">비고</th>
+                            <th class="col-mail-date">발송일자</th>
+                            <th class="col-action">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTableBody">
+                        <!-- 데이터가 여기에 추가됩니다 -->
+                    </tbody>
+                </table>
+
+                <!-- 페이지네이션 -->
+                <div id="pagination" class="pagination-container">
+                    <div class="pagination-info">
+                        <span id="paginationInfo">0건 중 0-0</span>
+                        <select id="itemsPerPage" class="items-per-page">
+                            <option value="50">50건</option>
+                            <option value="100" selected>100건</option>
+                            <option value="200">200건</option>
+                            <option value="500">500건</option>
+                        </select>
+                    </div>
+                    <div class="pagination-controls">
+                        <button id="firstPage" class="pagination-btn" title="처음">«</button>
+                        <button id="prevPage" class="pagination-btn" title="이전">‹</button>
+                        <div id="pageNumbers" class="page-numbers"></div>
+                        <button id="nextPage" class="pagination-btn" title="다음">›</button>
+                        <button id="lastPage" class="pagination-btn" title="마지막">»</button>
+                    </div>
+                </div>
+
+                <div id="emptyState" class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <p>등록된 접수 내역이 없습니다</p>
+                    <button type="button" class="btn-go-form">새 시료 접수하기</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 주소 검색 모달 -->
+    <div id="addressModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>📍 주소 검색</h3>
+                <button type="button" class="modal-close" id="closeAddressModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="daumPostcodeContainer" class="postcode-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 통계 모달 -->
+    <div id="statisticsModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>📊 수질분석 접수 통계</h3>
+                <button type="button" class="modal-close" id="closeStatisticsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-container">
+                    <div class="stats-summary">
+                        <div class="stat-card total">
+                            <div class="stat-icon">📋</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="statTotalCount">0</span>
+                                <span class="stat-label">총 접수</span>
+                            </div>
+                        </div>
+                        <div class="stat-card completed">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="statCompletedCount">0</span>
+                                <span class="stat-label">완료</span>
+                            </div>
+                        </div>
+                        <div class="stat-card pending">
+                            <div class="stat-icon">⏳</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="statPendingCount">0</span>
+                                <span class="stat-label">미완료</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stats-details">
+                        <div class="stats-section">
+                            <h4>💧 시료명별</h4>
+                            <div class="stats-chart" id="statsByWaterType"></div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>🎯 목적별</h4>
+                            <div class="stats-chart" id="statsByPurpose"></div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>🔬 검사항목별</h4>
+                            <div class="stats-chart" id="statsByTestItems"></div>
+                        </div>
+                        <div class="stats-section stats-section-full">
+                            <h4>📅 월별 접수 현황</h4>
+                            <div class="stats-chart-monthly" id="statsByMonth"></div>
+                            <div class="stats-quarterly" id="statsQuarterly"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="closeStatisticsBtn" class="btn-cancel">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 접수 목록 검색 모달 -->
+    <div id="listSearchModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-search">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-icons-outlined">search</span>
+                    <h3>검색</h3>
+                </div>
+                <button type="button" class="modal-close" id="closeSearchModal">
+                    <span class="material-icons-outlined">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="search-modal-form">
+                    <div class="search-form-group">
+                        <label for="searchDateFromInput">
+                            <span class="material-icons-outlined label-icon-calendar">calendar_today</span>
+                            접수일자 (범위)
+                        </label>
+                        <div class="search-input-row">
+                            <div class="search-input-wrapper">
+                                <input type="date" id="searchDateFromInput" class="search-input" title="시작일">
+                            </div>
+                            <span class="date-range-separator">~</span>
+                            <div class="search-input-wrapper">
+                                <input type="date" id="searchDateToInput" class="search-input" title="종료일">
+                            </div>
+                            <button type="button" id="clearSearchDate" class="btn-clear-field">초기화</button>
+                        </div>
+                    </div>
+                    <div class="search-form-group">
+                        <label for="searchNameInput">
+                            <span class="material-icons-outlined label-icon-calendar">person</span>
+                            성명
+                        </label>
+                        <input type="text" id="searchNameInput" placeholder="성명 입력..." class="search-input">
+                    </div>
+                    <div class="search-form-group">
+                        <label for="searchReceptionFromInput">
+                            <span class="material-icons-outlined label-icon-calendar">tag</span>
+                            접수번호 (범위)
+                        </label>
+                        <div class="search-input-row">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchReceptionFromInput" class="search-input" placeholder="시작 번호">
+                            </div>
+                            <span class="date-range-separator">~</span>
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchReceptionToInput" class="search-input" placeholder="종료 번호">
+                            </div>
+                            <button type="button" id="clearSearchReception" class="btn-clear-field">초기화</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="resetSearchBtn" class="btn-reset">전체 초기화</button>
+                <button type="button" id="applySearchBtn" class="btn-search-apply">검색</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 등록 결과 모달 -->
+    <div id="registrationResultModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>📋 등록 결과</h3>
+                <button type="button" class="modal-close" id="closeRegistrationModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="result-table-wrapper">
+                    <table class="result-table">
+                        <tbody id="resultTableBody">
+                            <!-- 등록된 데이터가 여기에 표시됩니다 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="closeResultBtn" class="btn-cancel">닫기</button>
+                <button type="button" id="exportResultBtn" class="btn-confirm">엑셀로 내보내기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 우편발송일자 입력 모달 -->
+    <div id="mailDateModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>📮 우편발송일자 입력</h3>
+                <button type="button" class="modal-close" id="closeMailDateModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="mailDateInfo" class="mail-date-info">선택한 0건의 우편발송일자를 입력하세요.</p>
+                <div class="form-field">
+                    <label for="mailDateInput">발송일자</label>
+                    <input type="date" id="mailDateInput" class="mail-date-input">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelMailDateBtn" class="btn-cancel">취소</button>
+                <button type="button" id="confirmMailDateBtn" class="btn-confirm">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 메시지 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script src="../bonghwaData.js"></script>
+    <!-- 공통 모듈 -->
+    <!-- DOMPurify for XSS prevention -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" integrity="sha384-cwS6YdhLI7XS60eoDiC+egV0qHp8zI+Cms46R0nbn8JrmoAzV9uFL60etMZhAnSu" crossorigin="anonymous"></script>
+    <script src="../shared/sanitize.js"></script>
+    <script src="../shared/constants.js"></script>
+    <script src="../shared/file-api.js"></script>
+    <script src="../shared/utils.js"></script>
+    <script src="../shared/toast.js"></script>
+    <script src="../shared/pagination.js"></script>
+    <script src="../shared/address.js"></script>
+    <script src="../shared/address-parser.js"></script>
+    <script src="../shared/search-filter.js"></script>
+    <script src="../shared/form-validator.js"></script>
+    <script src="../shared/theme.js"></script>
+    <script src="../shared/tooltip.js"></script>
+    <!-- Firebase SDK (compat 버전 - Electron 호환) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <!-- 네트워크 접근 제어 (Firebase 초기화 전에 로드) -->
+    <script src="../shared/logger.js"></script>
+    <script src="../shared/network-access.js"></script>
+    <!-- Firebase 스크립트 -->
+    <script src="../shared/firebase-config.js"></script>
+    <script src="../shared/firestore-db.js"></script>
+    <script src="../shared/sync-utils.js"></script>
+    <script src="water-script.js"></script>
+</body>
+
+</html>

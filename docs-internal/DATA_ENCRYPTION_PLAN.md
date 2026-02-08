@@ -1,0 +1,1083 @@
+# 데이터 암호화 구현 계획서
+
+> 작성일: 2026-02-04
+> 프로젝트: 시료접수대장 (Sample Log)
+> 버전: 1.0
+
+---
+
+## 목차
+
+1. [개요](#1-개요)
+2. [현재 시스템 구조](#2-현재-시스템-구조)
+3. [기술 스택](#3-기술-스택)
+4. [Firebase 데이터 암호화](#4-firebase-데이터-암호화)
+5. [로컬 백업 데이터 암호화](#5-로컬-백업-데이터-암호화)
+6. [키 관리 전략](#6-키-관리-전략)
+7. [구현 태스크 계획](#7-구현-태스크-계획)
+8. [코드 예시](#8-코드-예시)
+9. [보안 고려사항](#9-보안-고려사항)
+10. [롤백 계획](#10-롤백-계획)
+
+---
+
+## 1. 개요
+
+### 1.1 목적
+
+- Firebase Firestore에 저장되는 민감한 개인정보 보호
+- 로컬 백업 JSON 파일의 무단 열람 방지
+- 데이터 유출 시에도 정보 보호 가능한 구조 구축
+
+### 1.2 범위
+
+| 대상 | 암호화 범위 | 우선순위 |
+|------|------------|---------|
+| Firebase Firestore | 민감 필드 선택적 암호화 | Phase 1 |
+| 로컬 백업 파일 | 전체 데이터 암호화 | Phase 2 |
+| localStorage | 암호화 하지 않음 (캐시 용도) | - |
+
+### 1.3 민감 정보 정의
+
+```
+- 성명 (name)
+- 연락처 (phone)
+- 주소 (address)
+- 생년월일 (birthDate)
+- 법인번호 (corpNumber)
+```
+
+---
+
+## 2. 현재 시스템 구조
+
+### 2.1 데이터 흐름
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        현재 데이터 흐름                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [사용자 입력]                                                       │
+│       ↓                                                             │
+│  [sampleLogs 배열] ←──→ [localStorage] (캐시)                       │
+│       ↓                                                             │
+│  [Firebase Firestore] (Primary - 평문 저장)                         │
+│       ↓                                                             │
+│  [로컬 JSON 파일] (Backup - 평문 저장)                               │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 저장 위치별 현황
+
+| 저장 위치 | 파일/경로 | 현재 상태 | 접근 가능성 |
+|----------|----------|----------|------------|
+| Firebase | `samples/{type}/{year}/data` | 평문 | Firebase 콘솔 |
+| localStorage | `sampleLogs_{type}_{year}` | 평문 | 브라우저 개발자도구 |
+| 로컬 파일 | `auto-save-{type}-{year}.json` | 평문 | 파일 탐색기 |
+
+---
+
+## 3. 기술 스택
+
+### 3.1 암호화 라이브러리
+
+#### CryptoJS (권장)
+
+```
+라이브러리: crypto-js
+버전: 4.2.0
+CDN: https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js
+크기: ~70KB (minified)
+```
+
+**장점:**
+- 순수 JavaScript, 브라우저/Node.js 모두 지원
+- Electron과 웹 환경 동일 코드 사용 가능
+- AES-256 지원
+- 널리 사용되어 검증됨
+
+**지원 알고리즘:**
+- AES (128/192/256)
+- DES / Triple DES
+- SHA-1, SHA-256, SHA-512
+- HMAC
+- PBKDF2
+
+#### Web Crypto API (대안)
+
+```
+브라우저 내장 API
+별도 라이브러리 불필요
+```
+
+**장점:**
+- 네이티브 성능
+- 별도 의존성 없음
+
+**단점:**
+- 비동기 API (Promise 기반)
+- 코드 복잡도 증가
+
+### 3.2 선택: CryptoJS
+
+| 항목 | 선택 |
+|------|------|
+| 라이브러리 | CryptoJS 4.2.0 |
+| 알고리즘 | AES-256-CBC |
+| 키 유도 | PBKDF2 (100,000 iterations) |
+| 인코딩 | Base64 |
+
+---
+
+## 4. Firebase 데이터 암호화
+
+### 4.1 암호화 전략: 선택적 필드 암호화
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Firebase 저장 구조                                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  {                                                                  │
+│    "id": "soil-2026-001",           // 평문 (검색/정렬용)           │
+│    "receptionNumber": "2026-001",   // 평문 (검색용)                │
+│    "date": "2026-02-04",            // 평문 (검색/정렬용)           │
+│    "purpose": "논",                 // 평문 (필터용)                │
+│    "isCompleted": false,            // 평문 (필터용)                │
+│    "_encrypted": {                  // 암호화된 민감 정보           │
+│      "name": "U2FsdGVkX1...",                                       │
+│      "phone": "U2FsdGVkX1...",                                      │
+│      "address": "U2FsdGVkX1...",                                    │
+│      "birthDate": "U2FsdGVkX1..."                                   │
+│    }                                                                │
+│  }                                                                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 암호화 대상 필드
+
+| 필드명 | 암호화 | 이유 |
+|--------|--------|------|
+| id | ❌ | 문서 식별자 |
+| receptionNumber | ❌ | 검색 필요 |
+| date | ❌ | 정렬/검색 필요 |
+| purpose | ❌ | 필터 필요 |
+| name | ✅ | 개인정보 |
+| phone | ✅ | 개인정보 |
+| address | ✅ | 개인정보 |
+| birthDate | ✅ | 개인정보 |
+| corpNumber | ✅ | 법인정보 |
+| parcels | ✅ | 주소 포함 |
+| note | ⚠️ | 선택적 (내용에 따라) |
+
+### 4.3 데이터 흐름
+
+```
+[저장 시]
+sampleLog → 민감 필드 추출 → AES 암호화 → _encrypted 객체에 저장 → Firebase 업로드
+
+[로드 시]
+Firebase 다운로드 → _encrypted 복호화 → 원본 객체 복원 → sampleLogs에 저장
+```
+
+---
+
+## 5. 로컬 백업 데이터 암호화
+
+### 5.1 암호화 전략: 전체 파일 암호화
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  로컬 백업 저장 흐름                                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  sampleLogs (배열)                                                  │
+│       ↓                                                             │
+│  JSON.stringify() → 평문 JSON 문자열                                │
+│       ↓                                                             │
+│  AES.encrypt() → 암호화된 문자열 (Base64)                           │
+│       ↓                                                             │
+│  파일 저장: backup-{type}-{year}.enc                                │
+│                                                                     │
+│  파일 내용 예시:                                                    │
+│  U2FsdGVkX19abc123def456ghi789jkl012mno345pqr678stu901vwx234...    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 파일 형식 변경
+
+| 항목 | 현재 | 변경 후 |
+|------|------|--------|
+| 파일명 | `auto-save-{type}-{year}.json` | `backup-{type}-{year}.enc` |
+| 확장자 | `.json` | `.enc` |
+| 내용 | JSON (평문) | Base64 (암호화) |
+| 열람 | 텍스트 에디터로 가능 | 불가능 |
+
+### 5.3 복구 프로세스
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  복구 시나리오                                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. 사용자가 "백업에서 복구" 클릭                                    │
+│  2. 파일 선택 다이얼로그 (.enc 파일)                                 │
+│  3. 파일 읽기 → 암호화된 문자열                                      │
+│  4. 복호화 키 입력 (또는 자동)                                       │
+│  5. AES.decrypt() → 평문 JSON                                       │
+│  6. JSON.parse() → sampleLogs 배열                                  │
+│  7. 데이터 검증 (스키마 체크)                                        │
+│  8. localStorage에 저장                                             │
+│  9. (선택) Firebase에 업로드                                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6. 키 관리 전략
+
+### 6.1 옵션 비교
+
+| 방식 | 보안성 | 사용성 | 복구 | 이동성 | 권장 |
+|------|--------|--------|------|--------|------|
+| 하드코딩 | ❌ 낮음 | ✅ 좋음 | ✅ 항상 가능 | ✅ 좋음 | ❌ |
+| 환경 변수 | ⚠️ 중간 | ✅ 좋음 | ✅ 항상 가능 | ⚠️ 설정 필요 | ⚠️ |
+| 사용자 비밀번호 | ⚠️ 중간 | ⚠️ 입력 필요 | ⚠️ 기억 필요 | ✅ 좋음 | ⚠️ |
+| **키 파일** | ✅ 높음 | ✅ 좋음 | ⚠️ 파일 필요 | ⚠️ 파일 이동 | ✅ 권장 |
+| **비밀번호 + 키 파일** | ✅✅ 매우 높음 | ⚠️ 복잡 | ❌ 둘 다 필요 | ⚠️ | ✅✅ 최고 보안 |
+| Firebase UID 기반 | ⚠️ 중간 | ✅ 좋음 | ✅ 로그인 | ✅ 좋음 | ✅ Firebase용 |
+| Electron safeStorage | ✅ 높음 | ✅ 좋음 | ❌ PC 종속 | ❌ 불가 | ✅ Electron용 |
+
+### 6.2 키 파일 방식 (권장)
+
+#### 6.2.1 개념
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  키 파일 방식                                                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  암호화 키 = 키 파일 내용의 SHA-256 해시                             │
+│                                                                     │
+│  [키 파일] ──→ SHA-256 해시 ──→ 암호화 키 (256비트)                 │
+│                                                                     │
+│  예시: sample-log.key (32바이트 랜덤 데이터)                         │
+│        또는 사용자가 지정한 아무 파일 (이미지, 문서 등)               │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 6.2.2 키 파일의 장단점
+
+**장점:**
+
+| 항목 | 설명 |
+|------|------|
+| **높은 엔트로피** | 256비트 랜덤 키 (비밀번호보다 강력) |
+| **입력 불필요** | 앱 시작 시 비밀번호 입력 없음 |
+| **복사/백업 용이** | USB, 클라우드 등에 별도 보관 가능 |
+| **무차별 대입 불가** | 키 공간이 매우 큼 (2^256) |
+
+**단점:**
+
+| 항목 | 설명 |
+|------|------|
+| **파일 분실 위험** | 키 파일 없으면 복호화 불가 |
+| **파일 유출 위험** | 키 파일 노출 시 보안 무력화 |
+| **PC 이동 시 번거로움** | 키 파일도 함께 이동 필요 |
+| **웹 버전 제한** | 브라우저에서 로컬 파일 접근 제한 |
+
+#### 6.2.3 키 파일 유형
+
+| 유형 | 설명 | 보안성 |
+|------|------|--------|
+| **전용 키 파일** | 앱이 생성한 랜덤 바이너리 파일 (.key) | ✅ 최고 |
+| **임의 파일** | 사용자 지정 파일 (이미지, 문서 등) | ⚠️ 예측 가능성 |
+| **복합 키** | 비밀번호 + 키 파일 조합 | ✅✅ 최고 |
+
+#### 6.2.4 키 파일 저장 위치 옵션
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  키 파일 저장 위치                                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [옵션 1] 앱 데이터 폴더 (기본)                                      │
+│    위치: %APPDATA%/시료접수대장/sample-log.key                       │
+│    장점: 자동 로드, 사용자 조작 불필요                               │
+│    단점: 앱 삭제 시 함께 삭제될 수 있음                              │
+│                                                                     │
+│  [옵션 2] 사용자 지정 위치                                           │
+│    위치: USB, 외장하드, 클라우드 동기화 폴더 등                      │
+│    장점: 별도 보관으로 보안 강화                                     │
+│    단점: 앱 시작 시 경로 지정 필요                                   │
+│                                                                     │
+│  [옵션 3] USB 전용 (분리 보관)                                       │
+│    위치: USB 드라이브                                                │
+│    장점: 물리적 분리로 최고 보안                                     │
+│    단점: USB 연결 필요, 분실 위험                                    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 6.2.5 키 파일 구현 코드
+
+```javascript
+/**
+ * 키 파일 생성 (256비트 랜덤)
+ */
+async function generateKeyFile() {
+    // 32바이트 (256비트) 랜덤 데이터 생성
+    const keyData = crypto.getRandomValues(new Uint8Array(32));
+
+    // Base64로 인코딩하여 저장
+    const keyBase64 = btoa(String.fromCharCode(...keyData));
+
+    // 파일 저장 (Electron)
+    const result = await window.electronAPI.saveFileDialog({
+        title: '암호화 키 파일 저장',
+        defaultPath: 'sample-log.key',
+        filters: [{ name: 'Key File', extensions: ['key'] }]
+    });
+
+    if (result.filePath) {
+        await window.electronAPI.writeFile(result.filePath, keyBase64);
+        return result.filePath;
+    }
+    return null;
+}
+
+/**
+ * 키 파일에서 암호화 키 유도
+ */
+async function deriveKeyFromFile(keyFilePath) {
+    // 파일 읽기
+    const result = await window.electronAPI.readFile(keyFilePath);
+    if (!result.success) return null;
+
+    // SHA-256 해시로 256비트 키 생성
+    const hash = CryptoJS.SHA256(result.content);
+    return hash.toString();
+}
+
+/**
+ * 복합 키 생성 (비밀번호 + 키 파일)
+ */
+async function deriveCompositeKey(password, keyFilePath) {
+    // 키 파일 해시
+    const fileKey = await deriveKeyFromFile(keyFilePath);
+    if (!fileKey) return null;
+
+    // 비밀번호 + 키 파일 해시 결합
+    const combined = password + fileKey;
+
+    // PBKDF2로 최종 키 유도
+    return CryptoJS.PBKDF2(combined, 'sample-log-salt', {
+        keySize: 256 / 32,
+        iterations: 100000
+    }).toString();
+}
+```
+
+### 6.3 권장 키 관리 구조
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  권장: 키 파일 + 선택적 비밀번호                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [기본 모드] 키 파일만 사용                                          │
+│    - 첫 실행 시 키 파일 자동 생성 (앱 데이터 폴더)                   │
+│    - 사용자 입력 없이 자동 암호화/복호화                             │
+│    - 키 파일 백업 안내 표시                                          │
+│                                                                     │
+│  [강화 모드] 키 파일 + 비밀번호 (선택)                               │
+│    - 설정에서 "추가 비밀번호" 활성화                                 │
+│    - 앱 시작 시 비밀번호 입력 필요                                   │
+│    - 키 파일 유출 시에도 보호                                        │
+│                                                                     │
+│  [복구 모드] 키 파일 재지정                                          │
+│    - 키 파일 경로 변경 가능                                          │
+│    - 다른 PC로 이동 시 키 파일 지정                                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  키 관리 구조 (상세)                                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [로컬 백업 암호화 키] ← 키 파일 방식 (권장)                         │
+│    - 생성: 앱 첫 실행 시 자동 생성 (32바이트 랜덤)                   │
+│    - 저장: 앱 데이터 폴더 (sample-log.key)                           │
+│    - 유도: SHA-256 해시 → 256비트 키                                │
+│    - 특징: 입력 없이 자동 동작, 키 파일 백업 필요                    │
+│                                                                     │
+│  [Firebase 암호화 키] ← UID 기반 (기존 유지)                         │
+│    - 생성: Firebase User UID + App Secret                           │
+│    - 저장: 메모리 (세션 동안만 유지)                                 │
+│    - 특징: 사용자별 고유 키, 로그인 필요                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.4 키 파일 관리 UI
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  설정 > 보안                                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  🔐 암호화 설정                                                      │
+│  ────────────────────────────────────────────────                   │
+│                                                                     │
+│  키 파일 위치:                                                       │
+│  ┌──────────────────────────────────────────┐ ┌────────┐            │
+│  │ C:\Users\xxx\AppData\sample-log.key     │ │ 변경...│            │
+│  └──────────────────────────────────────────┘ └────────┘            │
+│                                                                     │
+│  ☑ 백업 암호화 활성화                                               │
+│  ☐ 추가 비밀번호 사용 (선택)                                        │
+│                                                                     │
+│  ┌────────────────┐  ┌────────────────┐                             │
+│  │ 🔑 키 파일 백업 │  │ 🔄 키 파일 재생성│                            │
+│  └────────────────┘  └────────────────┘                             │
+│                                                                     │
+│  ⚠️ 키 파일을 분실하면 백업 데이터를 복구할 수 없습니다.             │
+│     USB나 클라우드에 키 파일을 백업해 두세요.                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.5 키 유도 함수 (PBKDF2)
+
+```javascript
+// 비밀번호로부터 암호화 키 유도 (비밀번호 방식 사용 시)
+function deriveKeyFromPassword(password, salt) {
+    return CryptoJS.PBKDF2(password, salt, {
+        keySize: 256 / 32,      // 256비트 키
+        iterations: 100000,      // 반복 횟수 (보안성)
+        hasher: CryptoJS.algo.SHA256
+    });
+}
+
+// 키 파일에서 암호화 키 유도 (키 파일 방식 사용 시)
+function deriveKeyFromFile(fileContent) {
+    return CryptoJS.SHA256(fileContent).toString();
+}
+```
+
+### 6.6 키 파일 생명주기
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  키 파일 생명주기                                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [1. 생성]                                                          │
+│    앱 첫 실행 → 키 파일 존재 확인 → 없으면 자동 생성                 │
+│    → 백업 안내 팝업 표시                                             │
+│                                                                     │
+│  [2. 사용]                                                          │
+│    앱 시작 → 키 파일 로드 → 메모리에 키 유지                         │
+│    → 암호화/복호화 시 사용                                           │
+│                                                                     │
+│  [3. 백업]                                                          │
+│    사용자 요청 시 → 키 파일을 다른 위치에 복사                       │
+│    → USB, 클라우드 등에 보관 권장                                    │
+│                                                                     │
+│  [4. 복구]                                                          │
+│    새 PC 또는 앱 재설치 → 키 파일 위치 지정                          │
+│    → 기존 백업 데이터 복호화 가능                                    │
+│                                                                     │
+│  [5. 재생성]                                                        │
+│    사용자 요청 시 → 새 키 파일 생성                                  │
+│    ⚠️ 기존 백업 데이터는 복호화 불가 (경고 표시)                     │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.7 기존 데이터 마이그레이션 전략
+
+암호화 적용 시 기존 평문 데이터의 처리 방법입니다.
+
+#### 6.7.1 저장소별 마이그레이션 정책
+
+| 저장소 | 마이그레이션 | 설명 |
+|--------|-------------|------|
+| **localStorage** | 불필요 | 캐시 목적, 평문 유지 |
+| **Firebase** | 점진적 | 수정 시 암호화 적용 |
+| **로컬 백업 (.json)** | 자동 | .enc로 자동 변환 |
+
+#### 6.7.2 localStorage (변경 없음)
+
+```
+현재: 평문 JSON 저장
+변경: 없음 (캐시 목적)
+
+이유:
+- localStorage는 앱 내 임시 캐시 용도
+- 실제 영구 저장은 Firebase와 로컬 백업이 담당
+- 암호화하면 성능만 저하됨
+```
+
+#### 6.7.3 Firebase (점진적 마이그레이션)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Firebase 점진적 마이그레이션                                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [읽기 시]                                                          │
+│    데이터 로드 → 암호화 여부 판별 → 복호화 or 평문 그대로            │
+│                                                                     │
+│  [쓰기 시]                                                          │
+│    데이터 수정 → 민감 필드 암호화 → 저장                            │
+│                                                                     │
+│  결과: 사용자가 수정한 레코드만 자연스럽게 암호화됨                  │
+│        기존 레코드는 읽기 가능 상태 유지                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**암호화 여부 판별 로직:**
+```javascript
+function isEncrypted(fieldValue) {
+  // 암호화된 데이터는 항상 "ENC:" 접두사로 시작
+  return typeof fieldValue === 'string' && fieldValue.startsWith('ENC:');
+}
+
+function readField(fieldValue, key) {
+  if (isEncrypted(fieldValue)) {
+    return decryptFromFirebase(fieldValue.substring(4), key);
+  }
+  return fieldValue;  // 평문 그대로 반환
+}
+```
+
+#### 6.7.4 로컬 백업 파일 (자동 마이그레이션)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  로컬 백업 자동 마이그레이션                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  앱 시작 시:                                                        │
+│    1. .json 파일 존재 확인                                          │
+│    2. 존재하면:                                                     │
+│       - 내용 읽기                                                   │
+│       - 암호화하여 .enc 파일로 저장                                 │
+│       - 원본 .json → .json.backup 으로 이름 변경 (삭제 안 함)       │
+│    3. 이후 자동 저장은 .enc 파일에만 수행                           │
+│                                                                     │
+│  복구 필요 시:                                                      │
+│    - .enc 파일 우선 사용 (복호화)                                   │
+│    - .enc 없으면 .json.backup 사용 (평문)                           │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**마이그레이션 코드 예시:**
+```javascript
+async function migrateJsonToEncrypted(basePath, year) {
+  const jsonPath = `${basePath}/auto-save-soil-${year}.json`;
+  const encPath = `${basePath}/auto-save-soil-${year}.enc`;
+  const backupPath = `${basePath}/auto-save-soil-${year}.json.backup`;
+
+  // .json 파일이 존재하고 .enc 파일이 없는 경우만 마이그레이션
+  if (await fileExists(jsonPath) && !await fileExists(encPath)) {
+    const plainData = await readFile(jsonPath);
+    const encryptedData = encryptForBackup(plainData);
+
+    await writeFile(encPath, encryptedData);
+    await renameFile(jsonPath, backupPath);  // 원본 보존
+
+    console.log(`마이그레이션 완료: ${jsonPath} → ${encPath}`);
+  }
+}
+```
+
+#### 6.7.5 호환성 유지 기간
+
+```
+Phase 1 (출시 후 6개월):
+  - 읽기: .enc (암호화) + .json (평문) 모두 지원
+  - 쓰기: .enc (암호화)만 사용
+  - .json 파일은 .backup으로 보존
+
+Phase 2 (6개월 후):
+  - 읽기: .enc 우선, .backup 폴백
+  - 앱 설정에서 "레거시 파일 정리" 옵션 제공
+
+Phase 3 (1년 후):
+  - .backup 파일 삭제 옵션 활성화
+  - 사용자 선택에 따라 정리
+```
+
+---
+
+## 7. 구현 태스크 계획
+
+### 7.1 Phase 1: 로컬 백업 암호화 (우선 구현)
+
+| # | 태스크 | 예상 시간 | 의존성 | 파일 |
+|---|--------|----------|--------|------|
+| 1.1 | CryptoJS 라이브러리 추가 | 30분 | - | `index.html` (각 페이지) |
+| 1.2 | 암호화 유틸리티 모듈 생성 | 2시간 | 1.1 | `src/shared/crypto-utils.js` |
+| 1.3 | Electron safeStorage 키 관리 | 2시간 | - | `src/index.js`, `src/preload.js` |
+| 1.4 | performAutoSave() 암호화 적용 | 1시간 | 1.2 | `src/shared/utils.js` |
+| 1.5 | loadFromAutoSaveFile() 복호화 적용 | 1시간 | 1.2 | `src/shared/utils.js` |
+| 1.6 | "백업에서 복구" UI 추가 | 2시간 | 1.5 | 각 페이지 HTML/JS |
+| 1.7 | 기존 .json → .enc 마이그레이션 | 1시간 | 1.4 | `src/shared/utils.js` |
+| 1.8 | 테스트 및 버그 수정 | 2시간 | 1.1~1.7 | - |
+
+**Phase 1 총 예상 시간: 12시간**
+
+### 7.2 Phase 2: Firebase 암호화
+
+| # | 태스크 | 예상 시간 | 의존성 | 파일 |
+|---|--------|----------|--------|------|
+| 2.1 | Firebase 암호화 키 생성 로직 | 1시간 | 1.2 | `src/shared/crypto-utils.js` |
+| 2.2 | encryptForFirebase() 함수 | 2시간 | 2.1 | `src/shared/crypto-utils.js` |
+| 2.3 | decryptFromFirebase() 함수 | 2시간 | 2.1 | `src/shared/crypto-utils.js` |
+| 2.4 | firestore-db.js 저장 로직 수정 | 2시간 | 2.2 | `src/shared/firestore-db.js` |
+| 2.5 | firestore-db.js 로드 로직 수정 | 2시간 | 2.3 | `src/shared/firestore-db.js` |
+| 2.6 | 기존 데이터 마이그레이션 스크립트 | 3시간 | 2.2, 2.3 | `scripts/migrate-firebase.js` |
+| 2.7 | 테스트 및 버그 수정 | 3시간 | 2.1~2.6 | - |
+
+**Phase 2 총 예상 시간: 15시간**
+
+### 7.3 Phase 3: 고급 기능
+
+| # | 태스크 | 예상 시간 | 의존성 | 파일 |
+|---|--------|----------|--------|------|
+| 3.1 | 비밀번호 변경 기능 | 2시간 | 1.3 | 설정 페이지 |
+| 3.2 | 키 복구 힌트 기능 | 1시간 | 3.1 | 설정 페이지 |
+| 3.3 | 암호화 상태 표시 UI | 1시간 | 1.4, 2.4 | 각 페이지 |
+| 3.4 | 암호화 설정 옵션 | 2시간 | - | 설정 페이지 |
+
+**Phase 3 총 예상 시간: 6시간**
+
+### 7.4 전체 타임라인
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  구현 타임라인                                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Week 1: Phase 1 (로컬 백업 암호화)                                 │
+│    ├── Day 1-2: 1.1 ~ 1.3 (라이브러리 & 키 관리)                    │
+│    ├── Day 3-4: 1.4 ~ 1.6 (암호화/복호화 적용)                      │
+│    └── Day 5: 1.7 ~ 1.8 (마이그레이션 & 테스트)                     │
+│                                                                     │
+│  Week 2: Phase 2 (Firebase 암호화)                                  │
+│    ├── Day 1-2: 2.1 ~ 2.3 (암호화 함수)                             │
+│    ├── Day 3-4: 2.4 ~ 2.5 (Firestore 적용)                          │
+│    └── Day 5: 2.6 ~ 2.7 (마이그레이션 & 테스트)                     │
+│                                                                     │
+│  Week 3: Phase 3 + 최종 검증                                        │
+│    ├── Day 1-2: 3.1 ~ 3.4 (고급 기능)                               │
+│    └── Day 3-5: 전체 통합 테스트 & 배포                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 8. 코드 예시
+
+### 8.1 crypto-utils.js (신규 생성)
+
+```javascript
+/**
+ * 암호화 유틸리티 모듈
+ * @module crypto-utils
+ */
+
+// CryptoJS 라이브러리 필요
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
+const CryptoUtils = (function() {
+    'use strict';
+
+    // 민감 필드 정의
+    const SENSITIVE_FIELDS = ['name', 'phone', 'address', 'birthDate', 'corpNumber', 'parcels'];
+
+    // Salt (앱 고유값)
+    const APP_SALT = 'sample-log-electron-2026';
+
+    /**
+     * 비밀번호로부터 암호화 키 유도
+     * @param {string} password - 사용자 비밀번호
+     * @param {string} [salt] - Salt 값
+     * @returns {CryptoJS.lib.WordArray} 암호화 키
+     */
+    function deriveKey(password, salt = APP_SALT) {
+        return CryptoJS.PBKDF2(password, salt, {
+            keySize: 256 / 32,
+            iterations: 100000,
+            hasher: CryptoJS.algo.SHA256
+        });
+    }
+
+    /**
+     * 문자열 암호화
+     * @param {string} plainText - 평문
+     * @param {string} key - 암호화 키 (또는 비밀번호)
+     * @returns {string} 암호화된 문자열 (Base64)
+     */
+    function encrypt(plainText, key) {
+        if (!plainText) return plainText;
+        try {
+            return CryptoJS.AES.encrypt(plainText, key).toString();
+        } catch (error) {
+            console.error('암호화 실패:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 문자열 복호화
+     * @param {string} cipherText - 암호화된 문자열
+     * @param {string} key - 복호화 키 (또는 비밀번호)
+     * @returns {string} 평문
+     */
+    function decrypt(cipherText, key) {
+        if (!cipherText) return cipherText;
+        try {
+            const bytes = CryptoJS.AES.decrypt(cipherText, key);
+            return bytes.toString(CryptoJS.enc.Utf8);
+        } catch (error) {
+            console.error('복호화 실패:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 전체 데이터 암호화 (로컬 백업용)
+     * @param {Array} data - 시료 데이터 배열
+     * @param {string} key - 암호화 키
+     * @returns {string} 암호화된 전체 데이터
+     */
+    function encryptBackup(data, key) {
+        const jsonString = JSON.stringify({
+            version: '2.0-encrypted',
+            exportDate: new Date().toISOString(),
+            totalRecords: data.length,
+            data: data
+        });
+        return encrypt(jsonString, key);
+    }
+
+    /**
+     * 전체 데이터 복호화 (로컬 백업용)
+     * @param {string} encryptedData - 암호화된 데이터
+     * @param {string} key - 복호화 키
+     * @returns {Object} 복호화된 데이터 객체
+     */
+    function decryptBackup(encryptedData, key) {
+        const decrypted = decrypt(encryptedData, key);
+        if (!decrypted) return null;
+        try {
+            return JSON.parse(decrypted);
+        } catch (error) {
+            console.error('JSON 파싱 실패:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 개별 레코드의 민감 필드 암호화 (Firebase용)
+     * @param {Object} record - 시료 레코드
+     * @param {string} key - 암호화 키
+     * @returns {Object} 민감 필드가 암호화된 레코드
+     */
+    function encryptRecord(record, key) {
+        const encrypted = { ...record, _encrypted: {} };
+
+        SENSITIVE_FIELDS.forEach(field => {
+            if (record[field] !== undefined) {
+                if (typeof record[field] === 'object') {
+                    encrypted._encrypted[field] = encrypt(JSON.stringify(record[field]), key);
+                } else {
+                    encrypted._encrypted[field] = encrypt(String(record[field]), key);
+                }
+                delete encrypted[field];
+            }
+        });
+
+        return encrypted;
+    }
+
+    /**
+     * 개별 레코드의 민감 필드 복호화 (Firebase용)
+     * @param {Object} record - 암호화된 시료 레코드
+     * @param {string} key - 복호화 키
+     * @returns {Object} 복호화된 레코드
+     */
+    function decryptRecord(record, key) {
+        if (!record._encrypted) return record;
+
+        const decrypted = { ...record };
+        delete decrypted._encrypted;
+
+        Object.keys(record._encrypted).forEach(field => {
+            const decryptedValue = decrypt(record._encrypted[field], key);
+            if (decryptedValue) {
+                try {
+                    decrypted[field] = JSON.parse(decryptedValue);
+                } catch {
+                    decrypted[field] = decryptedValue;
+                }
+            }
+        });
+
+        return decrypted;
+    }
+
+    /**
+     * 데이터 배열 전체 암호화 (Firebase용)
+     * @param {Array} records - 시료 데이터 배열
+     * @param {string} key - 암호화 키
+     * @returns {Array} 암호화된 데이터 배열
+     */
+    function encryptRecords(records, key) {
+        return records.map(record => encryptRecord(record, key));
+    }
+
+    /**
+     * 데이터 배열 전체 복호화 (Firebase용)
+     * @param {Array} records - 암호화된 데이터 배열
+     * @param {string} key - 복호화 키
+     * @returns {Array} 복호화된 데이터 배열
+     */
+    function decryptRecords(records, key) {
+        return records.map(record => decryptRecord(record, key));
+    }
+
+    // Public API
+    return {
+        deriveKey,
+        encrypt,
+        decrypt,
+        encryptBackup,
+        decryptBackup,
+        encryptRecord,
+        decryptRecord,
+        encryptRecords,
+        decryptRecords,
+        SENSITIVE_FIELDS
+    };
+})();
+
+// 전역 노출
+if (typeof window !== 'undefined') {
+    window.CryptoUtils = CryptoUtils;
+}
+
+// Node.js 환경
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CryptoUtils;
+}
+```
+
+### 8.2 utils.js performAutoSave() 수정 예시
+
+```javascript
+/**
+ * 자동 저장 수행 (암호화 버전)
+ */
+async function performAutoSave(options) {
+    const { FileAPI, moduleKey, data, webFileHandle, log = console.log } = options;
+    const enabledKey = `${moduleKey}AutoSaveEnabled`;
+
+    if (localStorage.getItem(enabledKey) !== 'true') return false;
+
+    // 암호화 키 가져오기
+    const encryptionKey = await getEncryptionKey();
+
+    // 데이터 암호화
+    const encryptedContent = window.CryptoUtils.encryptBackup(data, encryptionKey);
+
+    if (!encryptedContent) {
+        log('❌ 백업 암호화 실패');
+        return false;
+    }
+
+    // Electron 환경
+    if (window.isElectron && FileAPI.autoSavePath) {
+        try {
+            // 파일명 변경: .json → .enc
+            const encPath = FileAPI.autoSavePath.replace('.json', '.enc');
+            const result = await window.electronAPI.writeFile(encPath, encryptedContent);
+            if (result.success) {
+                log('🔐 암호화 백업 저장 완료:', encPath);
+                return true;
+            }
+        } catch (error) {
+            console.error('백업 저장 실패:', error);
+        }
+    }
+
+    // Web 환경 (File System Access API)
+    if (webFileHandle) {
+        try {
+            const writable = await webFileHandle.createWritable();
+            await writable.write(encryptedContent);
+            await writable.close();
+            log('🔐 암호화 백업 저장 완료 (Web)');
+            return true;
+        } catch (error) {
+            console.error('웹 백업 저장 실패:', error);
+        }
+    }
+
+    return false;
+}
+```
+
+### 8.3 loadFromAutoSaveFile() 수정 예시
+
+```javascript
+/**
+ * 자동 저장 파일에서 로드 (복호화 버전)
+ */
+async function loadFromAutoSaveFile(options) {
+    const { FileAPI, moduleKey, log = console.log } = options;
+
+    // Electron 환경
+    if (window.isElectron && FileAPI.autoSavePath) {
+        try {
+            // .enc 파일 먼저 시도
+            const encPath = FileAPI.autoSavePath.replace('.json', '.enc');
+            let result = await window.electronAPI.readFile(encPath);
+
+            if (result.success && result.content) {
+                // 암호화 키 가져오기
+                const encryptionKey = await getEncryptionKey();
+
+                // 복호화
+                const decrypted = window.CryptoUtils.decryptBackup(result.content, encryptionKey);
+
+                if (decrypted && decrypted.data) {
+                    log('🔓 암호화 백업에서 복원:', decrypted.data.length, '건');
+                    return decrypted.data;
+                }
+            }
+
+            // 기존 .json 파일 폴백 (마이그레이션 전)
+            result = await window.electronAPI.readFile(FileAPI.autoSavePath);
+            if (result.success && result.content) {
+                const data = JSON.parse(result.content);
+                log('📂 기존 백업에서 복원:', data.data?.length || data.length, '건');
+                return data.data || data;
+            }
+        } catch (error) {
+            console.error('백업 로드 실패:', error);
+        }
+    }
+
+    return null;
+}
+```
+
+---
+
+## 9. 보안 고려사항
+
+### 9.1 Do's (권장)
+
+- ✅ PBKDF2로 비밀번호에서 키 유도 (iterations ≥ 100,000)
+- ✅ 암호화 키를 메모리에만 유지 (localStorage 저장 금지)
+- ✅ Electron safeStorage 사용 (OS 키체인 활용)
+- ✅ 복호화 실패 시 적절한 에러 핸들링
+- ✅ 마이그레이션 전 기존 데이터 백업
+
+### 9.2 Don'ts (금지)
+
+- ❌ 암호화 키 하드코딩
+- ❌ 암호화 키를 localStorage/sessionStorage에 저장
+- ❌ 콘솔에 암호화 키 로깅
+- ❌ 약한 비밀번호 허용 (최소 8자 이상 권장)
+- ❌ 동일한 키로 무한정 데이터 암호화 (주기적 키 변경 권장)
+
+### 9.3 위험 요소 및 대응
+
+| 위험 | 영향 | 대응 |
+|------|------|------|
+| 키 분실 | 데이터 복구 불가 | 키 힌트 기능, 복구 코드 제공 |
+| 역공학 | 앱 내장 키 노출 | 사용자 비밀번호 기반 키 사용 |
+| 메모리 덤프 | 런타임 키 노출 | 민감 정보 사용 후 즉시 제거 |
+| 버전 호환성 | 암호화 포맷 변경 시 | 버전 필드로 마이그레이션 지원 |
+
+---
+
+## 10. 롤백 계획
+
+### 10.1 롤백 시나리오
+
+```
+1. 암호화 기능에 심각한 버그 발생
+2. 대량의 데이터 복호화 실패
+3. 성능 저하로 사용 불가
+```
+
+### 10.2 롤백 절차
+
+```
+1. 암호화 기능 비활성화 (설정 플래그)
+2. 기존 평문 백업 파일로 복원
+3. Firebase 데이터는 평문 모드로 전환
+4. 버그 수정 후 재배포
+```
+
+### 10.3 데이터 보존
+
+```
+- 마이그레이션 시 기존 .json 파일 삭제하지 않음
+- 암호화 실패 시 평문 저장 폴백
+- 복호화 실패 시 원본 데이터 유지
+```
+
+---
+
+## 부록
+
+### A. 참고 자료
+
+- [CryptoJS Documentation](https://cryptojs.gitbook.io/docs/)
+- [Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage)
+- [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
+- [OWASP Cryptographic Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
+
+### B. 체크리스트
+
+#### Phase 1 완료 체크리스트
+
+- [ ] CryptoJS 라이브러리 추가됨
+- [ ] crypto-utils.js 생성됨
+- [ ] Electron safeStorage 연동됨
+- [ ] performAutoSave() 암호화 적용됨
+- [ ] loadFromAutoSaveFile() 복호화 적용됨
+- [ ] "백업에서 복구" UI 추가됨
+- [ ] 기존 .json → .enc 마이그레이션 완료
+- [ ] 모든 시료 타입 (5개) 테스트 완료
+
+#### Phase 2 완료 체크리스트
+
+- [ ] Firebase 암호화 키 생성 로직 구현됨
+- [ ] encryptForFirebase() 함수 구현됨
+- [ ] decryptFromFirebase() 함수 구현됨
+- [ ] firestore-db.js 저장/로드 수정됨
+- [ ] 기존 Firebase 데이터 마이그레이션 완료
+- [ ] 모든 시료 타입 Firebase 테스트 완료
+
+---
+
+*문서 끝*

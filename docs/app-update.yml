@@ -1,0 +1,4 @@
+provider: github
+owner: bluesky78060
+repo: sample-log-electron
+updaterCacheDirName: sample-log-updater

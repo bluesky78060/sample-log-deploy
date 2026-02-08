@@ -1,0 +1,874 @@
+/* ========================================
+   토양 시료 전용 스타일
+   ======================================== */
+
+/* 토양 테마 색상 */
+:root {
+    --soil-primary: #22C55E;
+    --soil-primary-hover: #16A34A;
+    --soil-primary-light: #BBF7D0;
+    --soil-primary-dark: #15803D;
+    --soil-gradient: linear-gradient(135deg, #22C55E, #16A34A);
+}
+
+/* 네비게이션 바 토양 테마 */
+.soil-navbar {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-bottom: 2px solid var(--soil-primary-light);
+}
+
+.soil-navbar .brand-icon {
+    font-size: 1.5rem;
+}
+
+.soil-navbar .brand-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--soil-primary-dark);
+    margin-left: 0.25rem;
+}
+
+/* 뒤로가기 버튼 */
+.back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: white;
+    color: var(--soil-primary-dark);
+    text-decoration: none;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    border: 1px solid var(--soil-primary-light);
+    transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+    background: var(--soil-primary);
+    color: white;
+    border-color: var(--soil-primary);
+}
+
+/* 네비게이션 버튼 활성화 */
+.soil-navbar .nav-btn.active {
+    background: var(--soil-gradient);
+}
+
+/* 폼 카드 헤더 토양 테마 */
+.soil-navbar ~ .main-content .form-card .card-header {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-bottom: 1px solid var(--soil-primary-light);
+}
+
+.soil-navbar ~ .main-content .form-card .card-header h3 {
+    color: var(--soil-primary-dark);
+}
+
+/* 버튼 토양 테마 */
+.soil-navbar ~ .main-content .btn-add-small,
+.soil-navbar ~ .main-content .btn-add-parcel-empty,
+.soil-navbar ~ .main-content .btn-add-row {
+    background: var(--soil-gradient);
+}
+
+.soil-navbar ~ .main-content .btn-add-small:hover,
+.soil-navbar ~ .main-content .btn-add-parcel-empty:hover,
+.soil-navbar ~ .main-content .btn-add-row:hover {
+    background: linear-gradient(135deg, #16A34A, #15803D);
+}
+
+/* 확인 버튼 토양 테마 */
+.soil-navbar ~ .main-content .btn-confirm,
+.soil-navbar ~ .main-content .btn-search-apply {
+    background: var(--soil-gradient);
+}
+
+.soil-navbar ~ .main-content .btn-confirm:hover,
+.soil-navbar ~ .main-content .btn-search-apply:hover {
+    background: linear-gradient(135deg, #16A34A, #15803D);
+}
+
+/* 액션 버튼 토양 테마 */
+.soil-navbar .action-btn-icon.submit {
+    background: var(--soil-gradient);
+}
+
+.soil-navbar .action-btn-icon.submit:hover {
+    background: linear-gradient(135deg, #16A34A, #15803D);
+}
+
+/* 검색 버튼 토양 테마 */
+.soil-navbar ~ .main-content .btn-search {
+    background: var(--soil-gradient);
+}
+
+.soil-navbar ~ .main-content .btn-search:hover {
+    background: linear-gradient(135deg, #16A34A, #15803D);
+}
+
+/* 수령 방법 선택 버튼 토양 테마 */
+.soil-navbar ~ .main-content .reception-method-btn.selected {
+    background: var(--soil-gradient);
+    border-color: var(--soil-primary);
+}
+
+/* 체크박스 토양 테마 */
+.soil-navbar ~ .main-content input[type="checkbox"]:checked {
+    background: var(--soil-primary);
+    border-color: var(--soil-primary);
+}
+
+/* 토글 스위치 토양 테마 */
+.soil-navbar .autosave-toggle input:checked + .toggle-track {
+    background: var(--soil-gradient);
+}
+
+/* 통계 카드 토양 테마 */
+.soil-navbar ~ .main-content .stat-card.total {
+    border-left-color: var(--soil-primary);
+}
+
+/* 목록 뷰 헤더 */
+.soil-navbar ~ .main-content .view-header-top h2 {
+    color: var(--soil-primary-dark);
+}
+
+/* 토스트 성공 토양 테마 */
+.soil-navbar ~ .main-content .toast.success,
+.toast.success {
+    background: var(--soil-gradient);
+}
+
+/* 필지 카드 토양 테마 */
+.soil-navbar ~ .main-content .parcel-card {
+    border-left: 3px solid var(--soil-primary);
+}
+
+.soil-navbar ~ .main-content .parcel-card:hover {
+    border-left-color: var(--soil-primary-dark);
+}
+
+/* 선택된 작물 태그 토양 테마 */
+.soil-navbar ~ .main-content .crop-tag {
+    background: var(--soil-primary-light);
+    color: var(--soil-primary-dark);
+}
+
+/* 폼 필드 포커스 토양 테마 */
+.soil-navbar ~ .main-content input:focus,
+.soil-navbar ~ .main-content select:focus,
+.soil-navbar ~ .main-content textarea:focus {
+    border-color: var(--soil-primary);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+/* 테이블 행 구분선 */
+.soil-navbar ~ .main-content .data-table tbody tr {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* 테이블 행 선택 토양 테마 */
+.soil-navbar ~ .main-content .data-table tbody tr:hover {
+    background: rgba(34, 197, 94, 0.05);
+}
+
+.soil-navbar ~ .main-content .data-table tbody tr.selected {
+    background: rgba(34, 197, 94, 0.1);
+}
+
+/* 진행 바 토양 테마 */
+.soil-navbar ~ .main-content .progress-bar {
+    background: var(--soil-gradient);
+}
+
+/* 링크 토양 테마 */
+.soil-navbar ~ .main-content a {
+    color: var(--soil-primary);
+}
+
+.soil-navbar ~ .main-content a:hover {
+    color: var(--soil-primary-dark);
+}
+
+/* 필지 정보 카드 내부 스크롤 */
+.soil-navbar ~ .main-content .parcels-list {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* 필지 목록 스크롤바 스타일 */
+.soil-navbar ~ .main-content .parcels-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.soil-navbar ~ .main-content .parcels-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.soil-navbar ~ .main-content .parcels-list::-webkit-scrollbar-thumb {
+    background: var(--soil-primary-light);
+    border-radius: 3px;
+}
+
+.soil-navbar ~ .main-content .parcels-list::-webkit-scrollbar-thumb:hover {
+    background: var(--soil-primary);
+}
+
+/* 필지 요약과 작물추가 버튼 간격 축소 */
+.soil-navbar ~ .main-content .parcel-summary {
+    margin: 0;
+    padding: 0.15rem 0.4rem;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+}
+
+.soil-navbar ~ .main-content .btn-add-crop-area {
+    margin: 0;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+}
+
+/* ========================================
+   년도 선택 드롭다운 스타일
+   ======================================== */
+
+.year-select-wrapper {
+    margin-left: auto;
+    margin-right: 0.75rem;
+}
+
+/* 연도 선택 드롭다운 - ID 선택자로 최우선 적용 */
+select#yearSelect.year-select,
+select#listYearSelect.list-year-select {
+    background: white !important;
+    color: var(--soil-primary-dark) !important;
+    border: 2px solid var(--soil-primary) !important;
+    padding: 0.4rem 0.8rem !important;
+    border-radius: 6px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2322C55E' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px 12px !important;
+    padding-right: 1.8rem !important;
+    transition: all 0.2s ease !important;
+}
+
+select#listYearSelect.list-year-select {
+    margin-left: 0.75rem !important;
+}
+
+/* 목적(용도) 필터 드롭다운 - ID 선택자로 최우선 적용 */
+select#purposeFilter.purpose-filter {
+    background: white !important;
+    color: var(--soil-primary-dark) !important;
+    border: 2px solid var(--soil-primary) !important;
+    padding: 0.4rem 0.8rem !important;
+    border-radius: 6px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2322C55E' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px 12px !important;
+    padding-right: 1.8rem !important;
+    transition: all 0.2s ease !important;
+    margin-left: 0.5rem !important;
+}
+
+/* 시스템 기본 화살표 완전 제거 (IE/Edge) */
+select#purposeFilter.purpose-filter::-ms-expand {
+    display: none !important;
+}
+
+select#purposeFilter.purpose-filter:hover {
+    background: var(--soil-primary-light) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+select#purposeFilter.purpose-filter:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+select#purposeFilter.purpose-filter option {
+    background: white !important;
+    color: var(--soil-primary-dark) !important;
+    font-weight: 500 !important;
+}
+
+select#purposeFilter.purpose-filter.has-filter {
+    background-color: var(--soil-primary) !important;
+    color: white !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px 12px !important;
+}
+
+select#yearSelect.year-select:hover,
+select#listYearSelect.list-year-select:hover {
+    background: var(--soil-primary-light) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+select#yearSelect.year-select:focus,
+select#listYearSelect.list-year-select:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+select#yearSelect.year-select option,
+select#listYearSelect.list-year-select option {
+    background: white !important;
+    color: var(--soil-primary-dark) !important;
+    font-weight: 500 !important;
+}
+
+/* ========================================
+   다크 모드 스타일
+   ======================================== */
+
+/* 다크 모드 네비게이션 바 */
+[data-theme="dark"] .soil-navbar {
+    background: linear-gradient(135deg, #14532d 0%, #052e16 100%);
+    border-bottom-color: rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .soil-navbar .brand-text {
+    color: #86efac;
+}
+
+[data-theme="dark"] .back-btn {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .back-btn:hover {
+    background: var(--soil-primary);
+    color: white;
+}
+
+/* 다크 모드 카드 헤더 */
+[data-theme="dark"] .soil-navbar ~ .main-content .form-card .card-header {
+    background: linear-gradient(135deg, rgba(20, 83, 45, 0.95) 0%, rgba(5, 46, 22, 0.95) 100%);
+    border-bottom-color: rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="dark"] .soil-navbar ~ .main-content .form-card .card-header h3 {
+    color: #86efac;
+}
+
+/* 다크 모드 년도 선택 - ID 선택자로 최우선 적용 */
+[data-theme="dark"] select#yearSelect.year-select,
+[data-theme="dark"] select#listYearSelect.list-year-select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: rgba(34, 197, 94, 0.15) !important;
+    color: #86efac !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386efac' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px 12px !important;
+}
+
+[data-theme="dark"] select#yearSelect.year-select:hover,
+[data-theme="dark"] select#listYearSelect.list-year-select:hover {
+    background-color: rgba(34, 197, 94, 0.25) !important;
+}
+
+[data-theme="dark"] select#yearSelect.year-select:focus,
+[data-theme="dark"] select#listYearSelect.list-year-select:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+[data-theme="dark"] select#yearSelect.year-select option,
+[data-theme="dark"] select#listYearSelect.list-year-select option {
+    background-color: #14532d !important;
+    color: #86efac !important;
+}
+
+/* 다크 모드 목적 필터 - ID 선택자로 최우선 적용 */
+[data-theme="dark"] select#purposeFilter.purpose-filter {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: rgba(34, 197, 94, 0.15) !important;
+    color: #86efac !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386efac' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px 12px !important;
+}
+
+[data-theme="dark"] select#purposeFilter.purpose-filter:hover {
+    background-color: rgba(34, 197, 94, 0.25) !important;
+}
+
+[data-theme="dark"] select#purposeFilter.purpose-filter:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+[data-theme="dark"] select#purposeFilter.purpose-filter option {
+    background-color: #14532d !important;
+    color: #86efac !important;
+}
+
+[data-theme="dark"] select#purposeFilter.purpose-filter.has-filter {
+    background-color: rgba(34, 197, 94, 0.6) !important;
+    color: white !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px 12px !important;
+}
+
+/* 다크 모드 select 공통 (subCategory, purpose 등) */
+[data-theme="dark"] .soil-navbar ~ .main-content select,
+[data-theme="dark"] .soil-navbar ~ .main-content .form-field select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2386efac' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+}
+
+[data-theme="dark"] .soil-navbar ~ .main-content select:focus,
+[data-theme="dark"] .soil-navbar ~ .main-content .form-field select:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="dark"] .soil-navbar ~ .main-content select option {
+    background-color: #14532d !important;
+    color: #86efac !important;
+}
+
+/* 다크 모드 items-per-page */
+[data-theme="dark"] .soil-navbar ~ .main-content .items-per-page {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #86efac !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+/* 다크 모드 sublot-select */
+[data-theme="dark"] .sublot-select {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+/* 다크 모드 select 강제 적용 (ID 직접 타겟팅) */
+[data-theme="dark"] #subCategory,
+[data-theme="dark"] #purpose,
+[data-theme="dark"] #sampleName {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2386efac' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+    padding-right: 40px !important;
+}
+
+[data-theme="dark"] #subCategory:focus,
+[data-theme="dark"] #purpose:focus,
+[data-theme="dark"] #sampleName:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="dark"] #subCategory option,
+[data-theme="dark"] #purpose option,
+[data-theme="dark"] #sampleName option {
+    background-color: #14532d !important;
+    color: #86efac !important;
+}
+
+/* ========================================
+   다크 모드 필지 정보 카드 입력 필드
+   ======================================== */
+
+/* 다크 모드 parcel-card 배경 */
+[data-theme="dark"] .parcel-card {
+    background-color: rgba(20, 83, 45, 0.15) !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+/* 다크 모드 parcel-card 헤더 */
+[data-theme="dark"] .parcel-card-header {
+    background-color: rgba(20, 83, 45, 0.3) !important;
+    border-bottom-color: rgba(34, 197, 94, 0.2) !important;
+}
+
+[data-theme="dark"] .parcel-card-header h4 {
+    color: #86efac !important;
+}
+
+/* 다크 모드 필지 주소 입력 (lot-address-input) */
+[data-theme="dark"] .lot-address-input,
+[data-theme="dark"] .parcel-card input.lot-address-input {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .lot-address-input::placeholder {
+    color: rgba(134, 239, 172, 0.5) !important;
+}
+
+[data-theme="dark"] .lot-address-input:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* 다크 모드 하위 필지 입력 (sub-lot-input) */
+[data-theme="dark"] .sub-lot-input,
+[data-theme="dark"] .parcel-card input.sub-lot-input {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .sub-lot-input::placeholder {
+    color: rgba(134, 239, 172, 0.5) !important;
+}
+
+[data-theme="dark"] .sub-lot-input:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* 다크 모드 작물명 입력 (crop-direct-input) */
+[data-theme="dark"] .crop-direct-input,
+[data-theme="dark"] .parcel-card input.crop-direct-input {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .crop-direct-input::placeholder {
+    color: rgba(134, 239, 172, 0.5) !important;
+}
+
+[data-theme="dark"] .crop-direct-input:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* 다크 모드 면적 입력 (area-direct-input) */
+[data-theme="dark"] .area-direct-input,
+[data-theme="dark"] .parcel-card input.area-direct-input {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .area-direct-input::placeholder {
+    color: rgba(134, 239, 172, 0.5) !important;
+}
+
+[data-theme="dark"] .area-direct-input:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* 다크 모드 면적 단위 토글 버튼 (제곱미터/평) */
+[data-theme="dark"] .area-unit-toggle {
+    background-color: rgba(20, 83, 45, 0.5) !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .area-unit-toggle .unit-btn {
+    background-color: transparent !important;
+    color: rgba(134, 239, 172, 0.7) !important;
+    border-color: transparent !important;
+}
+
+[data-theme="dark"] .area-unit-toggle .unit-btn.active {
+    background-color: rgba(34, 197, 94, 0.8) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .area-unit-toggle .unit-btn:hover:not(.active) {
+    background-color: rgba(34, 197, 94, 0.3) !important;
+    color: #86efac !important;
+}
+
+/* 다크 모드 parcel-card 내 모든 input 공통 */
+[data-theme="dark"] .parcel-card input[type="text"],
+[data-theme="dark"] .parcel-card input[type="number"] {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .parcel-card input[type="text"]::placeholder,
+[data-theme="dark"] .parcel-card input[type="number"]::placeholder {
+    color: rgba(134, 239, 172, 0.5) !important;
+}
+
+[data-theme="dark"] .parcel-card input[type="text"]:focus,
+[data-theme="dark"] .parcel-card input[type="number"]:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* 다크 모드 parcel-card label */
+[data-theme="dark"] .parcel-card label,
+[data-theme="dark"] .parcel-form-group label {
+    color: #86efac !important;
+}
+
+[data-theme="dark"] .parcel-card .label-hint {
+    color: rgba(134, 239, 172, 0.6) !important;
+}
+
+/* 다크 모드 산 체크박스 라벨 */
+[data-theme="dark"] .mountain-checkbox-label {
+    color: #86efac !important;
+    background-color: rgba(20, 83, 45, 0.5) !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .mountain-checkbox-label:hover {
+    background-color: rgba(34, 197, 94, 0.3) !important;
+    border-color: rgba(34, 197, 94, 0.6) !important;
+}
+
+/* 다크 모드 산 체크박스 텍스트 */
+[data-theme="dark"] .mountain-checkbox-label .mountain-checkbox-text {
+    color: #86efac !important;
+}
+
+/* 다크 모드 산 체크박스 자체 */
+[data-theme="dark"] .mountain-checkbox-label .mountain-checkbox {
+    background-color: rgba(20, 83, 45, 0.9) !important;
+    border-color: rgba(34, 197, 94, 0.5) !important;
+    accent-color: #22c55e !important;
+}
+
+[data-theme="dark"] .mountain-checkbox-label .mountain-checkbox:checked {
+    background-color: #22c55e !important;
+    border-color: #22c55e !important;
+}
+
+[data-theme="dark"] .mountain-checkbox-label .mountain-checkbox:focus {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3) !important;
+}
+
+/* 다크 모드 자동완성 드롭다운 */
+[data-theme="dark"] .lot-address-autocomplete-list,
+[data-theme="dark"] .crop-autocomplete-list {
+    background-color: #14532d !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .lot-address-autocomplete-list li,
+[data-theme="dark"] .crop-autocomplete-list li {
+    color: #86efac !important;
+}
+
+[data-theme="dark"] .lot-address-autocomplete-list li:hover,
+[data-theme="dark"] .crop-autocomplete-list li:hover {
+    background-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+/* 다크 모드 하위 필지 추가 버튼 */
+[data-theme="dark"] .btn-add-sub-lot-icon {
+    background-color: rgba(34, 197, 94, 0.2) !important;
+    color: #86efac !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .btn-add-sub-lot-icon:hover {
+    background-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+/* 다크 모드 작물 추가 버튼 */
+[data-theme="dark"] .btn-add-crop-compact {
+    background-color: rgba(34, 197, 94, 0.2) !important;
+    color: #86efac !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .btn-add-crop-compact:hover {
+    background-color: rgba(34, 197, 94, 0.4) !important;
+}
+
+/* 다크 모드 필지 요약 정보 */
+[data-theme="dark"] .parcel-summary {
+    background-color: rgba(20, 83, 45, 0.3) !important;
+    color: #86efac !important;
+}
+
+[data-theme="dark"] .parcel-summary .summary-item span {
+    color: #a7f3d0 !important;
+}
+
+/* 다크 모드 하위 필지 목록 */
+[data-theme="dark"] .sub-lot-item {
+    background-color: rgba(20, 83, 45, 0.4) !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+[data-theme="dark"] .sub-lot-item .sub-lot-header span {
+    color: #a7f3d0 !important;
+}
+
+/* 다크 모드 작물 태그 */
+[data-theme="dark"] .crop-area-item {
+    background-color: rgba(20, 83, 45, 0.5) !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+[data-theme="dark"] .crop-area-item .crop-name,
+[data-theme="dark"] .crop-area-item .crop-area {
+    color: #a7f3d0 !important;
+}
+
+/* ========================================
+   필지별 비고 입력 스타일
+   ======================================== */
+
+.parcel-note-row {
+    grid-column: 1 / -1;
+    margin-top: 0.15rem;
+    padding-top: 0.15rem;
+    border-top: 1px dashed #e5e7eb;
+}
+
+/* 추가 작물 버튼 간격 줄이기 */
+.parcel-card .btn-add-crop-compact {
+    margin-top: 0.15rem;
+    margin-bottom: 0;
+    padding: 0.25rem 0.5rem;
+}
+
+.parcel-note-group {
+    width: 100%;
+}
+
+.parcel-note-group label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+
+.parcel-note-input {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.parcel-note-input:focus {
+    border-color: var(--soil-primary);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+    outline: none;
+}
+
+.parcel-note-input::placeholder {
+    color: #9ca3af;
+}
+
+/* 다크 모드 필지별 비고 */
+[data-theme="dark"] .parcel-note-row {
+    border-top-color: rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .parcel-note-group label {
+    color: #86efac !important;
+}
+
+[data-theme="dark"] .parcel-note-input {
+    background-color: rgba(20, 83, 45, 0.5) !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .parcel-note-input::placeholder {
+    color: rgba(134, 239, 172, 0.5) !important;
+}
+
+[data-theme="dark"] .parcel-note-input:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* ========================================
+   안내 배너 스타일
+   ======================================== */
+
+.info-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    margin-bottom: 0.75rem;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid var(--soil-primary-light);
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    color: var(--soil-primary-dark);
+}
+
+.info-banner .info-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+/* 다크 모드 안내 배너 */
+[data-theme="dark"] .info-banner {
+    background: linear-gradient(135deg, rgba(20, 83, 45, 0.4) 0%, rgba(22, 163, 74, 0.2) 100%);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #86efac;
+}
+
+/* 주소 컬럼 스타일 - 고정 너비 두 줄 표시 */
+.soil-navbar ~ .main-content .col-address {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+}
+
+/* 주소 데이터 셀 왼쪽 정렬 + 두 줄 표시 */
+.soil-navbar ~ .main-content td.col-address {
+    text-align: left;
+    white-space: normal;
+    word-break: keep-all;
+    line-height: 1.4;
+}

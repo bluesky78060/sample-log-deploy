@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Module Refactoring Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #ddd;
+        }
+        .test-item.success {
+            border-color: #4CAF50;
+            background: #f1f8f4;
+        }
+        .test-item.error {
+            border-color: #f44336;
+            background: #ffebee;
+        }
+        .test-item.pending {
+            border-color: #ff9800;
+            background: #fff3e0;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Water Module Refactoring Test</h1>
+
+    <div class="test-section">
+        <h2>Module Loading Test</h2>
+        <div id="moduleLoadingTest"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Manager Initialization Test</h2>
+        <div id="managerInitTest"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Data Operations Test</h2>
+        <button onclick="testDataOperations()">Run Data Tests</button>
+        <div id="dataOperationsTest"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>localStorage Compatibility Test</h2>
+        <button onclick="testLocalStorageCompat()">Test localStorage</button>
+        <div id="localStorageTest"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Performance Comparison</h2>
+        <button onclick="testPerformance()">Run Performance Test</button>
+        <div id="performanceTest"></div>
+    </div>
+
+    <script>
+        // Test results container
+        function addTestResult(containerId, testName, success, message) {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = 'test-item ' + (success ? 'success' : 'error');
+            div.innerHTML = `<strong>${testName}:</strong> ${message}`;
+            container.appendChild(div);
+        }
+
+        // Module loading test
+        function testModuleLoading() {
+            const container = document.getElementById('moduleLoadingTest');
+            container.innerHTML = '';
+
+            // Check if modules are loaded
+            const modules = [
+                { name: 'BaseSampleManager', obj: window.BaseSampleManager },
+                { name: 'WaterSampleManager', obj: window.WaterSampleManager },
+                { name: 'window.createFileAPI', obj: window.createFileAPI },
+                { name: 'window.smartMerge', obj: window.smartMerge },
+                { name: 'window.PaginationManager', obj: window.PaginationManager },
+                { name: 'window.showToast', obj: window.showToast }
+            ];
+
+            modules.forEach(module => {
+                const exists = typeof module.obj !== 'undefined';
+                addTestResult('moduleLoadingTest', module.name, exists,
+                    exists ? '✓ Loaded' : '✗ Not found');
+            });
+        }
+
+        // Manager initialization test
+        async function testManagerInit() {
+            const container = document.getElementById('managerInitTest');
+            container.innerHTML = '';
+
+            try {
+                // Check if manager can be created
+                const manager = new WaterSampleManager();
+                addTestResult('managerInitTest', 'Create instance', true, '✓ Manager created');
+
+                // Check properties
+                addTestResult('managerInitTest', 'Module key',
+                    manager.moduleKey === 'water',
+                    `moduleKey = "${manager.moduleKey}"`);
+
+                addTestResult('managerInitTest', 'Module name',
+                    manager.moduleName === '수질분석',
+                    `moduleName = "${manager.moduleName}"`);
+
+                addTestResult('managerInitTest', 'Storage key',
+                    manager.storageKey === 'waterSampleLogs',
+                    `storageKey = "${manager.storageKey}"`);
+
+            } catch (error) {
+                addTestResult('managerInitTest', 'Create instance', false, error.message);
+            }
+        }
+
+        // Data operations test
+        async function testDataOperations() {
+            const container = document.getElementById('dataOperationsTest');
+            container.innerHTML = '';
+
+            try {
+                const manager = new WaterSampleManager();
+
+                // Test ID generation
+                const id = manager.generateId();
+                addTestResult('dataOperationsTest', 'ID generation',
+                    id && id.length > 10,
+                    `Generated ID: ${id}`);
+
+                // Test storage key generation
+                const storageKey = manager.getStorageKey('2026');
+                addTestResult('dataOperationsTest', 'Storage key',
+                    storageKey === 'waterSampleLogs_2026',
+                    `Storage key: ${storageKey}`);
+
+                // Test year detection
+                const year = manager.findYearWithData();
+                addTestResult('dataOperationsTest', 'Year detection',
+                    year && year.length === 4,
+                    `Detected year: ${year}`);
+
+            } catch (error) {
+                addTestResult('dataOperationsTest', 'Operations', false, error.message);
+            }
+        }
+
+        // localStorage compatibility test
+        function testLocalStorageCompat() {
+            const container = document.getElementById('localStorageTest');
+            container.innerHTML = '';
+
+            try {
+                // Check existing data
+                const years = ['2024', '2025', '2026'];
+                let foundData = false;
+
+                years.forEach(year => {
+                    const key = `waterSampleLogs_${year}`;
+                    const data = localStorage.getItem(key);
+                    if (data) {
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (Array.isArray(parsed)) {
+                                addTestResult('localStorageTest', `${year} data`, true,
+                                    `Found ${parsed.length} records`);
+                                foundData = true;
+                            }
+                        } catch (e) {
+                            addTestResult('localStorageTest', `${year} data`, false,
+                                'Invalid JSON format');
+                        }
+                    }
+                });
+
+                if (!foundData) {
+                    addTestResult('localStorageTest', 'Data check', false,
+                        'No existing data found');
+                }
+
+            } catch (error) {
+                addTestResult('localStorageTest', 'localStorage', false, error.message);
+            }
+        }
+
+        // Performance test
+        async function testPerformance() {
+            const container = document.getElementById('performanceTest');
+            container.innerHTML = '';
+
+            try {
+                // Create test data
+                const testData = [];
+                for (let i = 0; i < 1000; i++) {
+                    testData.push({
+                        id: Date.now().toString() + i,
+                        receptionNumber: i + 1,
+                        date: '2026-01-26',
+                        sampleName: `Test Sample ${i}`,
+                        applicantName: `신청인 ${i}`,
+                        phoneNumber: '010-1234-5678',
+                        address: '서울시 강남구',
+                        samplingLocation: ['장소1', '장소2'],
+                        samplingCrops: ['작물1', '작물2'],
+                        receptionMethod: '직접수령',
+                        completed: false
+                    });
+                }
+
+                const manager = new WaterSampleManager();
+                manager.sampleLogs = testData;
+
+                // Test save performance
+                const saveStart = performance.now();
+                manager.saveLogs();
+                const saveTime = performance.now() - saveStart;
+
+                addTestResult('performanceTest', 'Save 1000 records',
+                    saveTime < 100,
+                    `${saveTime.toFixed(2)}ms`);
+
+                // Test render performance (mock DOM)
+                manager.tableBody = { innerHTML: '' };
+                manager.emptyState = { style: { display: 'none' } };
+
+                const renderStart = performance.now();
+                manager.renderLogs(testData.slice(0, 100));
+                const renderTime = performance.now() - renderStart;
+
+                addTestResult('performanceTest', 'Render 100 records',
+                    renderTime < 50,
+                    `${renderTime.toFixed(2)}ms`);
+
+            } catch (error) {
+                addTestResult('performanceTest', 'Performance', false, error.message);
+            }
+        }
+
+        // Run initial tests on load
+        setTimeout(() => {
+            testModuleLoading();
+            testManagerInit();
+        }, 1000);
+    </script>
+
+    <!-- Load all required scripts in correct order -->
+    <script src="../bonghwaData.js"></script>
+    <script src="../cropData.js"></script>
+    <script src="../shared/sanitize.js"></script>
+    <script src="../shared/constants.js"></script>
+    <script src="../shared/file-api.js"></script>
+    <script src="../shared/utils.js"></script>
+    <script src="../shared/toast.js"></script>
+    <script src="../shared/pagination.js"></script>
+    <script src="../shared/sync-utils.js"></script>
+    <script src="../shared/BaseSampleManager.js"></script>
+    <script src="WaterSampleManager.js"></script>
+</body>
+</html>

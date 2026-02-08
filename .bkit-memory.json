@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-31T00:00:00.000Z",
+  "activeFeatures": [
+    {
+      "name": "code-refactoring",
+      "phase": "completed",
+      "startedAt": "2026-01-31T00:00:00.000Z",
+      "doCompletedAt": "2026-01-31T00:00:00.000Z",
+      "checkCompletedAt": "2026-01-31T00:00:00.000Z",
+      "reportCompletedAt": "2026-01-31T00:00:00.000Z",
+      "matchRate": 95,
+      "documents": {
+        "plan": "docs/01-plan/features/code-refactoring.plan.md",
+        "design": "docs/02-design/features/code-refactoring.design.md",
+        "analysis": "docs/03-analysis/code-refactoring.analysis.md",
+        "report": "docs/04-report/code-refactoring.report.md"
+      },
+      "implementedFiles": [
+        "src/shared/constants.js",
+        "src/shared/EventDelegator.js",
+        "src/shared/BaseSampleManager.js",
+        "src/soil/SoilSampleManager.js",
+        "src/water/WaterSampleManager.js",
+        "src/compost/CompostSampleManager.js",
+        "src/pesticide/PesticideSampleManager.js",
+        "src/heavy-metal/HeavyMetalSampleManager.js"
+      ]
+    }
+  ],
+  "projectLevel": "Dynamic",
+  "codeQualityScore": 87
+}

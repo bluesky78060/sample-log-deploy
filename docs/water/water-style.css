@@ -1,0 +1,1164 @@
+/* ========================================
+   수질분석 시료 전용 스타일
+   ======================================== */
+
+/* 숨김 컬럼 (우편번호 등) */
+.col-zipcode.hidden,
+th.col-zipcode.hidden,
+td.col-zipcode.hidden {
+    display: none;
+}
+
+/* 물 테마 색상 */
+:root {
+    --water-primary: #3B82F6;
+    --water-primary-hover: #2563EB;
+    --water-primary-light: #BFDBFE;
+    --water-primary-dark: #1D4ED8;
+    --water-gradient: linear-gradient(135deg, #3B82F6, #2563EB);
+}
+
+/* ========================================
+   아이콘 크기 조정
+   ======================================== */
+
+/* 카드 헤더 아이콘 */
+.water-navbar ~ .main-content .card-icon {
+    font-size: 1.2rem;
+}
+
+/* 목적(용도) 아이콘 */
+.purpose-icon {
+    font-size: 0.85rem !important;
+}
+
+/* 목적(용도) 라벨 패딩 축소 */
+.purpose-label {
+    padding: 0.35rem 0.5rem !important;
+    gap: 0.3rem !important;
+}
+
+/* 목적(용도) 텍스트 크기 */
+.purpose-text {
+    font-size: 0.8rem !important;
+}
+
+/* 목적(용도) 옵션 한 줄 표시 */
+.water-navbar ~ .main-content .purpose-options {
+    flex-wrap: nowrap !important;
+    gap: 0.5rem !important;
+}
+
+.water-navbar ~ .main-content .purpose-option {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 비고 메모 입력란 크기 축소 */
+.water-navbar ~ .main-content #note {
+    min-height: 60px;
+    max-height: 80px;
+}
+
+/* 검사항목 아이콘 */
+.test-item-icon {
+    font-size: 1.3rem !important;
+}
+
+/* 검사항목 라벨 컴팩트하게 */
+.water-navbar ~ .main-content .test-item-label {
+    padding: 0.75rem 1rem !important;
+    gap: 0.6rem !important;
+}
+
+.water-navbar ~ .main-content .test-item-name {
+    font-size: 0.9rem !important;
+}
+
+.water-navbar ~ .main-content .test-item-count {
+    font-size: 0.75rem !important;
+}
+
+.water-navbar ~ .main-content .test-items-options {
+    gap: 0.75rem !important;
+}
+
+/* 통보방법 아이콘 */
+.method-icon {
+    font-size: 1rem;
+}
+
+/* 네비게이션 버튼 아이콘 */
+.nav-btn-icon {
+    font-size: 1.1rem;
+}
+
+/* 유틸리티 버튼 아이콘 */
+.util-btn {
+    font-size: 1rem;
+}
+
+/* 액션 버튼 아이콘 */
+.action-btn-icon span {
+    font-size: 1.1rem;
+}
+
+/* 네비게이션 바 물 테마 */
+.water-navbar {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-bottom: 2px solid var(--water-primary-light);
+}
+
+.water-navbar .brand-icon {
+    font-size: 1.5rem;
+}
+
+.water-navbar .brand-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--water-primary-dark);
+    margin-left: 0.25rem;
+}
+
+/* 뒤로가기 버튼 */
+.back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: white;
+    color: var(--water-primary-dark);
+    text-decoration: none;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    border: 1px solid var(--water-primary-light);
+    transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+    background: var(--water-primary);
+    color: white;
+    border-color: var(--water-primary);
+}
+
+/* 네비게이션 버튼 활성화 */
+.water-navbar .nav-btn.active {
+    background: var(--water-gradient);
+}
+
+/* 폼 카드 헤더 물 테마 */
+.water-navbar ~ .main-content .form-card .card-header {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-bottom: 1px solid var(--water-primary-light);
+}
+
+.water-navbar ~ .main-content .form-card .card-header h3 {
+    color: var(--water-primary-dark);
+}
+
+/* 버튼 물 테마 */
+.water-navbar ~ .main-content .btn-add-small,
+.water-navbar ~ .main-content .btn-add-location-empty,
+.water-navbar ~ .main-content .btn-add-row {
+    background: var(--water-gradient);
+}
+
+.water-navbar ~ .main-content .btn-add-small:hover,
+.water-navbar ~ .main-content .btn-add-location-empty:hover,
+.water-navbar ~ .main-content .btn-add-row:hover {
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+}
+
+/* 확인 버튼 물 테마 */
+.water-navbar ~ .main-content .btn-confirm,
+.water-navbar ~ .main-content .btn-search-apply {
+    background: var(--water-gradient);
+}
+
+.water-navbar ~ .main-content .btn-confirm:hover,
+.water-navbar ~ .main-content .btn-search-apply:hover {
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+}
+
+/* 액션 버튼 물 테마 */
+.water-navbar .action-btn-icon.submit {
+    background: var(--water-gradient);
+}
+
+.water-navbar .action-btn-icon.submit:hover {
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+}
+
+/* 검색 버튼 물 테마 */
+.water-navbar ~ .main-content .btn-search {
+    background: var(--water-gradient);
+}
+
+.water-navbar ~ .main-content .btn-search:hover {
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+}
+
+/* 수령 방법 선택 버튼 물 테마 */
+.water-navbar ~ .main-content .reception-method-btn.active {
+    background: var(--water-gradient);
+    border-color: var(--water-primary);
+    color: white;
+}
+
+/* 체크박스 물 테마 */
+.water-navbar ~ .main-content input[type="checkbox"]:checked {
+    background: var(--water-primary);
+    border-color: var(--water-primary);
+}
+
+/* 토글 스위치 물 테마 */
+.water-navbar .autosave-toggle input:checked + .toggle-track {
+    background: var(--water-gradient);
+}
+
+/* 통계 카드 물 테마 */
+.water-navbar ~ .main-content .stat-card.total {
+    border-left-color: var(--water-primary);
+}
+
+/* 목록 뷰 헤더 */
+.water-navbar ~ .main-content .view-header-top h2 {
+    color: var(--water-primary-dark);
+}
+
+/* 토스트 성공 물 테마 */
+.toast.success {
+    background: var(--water-gradient) !important;
+}
+
+/* 시료수 입력 그룹 */
+.sample-count-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sample-count-group input {
+    flex: 1;
+}
+
+.sample-count-unit {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* 목적(용도) 옵션 스타일 */
+.purpose-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.purpose-option {
+    cursor: pointer;
+}
+
+.purpose-option input[type="radio"] {
+    display: none;
+}
+
+.purpose-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+.purpose-option input[type="radio"]:checked + .purpose-label {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-color: var(--water-primary);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.purpose-icon {
+    font-size: 1.25rem;
+}
+
+.purpose-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #334155;
+}
+
+.purpose-option input[type="radio"]:checked + .purpose-label .purpose-text {
+    color: var(--water-primary-dark);
+}
+
+/* 검사항목 옵션 스타일 */
+.test-items-options {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.test-item-option {
+    flex: 1;
+    cursor: pointer;
+}
+
+.test-item-option input[type="radio"] {
+    display: none;
+}
+
+.test-item-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.test-item-option input[type="radio"]:checked + .test-item-label {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-color: var(--water-primary);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.test-item-icon {
+    font-size: 2rem;
+}
+
+.test-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.test-item-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.test-item-count {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.test-item-option input[type="radio"]:checked + .test-item-label .test-item-name {
+    color: var(--water-primary-dark);
+}
+
+/* 검사항목 상세 정보 */
+.test-items-detail {
+    margin-top: 1rem;
+}
+
+.test-items-info {
+    display: none;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 10px;
+    border-left: 3px solid var(--water-primary);
+}
+
+.test-items-info.active {
+    display: block;
+}
+
+.test-items-info h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--water-primary-dark);
+    margin-bottom: 0.5rem;
+}
+
+.test-items-list {
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* 폼 필드 포커스 물 테마 */
+.water-navbar ~ .main-content input:focus,
+.water-navbar ~ .main-content select:focus,
+.water-navbar ~ .main-content textarea:focus {
+    border-color: var(--water-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 테이블 행 선택 물 테마 */
+.water-navbar ~ .main-content .data-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.water-navbar ~ .main-content .data-table tbody tr.selected {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* 진행 바 물 테마 */
+.water-navbar ~ .main-content .progress-bar {
+    background: var(--water-gradient);
+}
+
+/* 링크 물 테마 */
+.water-navbar ~ .main-content a {
+    color: var(--water-primary);
+}
+
+.water-navbar ~ .main-content a:hover {
+    color: var(--water-primary-dark);
+}
+
+/* textarea 스타일 */
+textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--water-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+    .test-items-options {
+        flex-direction: column;
+    }
+
+    .purpose-options {
+        flex-direction: column;
+    }
+
+    .purpose-label {
+        width: 100%;
+    }
+}
+
+/* 채취장소 자동완성 - 카드 overflow 해제 */
+.water-navbar ~ .main-content .form-card.has-autocomplete,
+.water-navbar ~ .main-content .form-card:has(.location-autocomplete-wrapper) {
+    overflow: visible;
+}
+
+.water-navbar ~ .main-content .form-card.has-autocomplete .card-body,
+.water-navbar ~ .main-content .form-card .card-body:has(.location-autocomplete-wrapper) {
+    overflow: visible;
+}
+
+/* 채취장소 컨테이너도 overflow visible */
+.sampling-locations-container,
+.sampling-locations-list {
+    overflow: visible !important;
+}
+
+/* 채취장소 자동완성 스타일 */
+.location-autocomplete-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.location-autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 9999;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.location-autocomplete-list.show {
+    display: block;
+}
+
+.location-autocomplete-list li {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.9rem;
+    transition: background-color 0.15s ease;
+}
+
+.location-autocomplete-list li:last-child {
+    border-bottom: none;
+}
+
+.location-autocomplete-list li:hover {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: var(--water-primary-dark);
+}
+
+/* 동적 채취장소 컨테이너 스타일 */
+.sampling-locations-container {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.sampling-location-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.sampling-location-header label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #334155;
+}
+
+.location-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-add-location,
+.btn-remove-location {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-add-location {
+    background: var(--water-primary-light);
+    color: var(--water-primary-dark);
+}
+
+.btn-add-location:hover {
+    background: var(--water-primary);
+    color: white;
+}
+
+.btn-remove-location {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.btn-remove-location:hover {
+    background: #dc2626;
+    color: white;
+}
+
+.location-count-badge {
+    background: var(--water-gradient);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+}
+
+.sampling-locations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.sampling-location-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sampling-crop-input {
+    width: 140px;
+    flex-shrink: 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sampling-crop-input:focus {
+    outline: none;
+    border-color: var(--water-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.sampling-crop-input::placeholder {
+    color: #94a3b8;
+}
+
+.location-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--water-primary-light);
+    color: var(--water-primary-dark);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sampling-location-item .location-autocomplete-wrapper {
+    flex: 1;
+}
+
+.sampling-location-item .sampling-location-input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sampling-location-item .sampling-location-input:focus {
+    outline: none;
+    border-color: var(--water-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.sampling-location-item .sampling-location-input::placeholder {
+    color: #94a3b8;
+}
+
+/* 채취장소 스크롤바 스타일링 */
+.sampling-locations-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sampling-locations-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.sampling-locations-list::-webkit-scrollbar-thumb {
+    background: var(--water-primary-light);
+    border-radius: 3px;
+}
+
+.sampling-locations-list::-webkit-scrollbar-thumb:hover {
+    background: var(--water-primary);
+}
+
+/* 그리드 레이아웃 1:1 비율로 변경, 간격 축소 */
+.water-navbar ~ .main-content .form-two-column {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* 카드 가로 길이 통일 및 가운데 정렬 */
+.water-navbar ~ .main-content .form-right-column .form-card,
+.water-navbar ~ .main-content .form-left-column .form-card {
+    max-width: 520px;
+    width: 100%;
+}
+
+/* 양쪽 컬럼 가운데 정렬 */
+.water-navbar ~ .main-content .form-left-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.water-navbar ~ .main-content .form-right-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* 오른쪽 컬럼 스크롤바 스타일 */
+.water-navbar ~ .main-content .form-right-column::-webkit-scrollbar {
+    width: 6px;
+}
+
+.water-navbar ~ .main-content .form-right-column::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.water-navbar ~ .main-content .form-right-column::-webkit-scrollbar-thumb {
+    background: var(--water-primary-light);
+    border-radius: 3px;
+}
+
+.water-navbar ~ .main-content .form-right-column::-webkit-scrollbar-thumb:hover {
+    background: var(--water-primary);
+}
+
+/* 검사항목 옵션 컴팩트하게 */
+.water-navbar ~ .main-content .test-item-label {
+    padding: 0.9rem 1rem !important;
+}
+
+.water-navbar ~ .main-content .test-item-icon {
+    font-size: 1.5rem !important;
+}
+
+/* 채취장소 컴팩트하게 */
+.water-navbar ~ .main-content .sampling-crop-input {
+    width: 120px;
+}
+
+/* ========================================
+   년도 선택 드롭다운 스타일
+   ======================================== */
+
+.year-select-wrapper {
+    margin-left: auto;
+    margin-right: 0.75rem;
+}
+
+.year-select,
+.list-year-select {
+    background: white;
+    color: var(--water-primary-dark);
+    border: 2px solid var(--water-primary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%233B82F6' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 1.8rem;
+    transition: all 0.2s ease;
+}
+
+.list-year-select {
+    margin-left: 0.75rem;
+}
+
+.year-select:hover,
+.list-year-select:hover {
+    background: var(--water-primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.year-select:focus,
+.list-year-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.year-select option,
+.list-year-select option {
+    background: white;
+    color: var(--water-primary-dark);
+    font-weight: 500;
+}
+
+/* ========================================
+   다크 모드 스타일
+   ======================================== */
+
+/* 다크 모드 네비게이션 바 */
+[data-theme="dark"] .water-navbar {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-bottom-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .water-navbar .brand-text {
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .back-btn {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .back-btn:hover {
+    background: var(--water-primary);
+    color: white;
+}
+
+/* 다크 모드 카드 헤더 */
+[data-theme="dark"] .water-navbar ~ .main-content .form-card .card-header {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border-bottom-color: rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .water-navbar ~ .main-content .form-card .card-header h3 {
+    color: #93c5fd;
+}
+
+/* 다크 모드 목적(용도) 옵션 */
+[data-theme="dark"] .purpose-label {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .purpose-option:hover .purpose-label {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] .purpose-option input[type="radio"]:checked + .purpose-label {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.3));
+    border-color: var(--water-primary);
+}
+
+[data-theme="dark"] .purpose-text {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .purpose-option input[type="radio"]:checked + .purpose-label .purpose-text {
+    color: #93c5fd;
+}
+
+/* 다크 모드 검사항목 옵션 */
+[data-theme="dark"] .test-item-label {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .test-item-option:hover .test-item-label {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] .test-item-option input[type="radio"]:checked + .test-item-label {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.3));
+    border-color: var(--water-primary);
+}
+
+[data-theme="dark"] .test-item-name {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .test-item-count {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .test-item-option input[type="radio"]:checked + .test-item-label .test-item-name {
+    color: #93c5fd;
+}
+
+/* 다크 모드 검사항목 상세 정보 */
+[data-theme="dark"] .test-items-info {
+    background: rgba(30, 41, 59, 0.9);
+    border-left-color: var(--water-primary);
+}
+
+[data-theme="dark"] .test-items-info h4 {
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .test-items-list {
+    color: #94a3b8;
+}
+
+/* 다크 모드 textarea */
+[data-theme="dark"] textarea {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] textarea:focus {
+    border-color: var(--water-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] textarea::placeholder {
+    color: #64748b;
+}
+
+/* 다크 모드 채취장소 */
+[data-theme="dark"] .sampling-locations-container {
+    border-top-color: rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .sampling-location-header label {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .location-number {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .sampling-location-item .sampling-location-input,
+[data-theme="dark"] .sampling-crop-input {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .sampling-location-item .sampling-location-input:focus,
+[data-theme="dark"] .sampling-crop-input:focus {
+    border-color: var(--water-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .sampling-location-item .sampling-location-input::placeholder,
+[data-theme="dark"] .sampling-crop-input::placeholder {
+    color: #64748b;
+}
+
+[data-theme="dark"] .btn-add-location {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .btn-add-location:hover {
+    background: var(--water-primary);
+    color: white;
+}
+
+[data-theme="dark"] .btn-remove-location {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+}
+
+[data-theme="dark"] .btn-remove-location:hover {
+    background: #dc2626;
+    color: white;
+}
+
+/* 다크 모드 자동완성 리스트 */
+[data-theme="dark"] .location-autocomplete-list {
+    background: #1e293b;
+    border-color: rgba(148, 163, 184, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .location-autocomplete-list li {
+    border-bottom-color: rgba(148, 163, 184, 0.1);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .location-autocomplete-list li:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2));
+    color: #93c5fd;
+}
+
+/* 다크 모드 스크롤바 */
+[data-theme="dark"] .sampling-locations-list::-webkit-scrollbar-track,
+[data-theme="dark"] .water-navbar ~ .main-content .form-right-column::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.5);
+}
+
+[data-theme="dark"] .sampling-locations-list::-webkit-scrollbar-thumb,
+[data-theme="dark"] .water-navbar ~ .main-content .form-right-column::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .sampling-locations-list::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] .water-navbar ~ .main-content .form-right-column::-webkit-scrollbar-thumb:hover {
+    background: var(--water-primary);
+}
+
+/* 다크 모드 년도 선택 */
+[data-theme="dark"] .year-select,
+[data-theme="dark"] .list-year-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #93c5fd !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2393c5fd' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+}
+
+[data-theme="dark"] .year-select:hover,
+[data-theme="dark"] .list-year-select:hover {
+    background-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+[data-theme="dark"] .year-select:focus,
+[data-theme="dark"] .list-year-select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .year-select option,
+[data-theme="dark"] .list-year-select option {
+    background-color: #1e293b !important;
+    color: #93c5fd !important;
+}
+
+/* 다크 모드 select 공통 (sampleName 등) */
+[data-theme="dark"] .water-navbar ~ .main-content select,
+[data-theme="dark"] .water-navbar ~ .main-content .form-field select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: rgba(30, 41, 59, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2393c5fd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+}
+
+[data-theme="dark"] .water-navbar ~ .main-content select:focus,
+[data-theme="dark"] .water-navbar ~ .main-content .form-field select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .water-navbar ~ .main-content select option {
+    background-color: #1e293b !important;
+    color: #93c5fd !important;
+}
+
+/* 다크 모드 items-per-page */
+[data-theme="dark"] .water-navbar ~ .main-content .items-per-page {
+    background-color: rgba(30, 41, 59, 0.9) !important;
+    color: #93c5fd !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* 다크 모드 시료수 단위 */
+[data-theme="dark"] .sample-count-unit {
+    color: #94a3b8;
+}
+
+/* ========================================
+   판정 버튼 스타일 (적합/부적합 토글)
+   ======================================== */
+
+.btn-result {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 50px;
+}
+
+.btn-result:hover {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+}
+
+.btn-result.pass {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+}
+
+.btn-result.pass:hover {
+    background: #bbf7d0;
+    border-color: #4ade80;
+}
+
+.btn-result.fail {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.btn-result.fail:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}
+
+/* 판정 컬럼 너비 */
+.col-result {
+    width: 60px;
+    text-align: center;
+}
+
+/* 다크 모드 판정 버튼 */
+[data-theme="dark"] .btn-result {
+    background: rgba(59, 130, 246, 0.2);
+    color: #d6d3d1;
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] .btn-result:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+}
+
+[data-theme="dark"] .btn-result.pass {
+    background: rgba(22, 101, 52, 0.4);
+    color: #86efac;
+    border-color: rgba(134, 239, 172, 0.5);
+}
+
+[data-theme="dark"] .btn-result.pass:hover {
+    background: rgba(22, 101, 52, 0.6);
+    border-color: rgba(134, 239, 172, 0.7);
+}
+
+[data-theme="dark"] .btn-result.fail {
+    background: rgba(220, 38, 38, 0.3);
+    color: #fca5a5;
+    border-color: rgba(252, 165, 165, 0.5);
+}
+
+[data-theme="dark"] .btn-result.fail:hover {
+    background: rgba(220, 38, 38, 0.5);
+    border-color: rgba(252, 165, 165, 0.7);
+}
+
+/* 주소 컬럼 스타일 - 고정 너비 두 줄 표시 */
+.water-navbar ~ .main-content .col-address {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+}
+
+/* 주소 데이터 셀 왼쪽 정렬 + 두 줄 표시 */
+.water-navbar ~ .main-content td.col-address {
+    text-align: left;
+    white-space: normal;
+    word-break: keep-all;
+    line-height: 1.4;
+}
+
+/* 채취장소 왼쪽 정렬 */
+.water-navbar ~ .main-content td.text-truncate {
+    text-align: left;
+}

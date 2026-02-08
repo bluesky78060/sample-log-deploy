@@ -1,0 +1,158 @@
+{
+  "version": "2.0",
+  "exportDate": "2026-01-19T11:44:27.772Z",
+  "totalRecords": 4,
+  "data": [
+    {
+      "id": "1767315567048_0",
+      "receptionMethod": "우편",
+      "samplingLocation": "봉화군 봉화읍 화천리 24-4",
+      "testResult": "pass",
+      "addressRoad": "경기 안양시 만안구 안양천서로 289 (안양동, 주공뜨란채)",
+      "address": "(13994) 경기 안양시 만안구 안양천서로 289 (안양동, 주공뜨란채) 106동 1403호",
+      "corpNumber": "",
+      "receptionNumber": "1",
+      "sampleCount": "1",
+      "syncedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "birthDate": "640604",
+      "sampleName": "지하수",
+      "testItems": "생활용수",
+      "date": "2025-12-30",
+      "updatedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "createdAt": "2026-01-02T00:59:27.047Z",
+      "addressDetail": "106동 1403호",
+      "note": "소백지하수",
+      "samplingLocations": [
+        "봉화군 봉화읍 화천리 24-4"
+      ],
+      "addressPostcode": "13994",
+      "phoneNumber": "010-0000-0000",
+      "name": "구재만",
+      "isComplete": true,
+      "samplingCrops": [
+        ""
+      ],
+      "mainCrop": "",
+      "sampleType": "물",
+      "applicantType": "개인",
+      "purpose": "참고용"
+    },
+    {
+      "id": "1767315692441_0",
+      "receptionNumber": "2",
+      "note": "",
+      "corpNumber": "",
+      "phoneNumber": "010-2671-4834",
+      "createdAt": "2026-01-02T01:01:32.441Z",
+      "purpose": "참고용",
+      "addressDetail": "",
+      "testItems": "생활용수",
+      "syncedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "sampleType": "물",
+      "addressRoad": "경북 봉화군 봉화읍 봉화로 425-4",
+      "receptionMethod": "우편",
+      "address": "(36234) 경북 봉화군 봉화읍 봉화로 425-4",
+      "isComplete": true,
+      "testResult": "pass",
+      "applicantType": "개인",
+      "date": "2025-12-30",
+      "updatedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "sampleCount": "1",
+      "samplingLocation": "봉화군 봉화읍 문단리 284",
+      "addressPostcode": "36234",
+      "sampleName": "지하수",
+      "samplingLocations": [
+        "봉화군 봉화읍 문단리 284"
+      ],
+      "birthDate": "",
+      "mainCrop": "한우",
+      "samplingCrops": [
+        "한우"
+      ],
+      "name": "권금자"
+    },
+    {
+      "id": "1767315782262_0",
+      "receptionMethod": "",
+      "birthDate": "590103",
+      "sampleName": "지하수",
+      "testItems": "생활용수",
+      "corpNumber": "",
+      "note": "",
+      "address": "(36234) 경북 봉화군 봉화읍 봉화로 425-4",
+      "samplingLocation": "봉화군 봉화읍 문단리432",
+      "name": "석희동",
+      "sampleCount": "1",
+      "phoneNumber": "010-3538-4834",
+      "applicantType": "개인",
+      "updatedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "addressPostcode": "36234",
+      "mainCrop": "한우",
+      "addressDetail": "",
+      "createdAt": "2026-01-02T01:03:02.262Z",
+      "samplingCrops": [
+        "한우"
+      ],
+      "testResult": "pass",
+      "sampleType": "물",
+      "samplingLocations": [
+        "봉화군 봉화읍 문단리432"
+      ],
+      "addressRoad": "경북 봉화군 봉화읍 봉화로 425-4",
+      "purpose": "참고용",
+      "receptionNumber": "3",
+      "isComplete": true,
+      "syncedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "date": "2025-12-30"
+    },
+    {
+      "id": "mkc7lhwwlfobfilq6",
+      "sampleCount": "1",
+      "name": "안정란",
+      "syncedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "createdAt": "2026-01-13T06:26:51.248Z",
+      "receptionMethod": "우편",
+      "addressDetail": "",
+      "samplingLocation": "봉화군 물야면 가평리 140-1",
+      "addressPostcode": "36205",
+      "mainCrop": "한우",
+      "purpose": "참고용",
+      "updatedAt": {
+        "seconds": 1768801068,
+        "nanoseconds": 176000000
+      },
+      "testItems": "생활용수",
+      "sampleType": "물",
+      "phoneNumber": "010-5408-2176",
+      "addressRoad": "경북 봉화군 물야면 문수로 811-1",
+      "note": "",
+      "testResult": "",
+      "sampleName": "지하수",
+      "address": "(36205) 경북 봉화군 물야면 문수로 811-1",
+      "date": "2026-01-13",
+      "receptionNumber": "4",
+      "isComplete": false
+    }
+  ]
+}

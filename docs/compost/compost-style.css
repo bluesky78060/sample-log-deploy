@@ -1,0 +1,1389 @@
+/* ========================================
+   가축분뇨퇴비 시료 전용 스타일
+   ======================================== */
+
+/* 가축분뇨퇴비 테마 색상 */
+:root {
+    --compost-primary: #A16207;
+    --compost-primary-hover: #854D0E;
+    --compost-primary-light: #FEF3C7;
+    --compost-primary-dark: #713F12;
+    --compost-gradient: linear-gradient(135deg, #A16207, #854D0E);
+}
+
+/* 네비게이션 바 가축분뇨퇴비 테마 */
+.compost-navbar {
+    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+    border-bottom: 2px solid var(--compost-primary-light);
+}
+
+.compost-navbar .brand-icon {
+    font-size: 1.5rem;
+}
+
+.compost-navbar .brand-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--compost-primary-dark);
+    margin-left: 0.25rem;
+}
+
+/* 뒤로가기 버튼 */
+.back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: white;
+    color: var(--compost-primary-dark);
+    text-decoration: none;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    border: 1px solid var(--compost-primary-light);
+    transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+    background: var(--compost-primary);
+    color: white;
+    border-color: var(--compost-primary);
+}
+
+/* 네비게이션 버튼 활성화 */
+.compost-navbar .nav-btn.active {
+    background: var(--compost-gradient);
+}
+
+/* 폼 카드 헤더 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .form-card .card-header {
+    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+    border-bottom: 1px solid var(--compost-primary-light);
+}
+
+.compost-navbar ~ .main-content .form-card .card-header h3 {
+    color: var(--compost-primary-dark);
+}
+
+/* 버튼 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .btn-add-small,
+.compost-navbar ~ .main-content .btn-add-row {
+    background: var(--compost-gradient);
+}
+
+.compost-navbar ~ .main-content .btn-add-small:hover,
+.compost-navbar ~ .main-content .btn-add-row:hover {
+    background: linear-gradient(135deg, #854D0E, #713F12);
+}
+
+/* 확인 버튼 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .btn-confirm,
+.compost-navbar ~ .main-content .btn-search-apply {
+    background: var(--compost-gradient);
+}
+
+.compost-navbar ~ .main-content .btn-confirm:hover,
+.compost-navbar ~ .main-content .btn-search-apply:hover {
+    background: linear-gradient(135deg, #854D0E, #713F12);
+}
+
+/* 액션 버튼 가축분뇨퇴비 테마 */
+.compost-navbar .action-btn-icon.submit {
+    background: var(--compost-gradient);
+}
+
+.compost-navbar .action-btn-icon.submit:hover {
+    background: linear-gradient(135deg, #854D0E, #713F12);
+}
+
+/* 검색 버튼 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .btn-search {
+    background: var(--compost-gradient);
+}
+
+.compost-navbar ~ .main-content .btn-search:hover {
+    background: linear-gradient(135deg, #854D0E, #713F12);
+}
+
+/* 체크박스 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content input[type="checkbox"]:checked {
+    background: var(--compost-primary);
+    border-color: var(--compost-primary);
+}
+
+/* 라디오 버튼 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content input[type="radio"]:checked {
+    border-color: var(--compost-primary);
+}
+
+.compost-navbar ~ .main-content input[type="radio"]:checked::before {
+    background: var(--compost-primary);
+}
+
+/* 토글 스위치 가축분뇨퇴비 테마 */
+.compost-navbar .autosave-toggle input:checked + .toggle-track {
+    background: var(--compost-gradient);
+}
+
+/* 통계 카드 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .stat-card.total {
+    border-left-color: var(--compost-primary);
+}
+
+/* 목록 뷰 헤더 */
+.compost-navbar ~ .main-content .view-header-top h2 {
+    color: var(--compost-primary-dark);
+}
+
+/* 토스트 성공 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .toast.success,
+.toast.success {
+    background: var(--compost-gradient);
+}
+
+/* 퇴비종류 선택 버튼 스타일 */
+.compost-type-options {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    width: 100%;
+}
+
+.compost-type-btn {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    border: 1px solid var(--compost-primary-light);
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.compost-type-btn:hover {
+    background: var(--compost-primary-light);
+    border-color: var(--compost-primary);
+}
+
+.compost-type-btn.selected {
+    background: var(--compost-gradient);
+    border-color: var(--compost-primary);
+    color: white;
+}
+
+.compost-type-btn .icon {
+    font-size: 1rem;
+}
+
+/* 검사목적 선택 버튼 스타일 */
+.test-purpose-options {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.test-purpose-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--compost-primary-light);
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.test-purpose-btn:hover {
+    background: var(--compost-primary-light);
+    border-color: var(--compost-primary);
+}
+
+.test-purpose-btn.selected {
+    background: var(--compost-gradient);
+    border-color: var(--compost-primary);
+    color: white;
+}
+
+/* 검사 항목 목록 */
+.test-items-info {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+    border-radius: 8px;
+    border: 1px solid var(--compost-primary-light);
+}
+
+.test-items-label {
+    font-weight: 600;
+    color: var(--compost-primary-dark);
+    margin-bottom: 0.5rem;
+    display: block;
+    font-size: 0.875rem;
+}
+
+.test-items-list {
+    font-size: 0.8rem;
+    color: #666;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* 폼 필드 포커스 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content input:focus,
+.compost-navbar ~ .main-content select:focus,
+.compost-navbar ~ .main-content textarea:focus {
+    border-color: var(--compost-primary);
+    box-shadow: 0 0 0 3px rgba(161, 98, 7, 0.1);
+}
+
+/* 테이블 행 선택 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .data-table tbody tr:hover {
+    background: rgba(161, 98, 7, 0.05);
+}
+
+.compost-navbar ~ .main-content .data-table tbody tr.selected {
+    background: rgba(161, 98, 7, 0.1);
+}
+
+/* 진행 바 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content .progress-bar {
+    background: var(--compost-gradient);
+}
+
+/* 링크 가축분뇨퇴비 테마 */
+.compost-navbar ~ .main-content a {
+    color: var(--compost-primary);
+}
+
+.compost-navbar ~ .main-content a:hover {
+    color: var(--compost-primary-dark);
+}
+
+/* 퇴비 유형 배지 */
+.compost-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.compost-type-badge.pig {
+    background: #FCE7F3;
+    color: #BE185D;
+}
+
+.compost-type-badge.cow {
+    background: #FEF3C7;
+    color: #A16207;
+}
+
+.compost-type-badge.chicken {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+.compost-type-badge.mixed {
+    background: #E0E7FF;
+    color: #4F46E5;
+}
+
+.compost-type-badge.other {
+    background: #F3F4F6;
+    color: #6B7280;
+}
+
+/* 검사목적 배지 */
+.purpose-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.purpose-badge.quality {
+    background: #D1FAE5;
+    color: #059669;
+}
+
+.purpose-badge.maturity {
+    background: #DBEAFE;
+    color: #2563EB;
+}
+
+.purpose-badge.analysis {
+    background: #FEF3C7;
+    color: #A16207;
+}
+
+.purpose-badge.other {
+    background: #F3F4F6;
+    color: #6B7280;
+}
+
+/* ========================================
+   새 UI 스타일 - 시료종류/축종 선택
+   ======================================== */
+
+/* 접수번호/날짜 헤더 표시 */
+.reception-info {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+}
+
+.reception-number-display,
+.reception-date-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.reception-info .label {
+    font-size: 0.75rem;
+    color: var(--compost-primary-dark);
+    font-weight: 500;
+}
+
+.reception-info .reception-input,
+.reception-info .date-input {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--compost-primary-light);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+    width: auto;
+}
+
+.reception-info .reception-input {
+    width: 60px;
+    text-align: center;
+}
+
+.reception-info .date-input {
+    width: 130px;
+}
+
+/* 시료종류 버튼 - 카드 가로 폭 채우기 */
+.sample-type-options {
+    display: flex !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+}
+
+.sample-type-options .checkbox-card {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+}
+
+.sample-type-options .checkbox-card .checkbox-content {
+    justify-content: center !important;
+    padding: 0.6rem 0.4rem !important;
+}
+
+.checkbox-card {
+    display: block;
+    cursor: pointer;
+}
+
+/* 폼 필드 전체 너비 */
+.compost-navbar ~ .main-content .form-field.full-width {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+}
+
+/* 축종 버튼 - 카드 가로 폭 채우기 */
+.animal-type-options {
+    display: flex !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+}
+
+.animal-type-options .checkbox-card {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+}
+
+.animal-type-options .checkbox-card .checkbox-content {
+    justify-content: center !important;
+    padding: 0.6rem 0.4rem !important;
+}
+
+.checkbox-card input {
+    display: none;
+}
+
+.checkbox-card .checkbox-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border: 2px solid #E5E7EB;
+    border-radius: 10px;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+/* 기본 small 스타일은 sample-type에만 적용 */
+.sample-type-options .checkbox-card.small .checkbox-content {
+    padding: 0.4rem 0.6rem;
+    flex-direction: row;
+    min-width: auto;
+}
+
+.checkbox-card:hover .checkbox-content {
+    border-color: var(--compost-primary-light);
+    background: #FFFBEB;
+}
+
+.checkbox-card input:checked + .checkbox-content {
+    border-color: var(--compost-primary);
+    background: var(--compost-primary-light);
+}
+
+.checkbox-card .checkbox-icon {
+    font-size: 1.25rem;
+}
+
+.checkbox-card.small .checkbox-icon {
+    font-size: 0.9rem;
+}
+
+.checkbox-card .checkbox-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.checkbox-card.small .checkbox-label {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.checkbox-card input:checked + .checkbox-content .checkbox-label {
+    color: var(--compost-primary-dark);
+}
+
+/* 기타 입력 필드 */
+.other-input {
+    margin-top: 0.5rem;
+}
+
+.other-input.hidden {
+    display: none;
+}
+
+/* 통보방법 인라인 그룹 */
+.reception-method-group.inline {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.reception-method-group.inline .reception-method-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reception-method-group.inline .reception-method-btn:hover {
+    border-color: var(--compost-primary-light);
+    background: #FFFBEB;
+}
+
+.reception-method-group.inline .reception-method-btn.active {
+    border-color: var(--compost-primary);
+    background: var(--compost-primary-light);
+}
+
+.reception-method-group.inline .method-icon {
+    font-size: 1rem;
+}
+
+.reception-method-group.inline .method-text {
+    font-size: 0.8rem;
+    color: #374151;
+}
+
+/* 안내문구 스타일 */
+.form-notice {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+    border: 1px solid var(--compost-primary-light);
+    border-radius: 8px;
+}
+
+.form-notice p {
+    font-size: 0.8rem;
+    color: var(--compost-primary-dark);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* 축종 배지 */
+.animal-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.animal-type-badge.cow {
+    background: #FEF3C7;
+    color: #A16207;
+}
+
+.animal-type-badge.pig {
+    background: #FCE7F3;
+    color: #BE185D;
+}
+
+.animal-type-badge.chicken {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+.animal-type-badge.other {
+    background: #F3F4F6;
+    color: #6B7280;
+}
+
+/* 시료종류 배지 */
+.sample-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.sample-type-badge.compost {
+    background: #D1FAE5;
+    color: #059669;
+}
+
+.sample-type-badge.liquid {
+    background: #DBEAFE;
+    color: #2563EB;
+}
+
+/* 주소 스타일은 공통 style.css 사용 (토양과 동일) */
+
+/* 시료수 입력창 크기 조정 - 확대 */
+#sampleCount {
+    width: 120px;
+    min-width: 120px;
+}
+
+/* 검사에 따른 자료, 목적, 비고 - 채취년월일+시료수 전체 너비에 맞춤 */
+#rawMaterials,
+#purpose,
+#note {
+    width: 100%;
+}
+
+/* 검사에 따른 자료 입력란 */
+#rawMaterials {
+    min-height: 60px;
+    resize: vertical;
+}
+
+/* 목적(용도) 선택창 */
+#purpose {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.6rem;
+}
+
+/* 퇴비화 적합여부 판정 글씨를 회색으로 (placeholder처럼) */
+#purpose option[value="퇴비화기준 적합여부 판정"] {
+    color: #9CA3AF;
+}
+
+/* ========================================
+   퇴비 페이지 컴팩트 레이아웃
+   ======================================== */
+
+/* 카드 본문 패딩 축소 */
+.compost-navbar ~ .main-content .card-body {
+    padding: 0.75rem;
+}
+
+/* 폼 행 간격 축소 */
+.compost-navbar ~ .main-content .form-row {
+    margin-bottom: 0.5rem;
+}
+
+/* 라벨 크기 축소 */
+.compost-navbar ~ .main-content .form-field label {
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+/* 입력 필드 크기 축소 (체크박스 제외) */
+.compost-navbar ~ .main-content input:not([type="checkbox"]):not([type="radio"]),
+.compost-navbar ~ .main-content select,
+.compost-navbar ~ .main-content textarea {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+/* 테이블 체크박스 크기 고정 */
+.compost-navbar ~ .main-content .data-table input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+}
+
+/* 비고 텍스트 영역 */
+.compost-navbar ~ .main-content #note {
+    min-height: 40px;
+}
+
+/* 두 카드 가운데 정렬 */
+.compost-navbar ~ .main-content .form-two-column {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.compost-navbar ~ .main-content .form-left-column,
+.compost-navbar ~ .main-content .form-right-column {
+    flex: 0 0 auto;
+}
+
+/* 의뢰자 카드 크기 */
+.compost-navbar ~ .main-content .form-left-column .form-card {
+    min-width: 480px;
+}
+
+/* 의뢰내용 카드 크기 */
+.compost-navbar ~ .main-content .form-right-column .form-card {
+    min-width: 520px;
+}
+
+/* 농장주소 입력창 크기 확대 및 전체 너비 */
+.compost-navbar ~ .main-content #farmAddressFull {
+    height: 44px;
+    font-size: 1rem;
+    padding: 0.625rem 0.875rem;
+    width: 100%;
+}
+
+.compost-navbar ~ .main-content .lot-address-autocomplete-wrapper {
+    width: 100%;
+}
+
+/* 면적 입력창 전체 너비 */
+.compost-navbar ~ .main-content #farmArea {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 면적 입력 wrapper */
+.compost-navbar ~ .main-content .area-input-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* 접수 목록 테이블 - 우편번호 숨김 */
+.compost-navbar ~ .main-content .col-hidden {
+    display: none;
+}
+
+/* 전체 보기 모드에서 숨김 컬럼 표시 */
+.compost-navbar ~ .main-content .data-table.full-view .col-hidden {
+    display: table-cell;
+}
+
+/* 주소 컬럼 스타일 - 고정 너비 두 줄 표시 */
+.compost-navbar ~ .main-content .col-address {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+}
+
+/* 농장주소 컬럼 스타일 - 고정 너비 두 줄 표시 */
+.compost-navbar ~ .main-content .col-farm-address {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+}
+
+/* 주소, 농장주소 데이터 셀 왼쪽 정렬 + 두 줄 표시 */
+.compost-navbar ~ .main-content td.col-address,
+.compost-navbar ~ .main-content td.col-farm-address {
+    text-align: left;
+    white-space: normal;
+    word-break: keep-all;
+    line-height: 1.4;
+}
+
+/* 레이아웃: form-two-column 클래스 사용 (style.css 공통 스타일) */
+
+/* ========================================
+   축종 버튼 강제 스타일 (파일 끝에서 최우선)
+   ======================================== */
+div.animal-type-options {
+    display: flex !important;
+    gap: 0.5rem !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    justify-content: stretch !important;
+}
+
+div.animal-type-options label.checkbox-card.small {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+div.animal-type-options label.checkbox-card.small div.checkbox-content {
+    padding: 0.75rem 0.5rem !important;
+    justify-content: center !important;
+    width: 100% !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+}
+
+/* ========================================
+   년도 선택 드롭다운 스타일
+   ======================================== */
+
+.year-select-wrapper {
+    margin-left: auto;
+    margin-right: 0.75rem;
+}
+
+.year-select,
+.list-year-select {
+    background: white;
+    color: var(--compost-primary-dark);
+    border: 2px solid var(--compost-primary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23A16207' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 1.8rem;
+    transition: all 0.2s ease;
+}
+
+.list-year-select {
+    margin-left: 0.75rem;
+}
+
+.year-select:hover,
+.list-year-select:hover {
+    background: var(--compost-primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(161, 98, 7, 0.3);
+}
+
+.year-select:focus,
+.list-year-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(161, 98, 7, 0.2);
+}
+
+.year-select option,
+.list-year-select option {
+    background: white;
+    color: var(--compost-primary-dark);
+    font-weight: 500;
+}
+
+/* ========================================
+   다크 모드 스타일
+   ======================================== */
+
+/* 다크 모드 네비게이션 바 */
+[data-theme="dark"] .compost-navbar {
+    background: linear-gradient(135deg, #451a03 0%, #292524 100%);
+    border-bottom-color: rgba(161, 98, 7, 0.3);
+}
+
+[data-theme="dark"] .compost-navbar .brand-text {
+    color: #fcd34d;
+}
+
+[data-theme="dark"] .back-btn {
+    background: rgba(161, 98, 7, 0.15);
+    color: #fcd34d;
+    border-color: rgba(161, 98, 7, 0.3);
+}
+
+[data-theme="dark"] .back-btn:hover {
+    background: var(--compost-primary);
+    color: white;
+}
+
+/* 다크 모드 카드 헤더 */
+[data-theme="dark"] .compost-navbar ~ .main-content .form-card .card-header {
+    background: linear-gradient(135deg, rgba(69, 26, 3, 0.95) 0%, rgba(41, 37, 36, 0.95) 100%);
+    border-bottom-color: rgba(161, 98, 7, 0.2);
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content .form-card .card-header h3 {
+    color: #fcd34d;
+}
+
+/* 다크 모드 시료종류/축종 옵션 */
+[data-theme="dark"] .sample-type-options label,
+[data-theme="dark"] .animal-type-options label {
+    background: rgba(41, 37, 36, 0.9);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .sample-type-options label:hover,
+[data-theme="dark"] .animal-type-options label:hover {
+    background: rgba(161, 98, 7, 0.15);
+    border-color: rgba(161, 98, 7, 0.4);
+}
+
+[data-theme="dark"] .sample-type-options input:checked + label,
+[data-theme="dark"] .animal-type-options input:checked + label {
+    background: var(--compost-gradient);
+    border-color: var(--compost-primary);
+    color: white;
+}
+
+/* 다크 모드 년도 선택 */
+[data-theme="dark"] .year-select,
+[data-theme="dark"] .list-year-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: rgba(161, 98, 7, 0.15) !important;
+    color: #fcd34d !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fcd34d' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+}
+
+[data-theme="dark"] .year-select:hover,
+[data-theme="dark"] .list-year-select:hover {
+    background-color: rgba(161, 98, 7, 0.25) !important;
+}
+
+[data-theme="dark"] .year-select:focus,
+[data-theme="dark"] .list-year-select:focus {
+    border-color: #d97706 !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
+}
+
+[data-theme="dark"] .year-select option,
+[data-theme="dark"] .list-year-select option {
+    background-color: #451a03 !important;
+    color: #fcd34d !important;
+}
+
+/* 다크 모드 select 공통 */
+[data-theme="dark"] .compost-navbar ~ .main-content select,
+[data-theme="dark"] .compost-navbar ~ .main-content .form-field select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(217, 119, 6, 0.3) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23fcd34d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content select:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content .form-field select:focus {
+    border-color: #d97706 !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content select option {
+    background-color: #451a03 !important;
+    color: #fcd34d !important;
+}
+
+/* 다크 모드 items-per-page */
+[data-theme="dark"] .compost-navbar ~ .main-content .items-per-page {
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    color: #fcd34d !important;
+    border-color: rgba(217, 119, 6, 0.3) !important;
+}
+
+/* 다크 모드 select 강제 적용 (ID 직접 타겟팅) */
+[data-theme="dark"] .compost-navbar ~ .main-content #subCategory,
+[data-theme="dark"] .compost-navbar ~ .main-content #purpose,
+[data-theme="dark"] .compost-navbar ~ .main-content #sampleName {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(217, 119, 6, 0.3) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23fcd34d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 16px !important;
+    padding-right: 40px !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content #subCategory:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content #purpose:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content #sampleName:focus {
+    border-color: #d97706 !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content #subCategory option,
+[data-theme="dark"] .compost-navbar ~ .main-content #purpose option,
+[data-theme="dark"] .compost-navbar ~ .main-content #sampleName option {
+    background-color: #451a03 !important;
+    color: #fcd34d !important;
+}
+
+/* ========================================
+   다크 모드 의뢰내용 카드 스타일
+   ======================================== */
+
+/* 다크 모드 카드 본문 배경 */
+[data-theme="dark"] .compost-navbar ~ .main-content .form-card .card-body {
+    background-color: rgba(41, 37, 36, 0.95) !important;
+}
+
+/* 다크 모드 라벨 */
+[data-theme="dark"] .compost-navbar ~ .main-content .form-field label {
+    color: #fcd34d !important;
+}
+
+/* 다크 모드 필수 표시 */
+[data-theme="dark"] .compost-navbar ~ .main-content .required {
+    color: #f87171 !important;
+}
+
+/* 다크 모드 시료종류/축종 버튼 (checkbox-card) */
+[data-theme="dark"] .checkbox-card .checkbox-content {
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .checkbox-card .checkbox-label {
+    color: #fcd34d !important;
+}
+
+[data-theme="dark"] .checkbox-card:hover .checkbox-content {
+    background-color: rgba(161, 98, 7, 0.3) !important;
+    border-color: rgba(161, 98, 7, 0.6) !important;
+}
+
+[data-theme="dark"] .checkbox-card input:checked + .checkbox-content {
+    background: var(--compost-gradient) !important;
+    border-color: var(--compost-primary) !important;
+}
+
+[data-theme="dark"] .checkbox-card input:checked + .checkbox-content .checkbox-label {
+    color: #ffffff !important;
+}
+
+/* 다크 모드 입력 필드 공통 */
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="text"],
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="number"],
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="date"],
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="tel"],
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="email"] {
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="text"]::placeholder,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="number"]::placeholder,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="tel"]::placeholder,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="email"]::placeholder {
+    color: rgba(252, 211, 77, 0.5) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="text"]:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="number"]:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="date"]:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="tel"]:focus,
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="email"]:focus {
+    border-color: #d97706 !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2) !important;
+}
+
+/* 다크 모드 textarea */
+[data-theme="dark"] .compost-navbar ~ .main-content textarea {
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content textarea::placeholder {
+    color: rgba(252, 211, 77, 0.5) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content textarea:focus {
+    border-color: #d97706 !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2) !important;
+}
+
+/* 다크 모드 검사항목 정보 박스 */
+[data-theme="dark"] .test-items-info {
+    background: linear-gradient(135deg, rgba(69, 26, 3, 0.9) 0%, rgba(41, 37, 36, 0.9) 100%) !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .test-items-label {
+    color: #fcd34d !important;
+}
+
+[data-theme="dark"] .test-items-list {
+    color: #d6d3d1 !important;
+}
+
+/* 다크 모드 안내 문구 */
+[data-theme="dark"] .form-notice {
+    background: linear-gradient(135deg, rgba(69, 26, 3, 0.9) 0%, rgba(41, 37, 36, 0.9) 100%) !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .form-notice p {
+    color: #fcd34d !important;
+}
+
+/* 다크 모드 접수번호/날짜 입력 */
+[data-theme="dark"] .reception-info .reception-input,
+[data-theme="dark"] .reception-info .date-input {
+    background-color: rgba(69, 26, 3, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .reception-info .label {
+    color: #fcd34d !important;
+}
+
+/* 다크 모드 날짜 입력 아이콘 색상 */
+[data-theme="dark"] .compost-navbar ~ .main-content input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8) sepia(1) saturate(5) hue-rotate(10deg);
+}
+
+/* 다크 모드 시료수 단위 텍스트 */
+[data-theme="dark"] .sample-count-unit {
+    color: #d6d3d1 !important;
+}
+
+/* 다크 모드 자동완성 드롭다운 */
+[data-theme="dark"] .compost-navbar ~ .main-content .lot-address-autocomplete-list {
+    background-color: #451a03 !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content .lot-address-autocomplete-list li {
+    color: #fcd34d !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ .main-content .lot-address-autocomplete-list li:hover {
+    background-color: rgba(161, 98, 7, 0.3) !important;
+}
+
+/* 다크 모드 면적 단위 토글 */
+[data-theme="dark"] .area-unit-toggle {
+    background-color: rgba(69, 26, 3, 0.5) !important;
+    border-color: rgba(161, 98, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .area-unit-toggle .unit-btn {
+    background-color: transparent !important;
+    color: rgba(252, 211, 77, 0.7) !important;
+}
+
+[data-theme="dark"] .area-unit-toggle .unit-btn.active {
+    background-color: rgba(161, 98, 7, 0.8) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .area-unit-toggle .unit-btn:hover:not(.active) {
+    background-color: rgba(161, 98, 7, 0.3) !important;
+    color: #fcd34d !important;
+}
+
+/* 다크 모드 주소 검색 버튼 */
+[data-theme="dark"] .btn-address-search {
+    background: var(--compost-gradient) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .btn-address-search:hover {
+    background: linear-gradient(135deg, #854D0E, #713F12) !important;
+}
+
+/* ========================================
+   다크 모드 주소 검색 모달 (카카오 우편번호)
+   ======================================== */
+
+/* 퇴·액비 페이지 주소 검색 모달 배경 */
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-content,
+[data-theme="dark"] .compost-page #addressModal .modal-content {
+    background: linear-gradient(135deg, #451a03 0%, #292524 100%) !important;
+    border: 1px solid rgba(217, 119, 6, 0.4) !important;
+}
+
+/* 모달 헤더 */
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-header,
+[data-theme="dark"] .compost-page #addressModal .modal-header {
+    background: linear-gradient(135deg, rgba(69, 26, 3, 0.95) 0%, rgba(41, 37, 36, 0.95) 100%) !important;
+    border-bottom: 1px solid rgba(217, 119, 6, 0.3) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-header h3,
+[data-theme="dark"] .compost-page #addressModal .modal-header h3 {
+    color: #fcd34d !important;
+}
+
+/* 모달 닫기 버튼 */
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-close,
+[data-theme="dark"] .compost-page #addressModal .modal-close {
+    background: rgba(217, 119, 6, 0.2) !important;
+    color: #fcd34d !important;
+    border: 1px solid rgba(217, 119, 6, 0.3) !important;
+}
+
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-close:hover,
+[data-theme="dark"] .compost-page #addressModal .modal-close:hover {
+    background: rgba(217, 119, 6, 0.4) !important;
+    color: #ffffff !important;
+}
+
+/* 모달 본문 */
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-body,
+[data-theme="dark"] .compost-page #addressModal .modal-body {
+    background: rgba(41, 37, 36, 0.95) !important;
+    padding: 1rem !important;
+}
+
+/* 카카오 우편번호 컨테이너 - iframe은 외부 서비스라 내부 스타일 변경 불가 */
+/* 컨테이너에 둥근 모서리와 테두리 추가 */
+[data-theme="dark"] .compost-navbar ~ #addressModal .postcode-container,
+[data-theme="dark"] .compost-page #addressModal .postcode-container,
+[data-theme="dark"] .compost-navbar ~ #addressModal #daumPostcodeContainer,
+[data-theme="dark"] .compost-page #addressModal #daumPostcodeContainer {
+    background: #ffffff !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    border: 2px solid rgba(217, 119, 6, 0.5) !important;
+}
+
+/* 모달 오버레이 */
+[data-theme="dark"] .compost-navbar ~ #addressModal .modal-overlay,
+[data-theme="dark"] .compost-page #addressModal .modal-overlay {
+    background: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* ========================================
+   판정 버튼 스타일 (적합/부적합 토글)
+   ======================================== */
+
+.btn-result {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 50px;
+}
+
+.btn-result:hover {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+}
+
+.btn-result.pass {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+}
+
+.btn-result.pass:hover {
+    background: #bbf7d0;
+    border-color: #4ade80;
+}
+
+.btn-result.fail {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.btn-result.fail:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}
+
+/* 판정 컬럼 너비 */
+.col-result {
+    width: 60px;
+    text-align: center;
+}
+
+/* 부숙도 컬럼 */
+.col-maturity {
+    width: 100px;
+    min-width: 100px;
+    text-align: center;
+}
+
+.maturity-select {
+    width: 100%;
+    min-width: 90px;
+    padding: 4px 24px 4px 8px;
+    font-size: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background-color: white !important;
+    color: #1f2937 !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 12px;
+}
+
+.maturity-select:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+/* 함수율 컬럼 */
+.col-moisture {
+    width: 70px;
+    text-align: center;
+}
+
+.moisture-input {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.moisture-input:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.moisture-input::placeholder {
+    color: #9ca3af;
+}
+
+/* 다크 모드 부숙도/함수율 */
+[data-theme="dark"] .maturity-select {
+    background-color: rgba(69, 26, 3, 0.8) !important;
+    color: #fcd34d !important;
+    border-color: rgba(217, 119, 6, 0.4);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23fcd34d' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+}
+
+[data-theme="dark"] .maturity-select:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .maturity-select option {
+    background: #451a03;
+    color: #fcd34d;
+}
+
+[data-theme="dark"] .moisture-input {
+    background: rgba(69, 26, 3, 0.8);
+    color: #fcd34d;
+    border-color: rgba(217, 119, 6, 0.4);
+}
+
+[data-theme="dark"] .moisture-input:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .moisture-input::placeholder {
+    color: rgba(252, 211, 77, 0.5);
+}
+
+/* 다크 모드 판정 버튼 */
+[data-theme="dark"] .btn-result {
+    background: rgba(69, 26, 3, 0.6);
+    color: #d6d3d1;
+    border-color: rgba(161, 98, 7, 0.4);
+}
+
+[data-theme="dark"] .btn-result:hover {
+    background: rgba(69, 26, 3, 0.8);
+    border-color: rgba(161, 98, 7, 0.6);
+}
+
+[data-theme="dark"] .btn-result.pass {
+    background: rgba(22, 101, 52, 0.4);
+    color: #86efac;
+    border-color: rgba(134, 239, 172, 0.5);
+}
+
+[data-theme="dark"] .btn-result.pass:hover {
+    background: rgba(22, 101, 52, 0.6);
+    border-color: rgba(134, 239, 172, 0.7);
+}
+
+[data-theme="dark"] .btn-result.fail {
+    background: rgba(220, 38, 38, 0.3);
+    color: #fca5a5;
+    border-color: rgba(252, 165, 165, 0.5);
+}
+
+[data-theme="dark"] .btn-result.fail:hover {
+    background: rgba(220, 38, 38, 0.5);
+    border-color: rgba(252, 165, 165, 0.7);
+}

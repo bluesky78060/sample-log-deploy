@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라벨지 인쇄</title>
+
+    <!-- Google Fonts: Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="label-print.css">
+    <style>
+        :root {
+            --gradient-start: #4f46e5;
+            --gradient-mid: #7c3aed;
+            --gradient-end: #ec4899;
+            --surface: rgba(255, 255, 255, 0.96);
+            --surface-soft: rgba(255, 255, 255, 0.9);
+            --border-subtle: rgba(99, 102, 241, 0.08);
+            --border-strong: rgba(79, 70, 229, 0.18);
+            --text-strong: #1f2937;
+            --text-body: #4b5563;
+            --text-muted: #6b7280;
+            --text-quiet: #9ca3af;
+            --shadow-strong: 0 26px 42px -18px rgba(79, 70, 229, 0.42);
+            --shadow-soft: 0 20px 36px -20px rgba(79, 70, 229, 0.25);
+            --radius-lg: 24px;
+            --radius-md: 18px;
+            --radius-sm: 12px;
+            --transition: all 0.25s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 45%, var(--gradient-end) 100%);
+            min-height: 100vh;
+            color: var(--text-body);
+            padding: 0 0 80px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+
+        .header {
+            padding: 64px 0 24px;
+            text-align: center;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            position: relative;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 12px;
+            color: white;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            backdrop-filter: blur(6px);
+            transition: all 0.2s ease;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .header-top {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .hero-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 38px;
+            backdrop-filter: blur(6px);
+        }
+
+        .header h1 {
+            font-size: clamp(2.8rem, 5vw, 3.6rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .header p {
+            max-width: 760px;
+            font-size: 1rem;
+            line-height: 1.32;
+            color: rgba(255, 255, 255, 0.88);
+        }
+
+        .section-card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-strong);
+            border: 1px solid var(--border-subtle);
+            overflow: hidden;
+            margin-top: 24px;
+        }
+
+        .section-header {
+            padding: 28px 32px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            background: linear-gradient(120deg, rgba(236, 72, 153, 0.16), rgba(79, 70, 229, 0.05));
+        }
+
+        .section-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            color: var(--gradient-start);
+            box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.12);
+        }
+
+        .section-icon.small {
+            width: 40px;
+            height: 40px;
+            font-size: 1.3rem;
+        }
+
+        .section-header h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-strong);
+        }
+
+        .section-header p {
+            font-size: 0.98rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .section-body {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            background: white;
+        }
+
+        .form-group label,
+        .field-section-title {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--text-strong);
+            font-size: 0.98rem;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid rgba(99, 102, 241, 0.22);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            transition: var(--transition);
+            background: rgba(248, 249, 255, 0.9);
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: rgba(79, 70, 229, 0.6);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+            background: white;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 12px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: var(--transition);
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-mid));
+            box-shadow: 0 16px 28px -18px rgba(79, 70, 229, 0.85);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 18px 30px -16px rgba(79, 70, 229, 0.95);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-pink {
+            background: linear-gradient(135deg, #ec4899, #d946ef);
+            box-shadow: 0 20px 34px -18px rgba(236, 72, 153, 0.6);
+        }
+
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.85);
+            color: var(--gradient-start);
+            border: 1.5px solid rgba(99, 102, 241, 0.28);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background: rgba(79, 70, 229, 0.08);
+            color: var(--gradient-mid);
+        }
+
+        .file-upload {
+            border: 2.5px dashed rgba(236, 72, 153, 0.28);
+            border-radius: var(--radius-md);
+            padding: 48px 32px;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(124, 58, 237, 0.05));
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-upload:hover,
+        .file-upload.dragover {
+            border-color: rgba(236, 72, 153, 0.45);
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(236, 72, 153, 0.08));
+            transform: translateY(-2px);
+        }
+
+        .upload-icon {
+            font-size: 2.4rem;
+            color: rgba(236, 72, 153, 0.72);
+            margin-bottom: 16px;
+        }
+
+        .upload-title {
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin-bottom: 6px;
+            color: var(--text-strong);
+        }
+
+        .upload-sub {
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+
+        .upload-cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: rgba(236, 72, 153, 0.12);
+            color: #ec4899;
+            border-radius: 999px;
+            padding: 10px 20px;
+            font-weight: 600;
+        }
+
+        .progress-card {
+            background: rgba(248, 250, 255, 0.9);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .progress-label {
+            font-weight: 600;
+            color: var(--text-strong);
+            font-size: 0.95rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(79, 70, 229, 0.12);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-mid));
+            transition: width 0.4s ease;
+            border-radius: inherit;
+        }
+
+        .progress-text {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .progress-steps {
+            margin-top: 12px;
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progress-steps li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.92rem;
+            color: var(--text-muted);
+        }
+
+        .progress-steps .step-box {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 1.5px solid rgba(99, 102, 241, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .progress-steps li.in-progress {
+            color: var(--gradient-start);
+            font-weight: 600;
+        }
+
+        .progress-steps li.in-progress .step-box {
+            border-color: var(--gradient-start);
+            color: var(--gradient-start);
+        }
+
+        .progress-steps li.done {
+            color: var(--text-strong);
+            font-weight: 600;
+        }
+
+        .progress-steps li.done .step-box {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-mid));
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .progress-note {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #d97706;
+        }
+
+        .data-preview {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(99, 102, 241, 0.12);
+            padding: 24px;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .preview-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-strong);
+        }
+
+        .data-table {
+            max-height: 240px;
+            overflow: auto;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        #labelFieldMapping {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            column-gap: 20px;
+            row-gap: 18px;
+            margin-top: 12px;
+        }
+
+        #labelFieldMapping .field-mapping {
+            display: contents;
+        }
+
+        #labelFieldMapping .field-mapping label {
+            font-weight: 600;
+            color: var(--text-strong);
+            align-self: center;
+        }
+
+        #labelFieldMapping .field-mapping select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: var(--radius-sm);
+            border: 1.5px solid rgba(99, 102, 241, 0.22);
+            background: rgba(248, 249, 255, 0.9);
+            transition: var(--transition);
+        }
+
+        #labelFieldMapping .field-mapping select:focus {
+            outline: none;
+            border-color: rgba(79, 70, 229, 0.6);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+            background: white;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .start-position-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .start-position-wrapper select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid rgba(99, 102, 241, 0.22);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            transition: var(--transition);
+            background: rgba(248, 249, 255, 0.9);
+        }
+
+        .start-position-wrapper select:focus {
+            outline: none;
+            border-color: rgba(79, 70, 229, 0.6);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+            background: white;
+        }
+
+        .hint-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin: 0;
+            padding-left: 4px;
+        }
+
+        /* 라벨 위치 선택 그리드 */
+        .label-position-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .label-grid-preview {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            padding: 12px;
+            background: rgba(248, 249, 255, 0.9);
+            border: 1.5px solid rgba(99, 102, 241, 0.15);
+            border-radius: var(--radius-sm);
+            width: fit-content;
+        }
+
+        .label-cell {
+            width: 36px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: white;
+            border: 1.5px solid rgba(99, 102, 241, 0.2);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .label-cell:hover {
+            border-color: var(--gradient-mid);
+            background: rgba(124, 58, 237, 0.08);
+            transform: scale(1.05);
+        }
+
+        .label-cell.used {
+            background: rgba(156, 163, 175, 0.3);
+            color: var(--text-quiet);
+            border-color: rgba(156, 163, 175, 0.4);
+        }
+
+        .label-cell.start {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-mid));
+            color: white;
+            border-color: var(--gradient-mid);
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+        }
+
+        .label-cell.available {
+            background: rgba(16, 185, 129, 0.15);
+            color: #059669;
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .label-position-info {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-top: 4px;
+        }
+
+        .position-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            color: var(--text-body);
+        }
+
+        .legend-box {
+            width: 16px;
+            height: 12px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .legend-box.used {
+            background: rgba(156, 163, 175, 0.3);
+            border-color: rgba(156, 163, 175, 0.4);
+        }
+
+        .legend-box.start {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-mid));
+            border-color: var(--gradient-mid);
+        }
+
+        .legend-box.available {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .preview-card {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(99, 102, 241, 0.12);
+            padding: 24px;
+            box-shadow: var(--shadow-soft);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .preview-card h3 {
+            color: var(--text-strong);
+            font-size: 1.2rem;
+        }
+
+        .preview-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .center-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.55);
+            padding: 24px;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            width: min(1100px, 95vw);
+            max-height: 90vh;
+            border-radius: 24px;
+            box-shadow: 0 32px 64px -24px rgba(15, 23, 42, 0.45);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 22px 28px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            background: linear-gradient(120deg, rgba(79, 70, 229, 0.08), rgba(236, 72, 153, 0.04));
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            color: var(--text-strong);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow: auto;
+            background: rgba(250, 251, 255, 0.9);
+        }
+
+        #labelModalSheet {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            align-items: flex-start;
+        }
+
+        @media (max-width: 840px) {
+            .container {
+                padding: 0 16px;
+            }
+
+            .header {
+                padding: 48px 0 20px;
+                gap: 12px;
+            }
+
+            .hero-icon {
+                width: 64px;
+                height: 64px;
+                font-size: 32px;
+                border-radius: 20px;
+            }
+
+            .header h1 {
+                font-size: clamp(1.8rem, 6vw, 2.4rem);
+                line-height: 1.2;
+            }
+
+            .header p {
+                font-size: 0.9rem;
+                line-height: 1.5;
+                padding: 0 8px;
+            }
+
+            .back-link {
+                top: 12px;
+                left: 12px;
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+
+            .section-card {
+                border-radius: 18px;
+            }
+
+            .section-body {
+                padding: 20px;
+            }
+
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 18px 20px;
+            }
+
+            .section-icon {
+                width: 42px;
+                height: 42px;
+                font-size: 1.4rem;
+            }
+
+            .section-header h3 {
+                font-size: 1.1rem;
+            }
+
+            .section-header p {
+                font-size: 0.85rem;
+                line-height: 1.5;
+            }
+
+            button, .btn {
+                min-height: 48px !important;
+                padding: 14px 20px !important;
+                font-size: 0.95rem !important;
+            }
+
+            select {
+                min-height: 48px !important;
+                padding: 12px 16px !important;
+                font-size: 1rem !important;
+            }
+
+            #labelFieldMapping {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .button-row,
+            .preview-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .button-row .btn,
+            .preview-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../src/index.html#listView" class="back-link">← 접수목록</a>
+            <div class="header-top">
+                <div class="hero-icon">🏷️</div>
+                <h1>라벨지 인쇄</h1>
+            </div>
+            <p>엑셀 파일을 업로드하여 A4 라벨지에 맞는 인쇄용 시트를 생성하세요.</p>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-icon">🏷️</div>
+                <div>
+                    <h3>라벨 출력 설정</h3>
+                    <p>라벨 템플릿과 필드를 설정하여 인쇄용 시트를 생성하세요</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="file-upload" id="labelFileDropArea">
+                    <div class="upload-icon">📊</div>
+                    <p class="upload-title">주소가 포함된 엑셀 파일을 선택하거나 드래그하세요</p>
+                    <p class="upload-sub">A4 라벨지 (2열 9행, 18개) 기준 · 최대 500행 지원</p>
+                    <span class="upload-cta">파일 선택</span>
+                    <input type="file" id="labelFile" accept=".xls,.xlsx" hidden name="labelFile" aria-label="라벨용 엑셀 파일 선택">
+                </div>
+                <div class="center-row">
+                    <button class="btn btn-outline" id="btnLoadSampleData" aria-label="샘플 데이터로 라벨 출력 테스트하기">📊 샘플 데이터로 테스트</button>
+                </div>
+
+                <div id="labelUploadProgress" class="hidden progress-card">
+                    <div class="progress-label">파일 처리 중...</div>
+                    <div class="progress-bar">
+                        <div id="labelProgressFill" class="progress-fill"></div>
+                    </div>
+                    <p id="labelProgressText" class="progress-text">처리 중...</p>
+                    <ul id="labelProgressSteps" class="progress-steps"></ul>
+                </div>
+
+                <div id="labelDataPreview" class="hidden data-preview">
+                    <div class="preview-heading">
+                        <div class="section-icon small">📋</div>
+                        <h3>데이터 미리보기</h3>
+                    </div>
+                    <p id="labelPreviewNote" class="progress-note hidden"></p>
+                    <div id="labelDataTable" class="data-table"></div>
+
+                    <div class="form-group">
+                        <label for="labelTemplate">라벨 템플릿 선택</label>
+                        <select id="labelTemplate" name="labelTemplate" autocomplete="off" aria-label="라벨 템플릿 선택">
+                            <option value="2x9">A4 - 2열 9행 (18개, 100×30mm)</option>
+                            <option disabled>(추후 추가 예정)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="labelStartPosition">시작 위치 (라벨지 절약)</label>
+                        <div class="start-position-wrapper">
+                            <div class="label-position-container">
+                                <!-- 라벨 위치 미니 프리뷰 -->
+                                <div class="label-grid-preview" id="labelGridPreview">
+                                    <div class="label-cell" data-pos="1">1</div>
+                                    <div class="label-cell" data-pos="2">2</div>
+                                    <div class="label-cell" data-pos="3">3</div>
+                                    <div class="label-cell" data-pos="4">4</div>
+                                    <div class="label-cell" data-pos="5">5</div>
+                                    <div class="label-cell" data-pos="6">6</div>
+                                    <div class="label-cell" data-pos="7">7</div>
+                                    <div class="label-cell" data-pos="8">8</div>
+                                    <div class="label-cell" data-pos="9">9</div>
+                                    <div class="label-cell" data-pos="10">10</div>
+                                    <div class="label-cell" data-pos="11">11</div>
+                                    <div class="label-cell" data-pos="12">12</div>
+                                    <div class="label-cell" data-pos="13">13</div>
+                                    <div class="label-cell" data-pos="14">14</div>
+                                    <div class="label-cell" data-pos="15">15</div>
+                                    <div class="label-cell" data-pos="16">16</div>
+                                    <div class="label-cell" data-pos="17">17</div>
+                                    <div class="label-cell" data-pos="18">18</div>
+                                </div>
+                                <div class="label-position-info">
+                                    <div class="position-legend">
+                                        <span class="legend-item"><span class="legend-box used"></span> 사용됨 (건너뜀)</span>
+                                        <span class="legend-item"><span class="legend-box start"></span> 시작 위치</span>
+                                        <span class="legend-item"><span class="legend-box available"></span> 인쇄 영역</span>
+                                    </div>
+                                    <p class="hint-text">💡 클릭하여 시작 위치를 선택하세요</p>
+                                </div>
+                            </div>
+                            <input type="hidden" id="labelStartPosition" name="labelStartPosition" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="field-section-title">라벨 필드 설정</div>
+                        <div id="labelFieldMapping"></div>
+                        <input type="hidden" id="nameSuffix" value="님 귀하">
+                    </div>
+
+                    <div class="button-row">
+                        <button class="btn btn-pink" id="btnGenerateLabels" aria-label="설정한 템플릿으로 라벨 생성하기">🏷️ 라벨 생성</button>
+                        <button class="btn btn-outline" id="btnLabelReset" aria-label="라벨 설정 초기화하기">↩️ 초기화</button>
+                    </div>
+                </div>
+
+                <div id="labelPreview" class="hidden preview-card">
+                    <h3>🖨️ 라벨 미리보기</h3>
+                    <div class="preview-actions">
+                        <button class="btn btn-pink" id="btnPrintLabels" aria-label="생성된 라벨 인쇄하기">🖨️ 인쇄하기</button>
+                    </div>
+                    <div id="labelSheet" class="label-sheet" style="display:none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 라벨 미리보기/인쇄 모달 -->
+    <div id="labelModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-content" id="labelModalContent">
+            <div class="modal-header">
+                <h3>🖨️ 라벨 미리보기</h3>
+                <div class="preview-actions">
+                    <button class="btn btn-pink" id="btnModalPrint">🖨️ 인쇄</button>
+                    <button class="btn btn-outline" id="btnModalReset">↩️ 초기화</button>
+                    <button class="btn btn-outline" id="btnModalClose">닫기</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="labelModalSheet"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- XLSX 라이브러리 (라벨 출력용) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <script src="label-app.js"></script>
+</body>
+</html>
