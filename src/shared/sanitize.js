@@ -2,6 +2,7 @@
 // 공통 XSS 방지 모듈
 // DOMPurify를 사용한 HTML 새니타이징
 // ========================================
+import DOMPurify from 'dompurify';
 
 /**
  * HTML 문자열을 새니타이즈하여 XSS 공격 방지
@@ -9,7 +10,7 @@
  * @returns {string} 새니타이즈된 HTML 문자열
  */
 function sanitizeHTML(html) {
-    if (typeof DOMPurify !== 'undefined') {
+    if (DOMPurify) {
         const config = {
             ALLOWED_TAGS: [
                 'div', 'span', 'p', 'br', 'hr',
