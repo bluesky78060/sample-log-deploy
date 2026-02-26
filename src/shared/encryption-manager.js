@@ -41,6 +41,12 @@ const EncryptionManager = (function() {
     /** @type {Function|null} 현재 열려있는 모달의 resolve (cleanup용) */
     let _activeModalResolve = null;
 
+    /** 웹 localStorage 키 상수 (Firebase/Electron 미사용 시 폴백) */
+    const LS_KEY_ENCRYPTION_KEY = 'encryption_keyFile';
+    const LS_KEY_SALT = 'encryption_salt';
+    const LS_KEY_RECOVERY_BLOB = 'encryption_recoveryBlob';
+    const LS_KEY_SESSION_PW = 'encryption_sessionPw';
+
     /** 비밀번호 복구 요청 sentinel (비밀번호 채널과 혼동 방지) */
     const RECOVER_SENTINEL = Symbol('recover');
 
@@ -343,6 +349,18 @@ const EncryptionManager = (function() {
             }
         }
 
+        // 3. 웹 localStorage 폴백 (Firebase/Electron 모두 없을 때)
+        try {
+            const lsKey = localStorage.getItem(LS_KEY_ENCRYPTION_KEY);
+            if (lsKey) {
+                _keySource = 'local';
+                console.log('[Encryption] Key loaded from localStorage');
+                return lsKey;
+            }
+        } catch (lsErr) {
+            console.warn('[Encryption] localStorage key load failed:', lsErr.message);
+        }
+
         return null;
     }
 
@@ -422,7 +440,17 @@ const EncryptionManager = (function() {
             }
         }
 
-        // 로컬 저장도 실패 시 키 자체는 반환 (세션 중에만 사용)
+        // 웹 localStorage 폴백 (Firebase/Electron 모두 없을 때)
+        try {
+            localStorage.setItem(LS_KEY_ENCRYPTION_KEY, keyFileContent);
+            console.log('[Encryption] Key stored in localStorage');
+            _keySource = 'local';
+            return keyFileContent;
+        } catch (lsErr) {
+            console.warn('[Encryption] localStorage key save failed:', lsErr.message);
+        }
+
+        // 모든 저장 실패 시 키 자체는 반환 (세션 중에만 사용)
         _keySource = 'generated';
         return keyFileContent;
     }
@@ -576,18 +604,31 @@ const EncryptionManager = (function() {
      * @returns {Promise<ArrayBuffer|null>} Salt ArrayBuffer 또는 null
      */
     async function loadSalt() {
+        // 1. Electron safeStorage
         if (window.electronAPI?.loadSalt) {
             try {
                 const saltBase64 = await window.electronAPI.loadSalt();
                 if (saltBase64 && window.CryptoUtils) {
-                    console.log(`[Encryption] Salt loaded (${saltBase64.length} chars)`);
+                    console.log(`[Encryption] Salt loaded from Electron (${saltBase64.length} chars)`);
                     return window.CryptoUtils.base64ToBuffer(saltBase64);
                 }
-                console.log('[Encryption] No saved salt found');
             } catch (err) {
-                console.warn('[Encryption] Salt load failed:', err.message);
+                console.warn('[Encryption] Electron salt load failed:', err.message);
             }
         }
+
+        // 2. 웹 localStorage 폴백
+        try {
+            const saltBase64 = localStorage.getItem(LS_KEY_SALT);
+            if (saltBase64 && window.CryptoUtils) {
+                console.log(`[Encryption] Salt loaded from localStorage (${saltBase64.length} chars)`);
+                return window.CryptoUtils.base64ToBuffer(saltBase64);
+            }
+        } catch (lsErr) {
+            console.warn('[Encryption] localStorage salt load failed:', lsErr.message);
+        }
+
+        console.log('[Encryption] No saved salt found');
         return null;
     }
 
@@ -597,14 +638,26 @@ const EncryptionManager = (function() {
      * @returns {Promise<void>}
      */
     async function saveSalt(salt) {
-        if (window.electronAPI?.saveSalt && window.CryptoUtils) {
+        if (!window.CryptoUtils) return;
+        const saltBase64 = window.CryptoUtils.bufferToBase64(salt);
+
+        // 1. Electron safeStorage
+        if (window.electronAPI?.saveSalt) {
             try {
-                const saltBase64 = window.CryptoUtils.bufferToBase64(salt);
                 await window.electronAPI.saveSalt(saltBase64);
-                console.log('[Encryption] Salt saved');
+                console.log('[Encryption] Salt saved to Electron');
+                return;
             } catch (err) {
-                console.warn('[Encryption] Salt save failed:', err.message);
+                console.warn('[Encryption] Electron salt save failed:', err.message);
             }
+        }
+
+        // 2. 웹 localStorage 폴백
+        try {
+            localStorage.setItem(LS_KEY_SALT, saltBase64);
+            console.log('[Encryption] Salt saved to localStorage');
+        } catch (lsErr) {
+            console.warn('[Encryption] localStorage salt save failed:', lsErr.message);
         }
     }
 
@@ -1248,6 +1301,17 @@ const EncryptionManager = (function() {
             }
         }
 
+        // 웹 localStorage 폴백
+        if (!stored) {
+            try {
+                localStorage.setItem(LS_KEY_RECOVERY_BLOB, JSON.stringify(blobData));
+                console.log('[Encryption] Recovery blob stored in localStorage');
+                stored = true;
+            } catch (lsErr) {
+                console.error('[Encryption] Failed to store recovery blob in localStorage:', lsErr.message);
+            }
+        }
+
         return stored ? recoveryKey : null;
     }
 
@@ -1270,7 +1334,7 @@ const EncryptionManager = (function() {
             }
         }
 
-        // 로컬 파일 확인
+        // 로컬 파일 확인 (Electron)
         const isElectron = window.electronAPI?.isElectron === true;
         if (isElectron && window.electronAPI?.loadRecoveryBlob) {
             try {
@@ -1282,6 +1346,17 @@ const EncryptionManager = (function() {
             } catch (err) {
                 console.warn('[Encryption] Recovery blob check (local) failed:', err.message);
             }
+        }
+
+        // 웹 localStorage 확인
+        try {
+            const lsBlob = localStorage.getItem(LS_KEY_RECOVERY_BLOB);
+            if (lsBlob) {
+                const parsed = JSON.parse(lsBlob);
+                if (parsed?.ct) return true;
+            }
+        } catch (lsErr) {
+            console.warn('[Encryption] Recovery blob check (localStorage) failed:', lsErr.message);
         }
 
         return false;
@@ -1353,7 +1428,7 @@ const EncryptionManager = (function() {
             }
         }
 
-        // Firebase에 없으면 로컬에서 로드
+        // Firebase에 없으면 Electron 로컬에서 로드
         if (!blob) {
             const isElectron = window.electronAPI?.isElectron === true;
             if (isElectron && window.electronAPI?.loadRecoveryBlob) {
@@ -1365,6 +1440,19 @@ const EncryptionManager = (function() {
                 } catch (err) {
                     console.warn('[Encryption] Recovery blob load (local) failed:', err.message);
                 }
+            }
+        }
+
+        // 웹 localStorage 폴백
+        if (!blob) {
+            try {
+                const lsBlob = localStorage.getItem(LS_KEY_RECOVERY_BLOB);
+                if (lsBlob) {
+                    blob = JSON.parse(lsBlob);
+                    console.log('[Encryption] Recovery blob loaded from localStorage');
+                }
+            } catch (lsErr) {
+                console.warn('[Encryption] Recovery blob load (localStorage) failed:', lsErr.message);
             }
         }
 
@@ -2014,24 +2102,47 @@ const EncryptionManager = (function() {
      * @returns {Promise<void>}
      */
     async function storeSessionPassword(password) {
+        // 1. Electron main process 메모리
         if (window.electronAPI?.storeSessionPassword) {
             await window.electronAPI.storeSessionPassword(password);
             console.log('[Encryption] Password stored in session (main process memory)');
+            return;
+        }
+
+        // 2. 웹 sessionStorage 폴백 (탭 닫으면 자동 삭제)
+        try {
+            sessionStorage.setItem(LS_KEY_SESSION_PW, password);
+            console.log('[Encryption] Password stored in sessionStorage');
+        } catch (e) {
+            console.warn('[Encryption] sessionStorage password store failed:', e.message);
         }
     }
 
     /**
-     * Electron main process 메모리에서 세션 비밀번호 조회
+     * Electron main process 메모리 또는 웹 sessionStorage에서 세션 비밀번호 조회
      * @returns {Promise<string|null>} 저장된 비밀번호 또는 null
      */
     async function getStoredSessionPassword() {
+        // 1. Electron main process
         if (window.electronAPI?.getSessionPassword) {
             const pw = await window.electronAPI.getSessionPassword();
             if (pw) {
                 console.log('[Encryption] Session password found in main process');
+                return pw;
             }
-            return pw;
         }
+
+        // 2. 웹 sessionStorage 폴백
+        try {
+            const pw = sessionStorage.getItem(LS_KEY_SESSION_PW);
+            if (pw) {
+                console.log('[Encryption] Session password found in sessionStorage');
+                return pw;
+            }
+        } catch (e) {
+            console.warn('[Encryption] sessionStorage password read failed:', e.message);
+        }
+
         return null;
     }
 
@@ -2973,6 +3084,9 @@ const EncryptionManager = (function() {
         _initInProgress = false;
         _keySource = null;
         _isFirstTimeSetup = false;
+
+        // 웹 sessionStorage 세션 비밀번호 정리
+        try { sessionStorage.removeItem(LS_KEY_SESSION_PW); } catch (e) { /* ignore */ }
     }
 
     /**

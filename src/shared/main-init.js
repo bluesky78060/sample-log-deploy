@@ -34,8 +34,8 @@ if (window.CacheManager) {
                 await window.firestoreDb.init();
             }
         }
-        // 암호화 매니저 초기화 (비밀번호 프롬프트 표시)
-        if (window.firestoreDb?.isEnabled() && window.encryptionManager?.init) {
+        // 암호화 매니저 초기화 (Firebase 없이도 로컬 암호화 지원)
+        if (window.encryptionManager?.init) {
             await window.encryptionManager.init();
         }
     } catch (err) {

@@ -869,14 +869,16 @@ checkAuthFileStatus();
 
     // Firebase + 암호화 초기화
     try {
+        let fbOk = false;
         if (window.firebaseConfig?.initialize) {
-            const fbOk = await window.firebaseConfig.initialize();
+            fbOk = await window.firebaseConfig.initialize();
             if (fbOk && window.firestoreDb?.init) {
                 await window.firestoreDb.init();
             }
-            if (fbOk && window.encryptionManager?.init) {
-                await window.encryptionManager.init();
-            }
+        }
+        // 암호화는 Firebase 없이도 초기화 (로컬 모드 지원)
+        if (window.encryptionManager?.init) {
+            await window.encryptionManager.init();
         }
     } catch (err) {
         console.warn('[Settings] Firebase/Encryption init error:', err);
@@ -1138,9 +1140,10 @@ document.getElementById('encEnterPwBtn')?.addEventListener('click', async () => 
         // 초기화 재시도 (비밀번호 프롬프트 표시)
         window.encryptionManager.reset();
         try {
+            // Firebase 초기화 시도 (실패해도 로컬 암호화는 계속)
             if (window.firebaseConfig?.initialize) {
-                await window.firebaseConfig.initialize();
-                if (window.firestoreDb?.init) {
+                const fbOk = await window.firebaseConfig.initialize();
+                if (fbOk && window.firestoreDb?.init) {
                     await window.firestoreDb.init();
                 }
             }

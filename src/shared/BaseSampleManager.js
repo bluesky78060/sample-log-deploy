@@ -126,8 +126,8 @@ class BaseSampleManager {
             }
         }
 
-        // 암호화 매니저 초기화 (테스트 전용)
-        if (window.firestoreInitialized && window.encryptionManager?.init) {
+        // 암호화 매니저 초기화 (Firebase 없이도 로컬 암호화 지원)
+        if (window.encryptionManager?.init) {
             try {
                 await window.encryptionManager.init();
                 this.log('암호화 매니저 초기화 완료');
