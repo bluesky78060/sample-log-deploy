@@ -8,6 +8,15 @@ const SAMPLE_TYPES = [
     { key: 'heavyMetal', name: '토양 중금속', icon: '⚗️', storagePrefix: 'test_heavyMetalSampleLogs' }
 ];
 
+// 자동저장 파일명의 시료 타입 키 매핑 (SAMPLE_TYPES key → 파일명에 사용되는 키)
+const FILE_TYPE_MAP = {
+    soil: 'soil',
+    water: 'water',
+    pesticide: 'pesticide',
+    compost: 'compost',
+    heavyMetal: 'heavy-metal'
+};
+
 // Electron 환경 확인
 const isElectron = window.electronAPI?.isElectron === true;
 
@@ -1328,6 +1337,40 @@ async function scanPlaintextData() {
             }
         }
 
+        // 2-1. 웹 자동저장 파일 스캔 (File System Access API)
+        if (!isElectron && window.getWebDirHandle && window.getWebDirHandle()) {
+            const dirHandle = window.getWebDirHandle();
+            for (const type of SAMPLE_TYPES) {
+                const fileTypeKey = FILE_TYPE_MAP[type.key] || type.key;
+                for (let year = MIN_YEAR; year <= currentYear; year++) {
+                    try {
+                        const fileName = `auto-save-${fileTypeKey}-${year}.json`;
+                        const fileHandle = await dirHandle.getFileHandle(fileName);
+                        const file = await fileHandle.getFile();
+                        const content = await file.text();
+                        if (!content) continue;
+
+                        const parsed = JSON.parse(content);
+                        if (parsed && !parsed._localEnc && parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+                            encMigrationScanResults.push({
+                                source: 'webAutosave',
+                                type: type.key,
+                                typeName: type.name,
+                                typeIcon: type.icon,
+                                year,
+                                fileName,
+                                plaintextCount: parsed.data.length,
+                                encryptedCount: 0,
+                                totalCount: parsed.data.length
+                            });
+                        }
+                    } catch (err) {
+                        // NotFoundError = 파일 없음, 무시
+                    }
+                }
+            }
+        }
+
         // 3. localStorage 데이터 스캔 (웹 로컬 모드)
         for (const type of SAMPLE_TYPES) {
             for (let year = MIN_YEAR; year <= currentYear; year++) {
@@ -1502,6 +1545,8 @@ async function encryptSingleItem(resultIndex) {
     let label;
     if (result.source === 'autosave') {
         label = `${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)`;
+    } else if (result.source === 'webAutosave') {
+        label = `${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)`;
     } else if (result.source === 'localStorage') {
         label = `${result.typeName} ${result.year}년 로컬 데이터 (${result.plaintextCount}건)`;
     } else {
@@ -1518,6 +1563,8 @@ async function encryptSingleItem(resultIndex) {
     try {
         if (result.source === 'autosave') {
             await encryptAutoSaveFile(result.filePath, result.typeName, result.year);
+        } else if (result.source === 'webAutosave') {
+            await encryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
         } else if (result.source === 'localStorage') {
             await encryptLocalStorageData(result.storageKey, result.typeName, result.year);
         } else {
@@ -1672,6 +1719,76 @@ async function encryptAutoSaveFile(filePath, typeName, year) {
 }
 
 /**
+ * 웹 자동저장 파일을 암호화 (File System Access API)
+ * @param {string} fileName - 파일명
+ * @param {string} typeName - 시료 타입명
+ * @param {number} year - 연도
+ */
+async function encryptWebAutoSaveFile(fileName, typeName, year) {
+    const dirHandle = window.getWebDirHandle ? window.getWebDirHandle() : null;
+    if (!dirHandle) {
+        alert('자동저장 폴더가 선택되지 않았습니다.');
+        return;
+    }
+
+    const progressDiv = document.getElementById('encMigrationProgress');
+    const progressBar = document.getElementById('encMigrationProgressBar');
+    const progressText = document.getElementById('encMigrationProgressText');
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+    progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 중...`;
+
+    try {
+        const fileHandle = await dirHandle.getFileHandle(fileName);
+        const file = await fileHandle.getFile();
+        const content = await file.text();
+        if (!content) {
+            progressText.textContent = '파일 읽기 실패';
+            progressBar.style.background = '#dc2626';
+            return;
+        }
+
+        progressBar.style.width = '30%';
+
+        // CryptoUtils.encryptForFile로 암호화
+        const encrypted = await window.CryptoUtils.encryptForFile(content);
+        if (!encrypted) {
+            progressText.textContent = '암호화 실패';
+            progressBar.style.background = '#dc2626';
+            return;
+        }
+
+        progressBar.style.width = '70%';
+
+        // 권한 확인 후 파일 쓰기
+        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+            const requested = await dirHandle.requestPermission({ mode: 'readwrite' });
+            if (requested !== 'granted') {
+                progressText.textContent = '폴더 쓰기 권한이 없습니다.';
+                progressBar.style.background = '#dc2626';
+                return;
+            }
+        }
+
+        const writeHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const writable = await writeHandle.createWritable();
+        await writable.write(encrypted);
+        await writable.close();
+
+        progressBar.style.width = '100%';
+        progressBar.style.background = '#22c55e';
+        progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 완료!`;
+        console.log(`[Migration] ${fileName} 웹 autosave 암호화 완료`);
+    } catch (err) {
+        console.error(`[Migration] ${fileName} 웹 autosave 암호화 오류:`, err);
+        progressBar.style.background = '#dc2626';
+        progressText.textContent = `오류: ${err.message}`;
+    }
+}
+
+/**
  * localStorage 데이터를 암호화
  * @param {string} storageKey - localStorage 키 (예: test_soilSampleLogs_2026)
  * @param {string} typeName - 시료 타입명
@@ -1752,6 +1869,7 @@ async function encryptAllPlaintext() {
 
     const firebaseResults = plaintextResults.filter(r => r.source === 'firebase');
     const autosaveResults = plaintextResults.filter(r => r.source === 'autosave');
+    const webAutosaveResults = plaintextResults.filter(r => r.source === 'webAutosave');
     const localStorageResults = plaintextResults.filter(r => r.source === 'localStorage');
 
     const details = [];
@@ -1761,8 +1879,12 @@ async function encryptAllPlaintext() {
         firebaseResults.forEach(r => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
     }
     if (autosaveResults.length > 0) {
-        details.push(`자동저장 파일: ${autosaveResults.length}개`);
+        details.push(`자동저장 파일 (Electron): ${autosaveResults.length}개`);
         autosaveResults.forEach(r => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
+    }
+    if (webAutosaveResults.length > 0) {
+        details.push(`자동저장 파일 (웹): ${webAutosaveResults.length}개`);
+        webAutosaveResults.forEach(r => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
     }
     if (localStorageResults.length > 0) {
         const totalLs = localStorageResults.reduce((sum, r) => sum + r.plaintextCount, 0);
@@ -1784,6 +1906,9 @@ async function encryptAllPlaintext() {
         }
         for (const result of autosaveResults) {
             await encryptAutoSaveFile(result.filePath, result.typeName, result.year);
+        }
+        for (const result of webAutosaveResults) {
+            await encryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
         }
         for (const result of localStorageResults) {
             await encryptLocalStorageData(result.storageKey, result.typeName, result.year);
@@ -1931,6 +2056,68 @@ async function scanEncryptedData() {
                         }
                     } catch (err) {
                         // 파일 없거나 파싱 실패 - 무시
+                    }
+                }
+            }
+        }
+
+        // 2-1. 웹 자동저장 파일 스캔 (File System Access API)
+        if (!isElectron && window.getWebDirHandle && window.getWebDirHandle()) {
+            const dirHandle = window.getWebDirHandle();
+            for (const type of SAMPLE_TYPES) {
+                const fileTypeKey = FILE_TYPE_MAP[type.key] || type.key;
+                for (let year = MIN_YEAR; year <= currentYear; year++) {
+                    try {
+                        const fileName = `auto-save-${fileTypeKey}-${year}.json`;
+                        const fileHandle = await dirHandle.getFileHandle(fileName);
+                        const file = await fileHandle.getFile();
+                        const content = await file.text();
+                        if (!content) continue;
+
+                        const parsed = JSON.parse(content);
+                        if (parsed && parsed._localEnc && parsed.iv && parsed.ct) {
+                            // 레거시 통째 암호화 파일
+                            decMigrationScanResults.push({
+                                source: 'webAutosave',
+                                type: type.key,
+                                typeName: type.name,
+                                typeIcon: type.icon,
+                                year,
+                                fileName,
+                                encryptedCount: 1,
+                                plaintextCount: 0,
+                                status: 'encrypted'
+                            });
+                        } else if (parsed && parsed._fileEnc && Array.isArray(parsed.data)) {
+                            // 레코드별 필드 암호화 파일
+                            const encCount = parsed.data.filter(r => r && r._enc).length;
+                            decMigrationScanResults.push({
+                                source: 'webAutosave',
+                                type: type.key,
+                                typeName: type.name,
+                                typeIcon: type.icon,
+                                year,
+                                fileName,
+                                encryptedCount: encCount,
+                                plaintextCount: parsed.data.length - encCount,
+                                status: 'encrypted'
+                            });
+                        } else if (parsed && parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+                            // 평문 파일
+                            decMigrationScanResults.push({
+                                source: 'webAutosave',
+                                type: type.key,
+                                typeName: type.name,
+                                typeIcon: type.icon,
+                                year,
+                                fileName,
+                                encryptedCount: 0,
+                                plaintextCount: parsed.data.length,
+                                status: 'plaintext'
+                            });
+                        }
+                    } catch (err) {
+                        // NotFoundError = 파일 없음, 무시
                     }
                 }
             }
@@ -2087,6 +2274,10 @@ function renderDecMigrationList() {
             btn.textContent = '암호화';
             btn.style.background = '#f59e0b';
             btn.addEventListener('click', () => encryptSingleAutoSave(index));
+        } else if (result.source === 'webAutosave' && result.status === 'plaintext') {
+            btn.textContent = '암호화';
+            btn.style.background = '#f59e0b';
+            btn.addEventListener('click', () => encryptSingleWebAutoSave(index));
         } else if (result.source === 'localStorage' && result.encryptedCount > 0) {
             btn.textContent = '복호화';
             btn.addEventListener('click', () => decryptSingleItem(index));
@@ -2167,6 +2358,28 @@ async function encryptSingleLocalStorage(resultIndex) {
 }
 
 /**
+ * 단일 웹 자동저장 파일 암호화 (복호화 섹션에서 평문 파일 암호화)
+ */
+async function encryptSingleWebAutoSave(resultIndex) {
+    const result = decMigrationScanResults[resultIndex];
+    if (!result || result.source !== 'webAutosave' || result.status !== 'plaintext') return;
+
+    if (!confirm(`${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)을 암호화하시겠습니까?`)) {
+        return;
+    }
+
+    setDecMigrationButtonsEnabled(false);
+
+    try {
+        await encryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
+    } finally {
+        setDecMigrationButtonsEnabled(true);
+    }
+
+    await scanEncryptedData();
+}
+
+/**
  * 단일 항목 복호화
  */
 async function decryptSingleItem(resultIndex) {
@@ -2178,6 +2391,8 @@ async function decryptSingleItem(resultIndex) {
         label = `${result.typeName} ${result.year}년 Firebase 데이터 ${result.encryptedCount}건`;
     } else if (result.source === 'localStorage') {
         label = `${result.typeName} ${result.year}년 로컬 데이터 ${result.encryptedCount}건`;
+    } else if (result.source === 'webAutosave') {
+        label = `${result.typeName} ${result.year}년 자동저장 파일`;
     } else {
         label = `${result.typeName} ${result.year}년 자동저장 파일`;
     }
@@ -2193,6 +2408,8 @@ async function decryptSingleItem(resultIndex) {
             await decryptFirebaseCollection(result.collectionName, result.encryptedCount);
         } else if (result.source === 'localStorage') {
             await decryptLocalStorageData(result.storageKey, result.typeName, result.year);
+        } else if (result.source === 'webAutosave') {
+            await decryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
         } else {
             await decryptAutoSaveFile(result.filePath, result.typeName, result.year);
         }
@@ -2335,6 +2552,77 @@ async function decryptAutoSaveFile(filePath, typeName, year) {
 }
 
 /**
+ * 웹 자동저장 파일의 암호화 데이터를 복호화 (File System Access API)
+ * @param {string} fileName - 파일명
+ * @param {string} typeName - 시료 타입명
+ * @param {number} year - 연도
+ */
+async function decryptWebAutoSaveFile(fileName, typeName, year) {
+    const dirHandle = window.getWebDirHandle ? window.getWebDirHandle() : null;
+    if (!dirHandle) {
+        alert('자동저장 폴더가 선택되지 않았습니다.');
+        return;
+    }
+
+    const progressDiv = document.getElementById('decMigrationProgress');
+    const progressBar = document.getElementById('decMigrationProgressBar');
+    const progressText = document.getElementById('decMigrationProgressText');
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+    progressText.textContent = `${typeName} ${year}년 자동저장 파일 복호화 중...`;
+
+    try {
+        const fileHandle = await dirHandle.getFileHandle(fileName);
+        const file = await fileHandle.getFile();
+        const content = await file.text();
+        if (!content) {
+            progressText.textContent = '파일 읽기 실패';
+            progressBar.style.background = '#dc2626';
+            return;
+        }
+
+        progressBar.style.width = '30%';
+
+        // CryptoUtils.decryptFromFile로 복호화
+        const decrypted = await window.CryptoUtils.decryptFromFile(content);
+        if (!decrypted) {
+            progressText.textContent = '복호화 실패 (키 불일치 또는 데이터 손상)';
+            progressBar.style.background = '#dc2626';
+            return;
+        }
+
+        progressBar.style.width = '70%';
+
+        // 권한 확인 후 평문 JSON으로 저장
+        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+            const requested = await dirHandle.requestPermission({ mode: 'readwrite' });
+            if (requested !== 'granted') {
+                progressText.textContent = '폴더 쓰기 권한이 없습니다.';
+                progressBar.style.background = '#dc2626';
+                return;
+            }
+        }
+
+        const plainContent = JSON.stringify(decrypted, null, 2);
+        const writeHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const writable = await writeHandle.createWritable();
+        await writable.write(plainContent);
+        await writable.close();
+
+        progressBar.style.width = '100%';
+        progressBar.style.background = '#22c55e';
+        progressText.textContent = `${typeName} ${year}년 자동저장 파일 평문 변환 완료!`;
+        console.log(`[DecMigration] ${fileName} 웹 autosave 복호화 완료`);
+    } catch (err) {
+        console.error(`[DecMigration] ${fileName} 웹 autosave 복호화 오류:`, err);
+        progressBar.style.background = '#dc2626';
+        progressText.textContent = `오류: ${err.message}`;
+    }
+}
+
+/**
  * localStorage 데이터를 복호화
  * @param {string} storageKey - localStorage 키
  * @param {string} typeName - 시료 타입명
@@ -2416,6 +2704,7 @@ async function decryptAllEncrypted() {
 
     const firebaseResults = decMigrationScanResults.filter(r => r.source === 'firebase');
     const autosaveResults = decMigrationScanResults.filter(r => r.source === 'autosave');
+    const webAutosaveResults = decMigrationScanResults.filter(r => r.source === 'webAutosave' && r.status === 'encrypted');
     const localStorageResults = decMigrationScanResults.filter(r => r.source === 'localStorage' && r.encryptedCount > 0);
 
     const details = [];
@@ -2425,8 +2714,12 @@ async function decryptAllEncrypted() {
         firebaseResults.forEach(r => details.push(`  ${r.typeName} ${r.year}년: ${r.encryptedCount}건`));
     }
     if (autosaveResults.length > 0) {
-        details.push(`자동저장 파일: ${autosaveResults.length}개`);
+        details.push(`자동저장 파일 (Electron): ${autosaveResults.length}개`);
         autosaveResults.forEach(r => details.push(`  ${r.typeName} ${r.year}년`));
+    }
+    if (webAutosaveResults.length > 0) {
+        details.push(`자동저장 파일 (웹): ${webAutosaveResults.length}개`);
+        webAutosaveResults.forEach(r => details.push(`  ${r.typeName} ${r.year}년`));
     }
     if (localStorageResults.length > 0) {
         const totalLs = localStorageResults.reduce((sum, r) => sum + r.encryptedCount, 0);
@@ -2446,6 +2739,9 @@ async function decryptAllEncrypted() {
         }
         for (const result of autosaveResults) {
             await decryptAutoSaveFile(result.filePath, result.typeName, result.year);
+        }
+        for (const result of webAutosaveResults) {
+            await decryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
         }
         for (const result of localStorageResults) {
             await decryptLocalStorageData(result.storageKey, result.typeName, result.year);
