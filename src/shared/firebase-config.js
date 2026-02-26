@@ -197,8 +197,16 @@ async function initializeFirebase() {
 
     // 네트워크 접근 체크 (웹 환경용)
     if (window.NetworkAccess) {
-        const accessResult = await window.NetworkAccess.checkAccess();
+        let accessResult = await window.NetworkAccess.checkAccess();
         logFirebase('네트워크 접근 체크:', accessResult);
+
+        // 게이트웨이 미설정 시 입력 모달 표시 후 재확인
+        if (!accessResult.allowed && accessResult.needsSetup) {
+            const setup = await window.NetworkAccess.promptGatewayIfNeeded();
+            if (setup) {
+                accessResult = await window.NetworkAccess.checkAccess();
+            }
+        }
 
         if (!accessResult.allowed) {
             logFirebase('네트워크 접근 거부:', accessResult.reason);

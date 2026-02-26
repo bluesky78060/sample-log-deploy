@@ -590,19 +590,80 @@ function initNetworkAccessUI() {
     const gatewayEl = document.getElementById('allowedGateway');
     const publicIPEl = document.getElementById('currentPublicIP');
     const accessEl = document.getElementById('currentAccessStatus');
+    const gatewayInput = document.getElementById('gatewayIPEdit');
+    const saveGatewayBtn = document.getElementById('saveGatewayBtn');
+    const deleteGatewayBtn = document.getElementById('deleteGatewayBtn');
+    const gatewaySaveStatus = document.getElementById('gatewaySaveStatus');
 
     // 환경 표시
     const isElectron = window.electronAPI?.isElectron === true || window.location.protocol === 'file:';
     envEl.textContent = isElectron ? 'Electron (항상 허용)' : '웹 브라우저';
 
-    // 허용된 게이트웨이 표시
-    const allowedGateway = NetworkAccess.getAllowedGateway();
-    if (allowedGateway) {
-        gatewayEl.textContent = allowedGateway;
-    } else {
-        gatewayEl.textContent = '설정 없음';
-        gatewayEl.style.color = '#dc2626';
+    // 게이트웨이 표시 업데이트
+    function updateGatewayDisplay() {
+        const allowedGateway = NetworkAccess.getAllowedGateway();
+        if (allowedGateway) {
+            gatewayEl.textContent = allowedGateway;
+            gatewayEl.style.color = '';
+            gatewayInput.value = allowedGateway;
+        } else {
+            gatewayEl.textContent = '설정 없음';
+            gatewayEl.style.color = '#dc2626';
+            gatewayInput.value = '';
+        }
     }
+
+    updateGatewayDisplay();
+
+    // IP 유효성 검사
+    function isValidIP(ip) {
+        const parts = ip.trim().split('.');
+        if (parts.length !== 4) return false;
+        return parts.every(p => {
+            const num = Number(p);
+            return Number.isInteger(num) && num >= 0 && num <= 255;
+        });
+    }
+
+    // 게이트웨이 저장
+    saveGatewayBtn.addEventListener('click', () => {
+        const ip = gatewayInput.value.trim();
+        if (!ip) {
+            gatewayInput.style.borderColor = '#dc2626';
+            gatewayInput.placeholder = 'IP 주소를 입력하세요';
+            return;
+        }
+        if (!isValidIP(ip)) {
+            gatewayInput.style.borderColor = '#dc2626';
+            gatewayInput.value = '';
+            gatewayInput.placeholder = '올바른 IP 형식: 0~255.0~255.0~255.0~255';
+            return;
+        }
+        NetworkAccess.saveGateway(ip);
+        gatewayInput.style.borderColor = '';
+        updateGatewayDisplay();
+        refreshNetworkStatus();
+
+        // 저장 완료 표시
+        gatewaySaveStatus.style.display = 'inline';
+        setTimeout(() => { gatewaySaveStatus.style.display = 'none'; }, 2000);
+
+        if (window.showToast) {
+            window.showToast('게이트웨이 IP가 저장되었습니다.', 'success');
+        }
+    });
+
+    // 게이트웨이 삭제
+    deleteGatewayBtn.addEventListener('click', () => {
+        if (!confirm('게이트웨이 설정을 삭제하시겠습니까?\n다음 접속 시 재입력이 필요합니다.')) return;
+        NetworkAccess.removeGateway();
+        updateGatewayDisplay();
+        refreshNetworkStatus();
+
+        if (window.showToast) {
+            window.showToast('게이트웨이 설정이 삭제되었습니다.', 'info');
+        }
+    });
 
     // 네트워크 상태 확인
     async function refreshNetworkStatus() {
@@ -613,7 +674,8 @@ function initNetworkAccessUI() {
         publicIPEl.textContent = publicIP || '확인 불가';
 
         const access = await NetworkAccess.checkAccess();
-        accessEl.textContent = access.allowed ? `허용 (${access.reason})` : `거부 (${access.reason})`;
+        const reason = access.needsSetup ? '게이트웨이 미설정' : access.reason;
+        accessEl.textContent = access.allowed ? `허용 (${reason})` : `거부 (${reason})`;
         accessEl.style.color = access.allowed ? '#16a34a' : '#dc2626';
 
         // 상태 배지 업데이트
@@ -624,6 +686,9 @@ function initNetworkAccessUI() {
             statusEl.className = 'status-badge disconnected';
             statusEl.textContent = '● 거부';
         }
+
+        // 게이트웨이 표시도 갱신
+        updateGatewayDisplay();
     }
 
     document.getElementById('checkNetworkBtn').addEventListener('click', refreshNetworkStatus);

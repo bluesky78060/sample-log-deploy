@@ -950,13 +950,27 @@
                 </div>
             </div>
 
-            <div style="margin-top: 1rem;">
-                <button type="button" id="checkNetworkBtn" class="btn btn-secondary">네트워크 상태 확인</button>
+            <!-- 게이트웨이 IP 설정/수정 -->
+            <div style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+                <h3 style="font-size: 0.95rem; font-weight: 500; color: #475569; margin-bottom: 0.75rem;">
+                    게이트웨이 IP 설정
+                </h3>
+                <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="gatewayIPEdit">게이트웨이 IP 주소</label>
+                        <input type="text" id="gatewayIPEdit" placeholder="예: 203.xxx.xxx.xxx" style="font-family: monospace;">
+                    </div>
+                    <button type="button" id="saveGatewayBtn" class="btn btn-primary" style="margin-bottom: 0; height: 42px;">저장</button>
+                    <button type="button" id="deleteGatewayBtn" class="btn" style="margin-bottom: 0; height: 42px; background: #fee2e2; color: #dc2626;">삭제</button>
+                </div>
+                <p class="help-text" style="margin-top: 0.5rem;">
+                    같은 서브넷(xxx.xxx.xxx.*)의 접속만 허용됩니다. 삭제하면 다음 접속 시 재입력이 필요합니다.
+                </p>
+                <span id="gatewaySaveStatus" style="font-size: 0.8rem; color: #16a34a; display: none;">저장됨</span>
             </div>
 
-            <div class="alert alert-warning" style="margin-top: 1rem;">
-                <strong>게이트웨이 변경 방법:</strong><br>
-                <code>src/shared/network-config.js</code> 파일에서 <code>ALLOWED_GATEWAY</code> 값을 수정하세요.
+            <div style="margin-top: 1rem;">
+                <button type="button" id="checkNetworkBtn" class="btn btn-secondary">네트워크 상태 확인</button>
             </div>
         </div>
 
