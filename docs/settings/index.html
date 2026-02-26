@@ -7,26 +7,8 @@
     <title>설정 - 시료 접수 대장</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <script>
-        tailwind.config = {
-            darkMode: ['selector', '[data-theme="dark"]'],
-            theme: {
-                extend: {
-                    colors: {
-                        primary: "#3B82F6",
-                        "background-light": "#F8FAFC",
-                        "background-dark": "#18181B",
-                    },
-                    fontFamily: {
-                        display: ["Noto Sans KR", "sans-serif"],
-                    },
-                }
-            }
-        };
-    </script>
     <style>
         * {
             margin: 0;
@@ -40,8 +22,8 @@
         }
 
         body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #FAF8F5 0%, #F5F3EF 50%, #FAF8F5 100%);
             min-height: 100%;
             padding: 2rem;
             overflow-y: auto;
@@ -55,16 +37,18 @@
         .settings-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border-radius: 16px;
+            border-radius: 20px;
             padding: 2rem;
             margin-bottom: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 20px rgba(60, 53, 48, 0.06);
+            border: 1.5px solid #E8E4DF;
         }
 
         .settings-card h2 {
             font-size: 1.25rem;
             font-weight: 600;
-            color: #1e293b;
+            font-family: 'Fraunces', 'Noto Sans KR', serif;
+            color: #3C3530;
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
@@ -83,23 +67,24 @@
             display: block;
             font-size: 0.875rem;
             font-weight: 500;
-            color: #475569;
+            color: #6B6460;
             margin-bottom: 0.5rem;
         }
 
         .form-group input {
             width: 100%;
             padding: 0.75rem 1rem;
-            border: 2px solid #e2e8f0;
+            border: 1.5px solid #E8E4DF;
             border-radius: 8px;
             font-size: 0.875rem;
             transition: all 0.2s ease;
+            background: #FAFAF9;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #7C9082;
+            box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12);
         }
 
         .form-group input::placeholder {
@@ -121,23 +106,25 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: #7C9082;
             color: white;
         }
 
         .btn-primary:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            background: #6B7D72;
+            box-shadow: 0 4px 12px rgba(124, 144, 130, 0.4);
         }
 
         .btn-success {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
+            background: #7C9082;
             color: white;
         }
 
         .btn-success:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+            background: #6B7D72;
+            box-shadow: 0 4px 12px rgba(124, 144, 130, 0.4);
         }
 
         .btn-warning {
@@ -226,7 +213,7 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            color: #64748b;
+            color: #78716C;
             text-decoration: none;
             font-size: 0.875rem;
             margin-bottom: 1.5rem;
@@ -234,7 +221,7 @@
         }
 
         .back-link:hover {
-            color: #3b82f6;
+            color: #7C9082;
         }
 
         .help-text {
@@ -268,57 +255,448 @@
             border: 1px solid #bbf7d0;
         }
 
+        /* 저장 모드 선택 */
+        .storage-mode-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .storage-mode-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            background: #FAFAF9;
+            border: 1.5px solid #E8E4DF;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .storage-mode-option:hover {
+            border-color: #7C9082;
+            background: #F5F5F0;
+        }
+
+        .storage-mode-option:has(input:checked) {
+            border-color: #7C9082;
+            background: rgba(124, 144, 130, 0.08);
+            box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12);
+        }
+
+        .storage-mode-option:has(input:disabled) {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .storage-mode-option:has(input:disabled):hover {
+            border-color: #E8E4DF;
+            background: #FAFAF9;
+        }
+
+        .storage-mode-option input[type="radio"] {
+            margin-top: 0.25rem;
+            accent-color: #7C9082;
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .storage-mode-content {
+            flex: 1;
+        }
+
+        .storage-mode-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .storage-mode-icon {
+            font-size: 1.1rem;
+        }
+
+        .storage-mode-label {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #3C3530;
+        }
+
+        .storage-mode-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .storage-mode-badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .storage-mode-desc {
+            font-size: 0.8rem;
+            color: #6B6460;
+            line-height: 1.5;
+            margin: 0;
+        }
+
         /* 다크 모드 */
         [data-theme="dark"] body {
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0c4a6e 100%);
+            background: linear-gradient(135deg, #1C1917 0%, #292524 50%, #1C1917 100%);
         }
 
         [data-theme="dark"] .settings-card {
-            background: rgba(30, 41, 59, 0.95);
+            background: rgba(41, 37, 36, 0.95);
+            border-color: #57534E;
         }
 
         [data-theme="dark"] .settings-card h2 {
-            color: #f1f5f9;
+            color: #E7E5E4;
         }
 
         [data-theme="dark"] .form-group label {
-            color: #94a3b8;
+            color: #A8A29E;
         }
 
         [data-theme="dark"] .form-group input {
-            background: #1e293b;
-            border-color: #334155;
-            color: #f1f5f9;
+            background: #1C1917;
+            border-color: #57534E;
+            color: #E7E5E4;
         }
 
         [data-theme="dark"] .form-group input:focus {
-            border-color: #60a5fa;
+            border-color: #7C9082;
         }
 
         [data-theme="dark"] .migration-item {
-            background: #1e293b;
-            border-color: #334155;
+            background: #292524;
+            border-color: #57534E;
         }
 
         [data-theme="dark"] .migration-item-name {
-            color: #f1f5f9;
+            color: #E7E5E4;
         }
 
         [data-theme="dark"] .back-link {
-            color: #94a3b8;
+            color: #A8A29E;
+        }
+
+        /* 다크 모드 - 확장 */
+        [data-theme="dark"] h1 {
+            color: #E7E5E4 !important;
+        }
+
+        [data-theme="dark"] .settings-card h3 {
+            color: #D6D3D1 !important;
+        }
+
+        /* 알림 박스 */
+        [data-theme="dark"] .alert-info {
+            background: #0c2d4d !important;
+            color: #7dd3fc !important;
+            border-color: #0369a1 !important;
+        }
+
+        [data-theme="dark"] .alert-warning {
+            background: #451a03 !important;
+            color: #fde68a !important;
+            border-color: #92400e !important;
+        }
+
+        [data-theme="dark"] .alert-success {
+            background: #052e16 !important;
+            color: #86efac !important;
+            border-color: #166534 !important;
+        }
+
+        [data-theme="dark"] .alert a {
+            color: #60a5fa !important;
+        }
+
+        [data-theme="dark"] .alert code {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            padding: 0.1em 0.3em;
+            border-radius: 3px;
+        }
+
+        /* 도움말 텍스트 */
+        [data-theme="dark"] .help-text {
+            color: #64748b !important;
+        }
+
+        [data-theme="dark"] .help-text a {
+            color: #60a5fa !important;
+        }
+
+        /* 인증 파일 업로드 영역 */
+        [data-theme="dark"] #authFileUploadArea > div {
+            border-color: #475569 !important;
+            background: #1e293b !important;
+        }
+
+        [data-theme="dark"] #authFileUploadArea p {
+            color: #94a3b8 !important;
+        }
+
+        /* 인증 파일 정보 (등록됨) */
+        [data-theme="dark"] #authFileInfo {
+            background: #052e16 !important;
+            border-color: #166534 !important;
+        }
+
+        /* 상태 정보 패널 (인라인 스타일 오버라이드) */
+        [data-theme="dark"] #encStatusInfo,
+        [data-theme="dark"] #cacheStatusInfo,
+        [data-theme="dark"] #networkAccessSection div[style*="background: #f8fafc"] {
+            background: #292524 !important;
+            border-color: #57534E !important;
+        }
+
+        /* 정보 패널 내부 텍스트 */
+        [data-theme="dark"] #encStatusInfo div[style*="color: #64748b"],
+        [data-theme="dark"] #cacheStatusInfo div[style*="color: #64748b"],
+        [data-theme="dark"] #networkAccessSection div[style*="color: #64748b"] {
+            color: #A8A29E !important;
+        }
+
+        /* 구분선 */
+        [data-theme="dark"] div[style*="border-top: 1px solid #e2e8f0"] {
+            border-color: #57534E !important;
+        }
+
+        /* 상태 배지 */
+        [data-theme="dark"] .status-badge.disconnected {
+            background: #3D2B1F !important;
+            color: #D4A96A !important;
+        }
+
+        [data-theme="dark"] .status-badge.connected {
+            background: #1E2B22 !important;
+            color: #A8B5A2 !important;
+        }
+
+        [data-theme="dark"] .status-badge.error {
+            background: #2D1515 !important;
+            color: #F4A4A4 !important;
+        }
+
+        /* 마이그레이션 항목 카운트 */
+        [data-theme="dark"] .migration-item-count {
+            color: #A8A29E !important;
+        }
+
+        /* 삭제 버튼 */
+        [data-theme="dark"] #deleteAuthFileBtn {
+            background: #2D1515 !important;
+            color: #F4A4A4 !important;
+        }
+
+        /* 암호화 마이그레이션 - 빈 텍스트 */
+        [data-theme="dark"] #encMigrationList > div[style*="color: #94a3b8"] {
+            color: #78716C !important;
+        }
+
+        /* 프로그레스 바 배경 */
+        [data-theme="dark"] #encMigrationProgress div[style*="background: #eee"] {
+            background: #57534E !important;
+        }
+
+        /* 잠금 오버레이 */
+        [data-theme="dark"] #settingsLockOverlay {
+            background: linear-gradient(135deg, #1C1917 0%, #292524 50%, #1C1917 100%) !important;
+        }
+
+        /* 비밀번호 프롬프트 다이얼로그 */
+        [data-theme="dark"] #settingsLockOverlay > div[style*="background: white"] {
+            background: #292524 !important;
+            color: #E7E5E4;
+        }
+
+        [data-theme="dark"] #settingsLockOverlay h3 {
+            color: #E7E5E4 !important;
+        }
+
+        [data-theme="dark"] #settingsLockOverlay p {
+            color: #A8A29E !important;
+        }
+
+        [data-theme="dark"] #settingsLockOverlay input[type="password"] {
+            background: #1C1917 !important;
+            border-color: #57534E !important;
+            color: #E7E5E4 !important;
+        }
+
+        [data-theme="dark"] #settingsLockOverlay button[id$="-cancel"] {
+            background: #3D3734 !important;
+            border-color: #57534E !important;
+            color: #A8A29E !important;
+        }
+
+        [data-theme="dark"] #settingsLockOverlay button[id$="-submit"][disabled] {
+            background: #57534E !important;
+            color: #A8A29E !important;
+        }
+
+        [data-theme="dark"] #settingsLockOverlay #settings-pw-error {
+            color: #F4A4A4 !important;
+        }
+
+        [data-theme="dark"] .enc-password-rules {
+            background: #1C1917 !important;
+            color: #D6D3D1 !important;
+        }
+
+        [data-theme="dark"] .enc-password-rules div {
+            color: #A8A29E !important;
+        }
+
+        [data-theme="dark"] .enc-password-rules div:first-child {
+            color: #D6D3D1 !important;
+        }
+
+        [data-theme="dark"] div[id$="-strength-bar"] {
+            background: #57534E !important;
+        }
+
+        [data-theme="dark"] div[id$="-strength-text"] {
+            color: #A8A29E !important;
+        }
+
+        /* 저장 모드 선택 - 다크모드 */
+        [data-theme="dark"] .storage-mode-option {
+            background: #1C1917;
+            border-color: #57534E;
+        }
+
+        [data-theme="dark"] .storage-mode-option:hover {
+            border-color: #7C9082;
+            background: #292524;
+        }
+
+        [data-theme="dark"] .storage-mode-option:has(input:checked) {
+            border-color: #7C9082;
+            background: rgba(124, 144, 130, 0.12);
+        }
+
+        [data-theme="dark"] .storage-mode-option:has(input:disabled) {
+            opacity: 0.4;
+        }
+
+        [data-theme="dark"] .storage-mode-option:has(input:disabled):hover {
+            border-color: #57534E;
+            background: #1C1917;
+        }
+
+        [data-theme="dark"] .storage-mode-label {
+            color: #E7E5E4;
+        }
+
+        [data-theme="dark"] .storage-mode-desc {
+            color: #A8A29E;
+        }
+
+        [data-theme="dark"] .storage-mode-badge {
+            background: #1E2B22;
+            color: #A8B5A2;
+        }
+
+        [data-theme="dark"] .storage-mode-badge.warning {
+            background: #3D2B1F;
+            color: #D4A96A;
         }
     </style>
+  <script type="module" crossorigin src="../assets/settings-CSl38NC4.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/theme-CPlEbtDB.js">
+  <link rel="modulepreload" crossorigin href="../assets/storage-manager-DGjzNIS0.js">
+  <link rel="modulepreload" crossorigin href="../assets/purify.es-A66Cw1IH.js">
+  <link rel="modulepreload" crossorigin href="../assets/toast-CYVUzQgW.js">
+  <link rel="modulepreload" crossorigin href="../assets/cache-manager-BxLSevb9.js">
+  <link rel="stylesheet" crossorigin href="../assets/storage-manager-D0OohLD5.css">
 </head>
 
 <body>
-    <div class="settings-container">
+    <!-- 비밀번호 확인 전 잠금 오버레이 -->
+    <div id="settingsLockOverlay" style="
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(135deg, #FAF8F5 0%, #F5F3EF 50%, #FAF8F5 100%);
+        z-index: 9999; display: flex; align-items: center; justify-content: center;
+    ">
+        <div style="text-align: center; color: #64748b;">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">🔒</div>
+            <div style="font-size: 1rem;">설정 접근 확인 중...</div>
+        </div>
+    </div>
+
+    <div class="settings-container" id="settingsContent" style="display: none;">
         <a href="../index.html" class="back-link">
             ← 메인으로 돌아가기
         </a>
 
-        <h1 style="font-size: 2rem; font-weight: 700; color: #1e293b; margin-bottom: 2rem;">
+        <h1 style="font-size: 2rem; font-weight: 600; font-family: 'Fraunces', 'Noto Sans KR', serif; color: #3C3530; margin-bottom: 2rem;">
             ⚙️ 설정
         </h1>
+
+        <!-- 저장 모드 선택 -->
+        <div class="settings-card" id="storageModeSection">
+            <h2>
+                <span>💾</span>
+                저장 모드 선택
+                <span id="storageModeStatus" class="status-badge disconnected">● 확인 중</span>
+            </h2>
+
+            <div class="alert alert-info">
+                <strong>저장 모드란?</strong><br>
+                데이터를 어디에 저장할지 선택합니다. Firebase 연결 상태에 따라 사용 가능한 모드가 달라집니다.
+            </div>
+
+            <div id="storageModeOptions" class="storage-mode-options">
+                <label class="storage-mode-option" data-mode="local">
+                    <input type="radio" name="storageMode" value="local">
+                    <div class="storage-mode-content">
+                        <div class="storage-mode-header">
+                            <span class="storage-mode-icon">📱</span>
+                            <span class="storage-mode-label">로컬 저장소만</span>
+                        </div>
+                        <p class="storage-mode-desc">이 컴퓨터에만 저장됩니다. 오프라인에서 완전히 동작하며, 다른 기기와 데이터를 공유할 수 없습니다.</p>
+                    </div>
+                </label>
+
+                <label class="storage-mode-option" data-mode="cloud">
+                    <input type="radio" name="storageMode" value="cloud">
+                    <div class="storage-mode-content">
+                        <div class="storage-mode-header">
+                            <span class="storage-mode-icon">🔄</span>
+                            <span class="storage-mode-label">클라우드 동기화</span>
+                            <span class="storage-mode-badge">권장</span>
+                        </div>
+                        <p class="storage-mode-desc">로컬 + Firebase에 동시 저장합니다. 오프라인에서도 작동하며, 온라인 시 자동으로 동기화됩니다.</p>
+                    </div>
+                </label>
+
+                <label class="storage-mode-option" data-mode="cloudOnly">
+                    <input type="radio" name="storageMode" value="cloudOnly">
+                    <div class="storage-mode-content">
+                        <div class="storage-mode-header">
+                            <span class="storage-mode-icon">☁️</span>
+                            <span class="storage-mode-label">클라우드 전용</span>
+                            <span class="storage-mode-badge warning">비권장</span>
+                        </div>
+                        <p class="storage-mode-desc">Firebase에만 저장합니다. 인터넷 연결이 필수이며, 오프라인 시 데이터 접근이 제한됩니다.</p>
+                    </div>
+                </label>
+            </div>
+
+            <p class="help-text" style="margin-top: 0.75rem;">
+                모드를 변경해도 기존 데이터는 삭제되지 않습니다. 클라우드 모드는 Firebase 연결이 필요합니다.
+            </p>
+        </div>
 
         <!-- Firebase 인증 파일 설정 (Electron 앱용) -->
         <div class="settings-card" id="authFileSection">
@@ -361,66 +739,197 @@
             </div>
 
             <p class="help-text" style="margin-top: 1rem;">
-                인증 파일이 없다면 관리자에게 문의하거나, 아래 수동 설정 섹션을 펼쳐서 직접 입력하세요.
+                인증 파일이 없다면 관리자에게 문의하거나, 아래 수동 설정을 펼쳐서 직접 입력하세요.
             </p>
+
+            <!-- Firebase 수동 설정 (인증 파일 카드 내 하단) -->
+            <div style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+                <h3 style="cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #475569; display: flex; align-items: center; gap: 0.5rem;" onclick="toggleManualSettings()">
+                    <span>☁️</span>
+                    수동 설정
+                    <span id="connectionStatus" class="status-badge disconnected">● 미연결</span>
+                    <span id="manualSettingsToggle" style="margin-left: auto; font-size: 0.8rem; color: #94a3b8;">▼ 펼치기</span>
+                </h3>
+
+                <div id="manualSettingsContent" style="display: none; margin-top: 1rem;">
+                    <div class="alert alert-warning">
+                        <strong>참고:</strong> Electron 앱에서는 인증 파일 사용을 권장합니다.
+                        웹 환경이거나 직접 설정이 필요한 경우에만 사용하세요.
+                    </div>
+
+                    <form id="firebaseForm">
+                        <div class="form-group">
+                            <label for="apiKey">API Key</label>
+                            <input type="text" id="apiKey" placeholder="AIzaSy...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectId">Project ID</label>
+                            <input type="text" id="projectId" placeholder="your-project-id">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="authDomain">Auth Domain</label>
+                            <input type="text" id="authDomain" placeholder="your-project-id.firebaseapp.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="storageBucket">Storage Bucket</label>
+                            <input type="text" id="storageBucket" placeholder="your-project-id.appspot.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="messagingSenderId">Messaging Sender ID</label>
+                            <input type="text" id="messagingSenderId" placeholder="123456789">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="appId">App ID</label>
+                            <input type="text" id="appId" placeholder="1:123456789:web:abcdef">
+                        </div>
+
+                        <p class="help-text">
+                            Firebase Console에서 프로젝트를 생성하고 웹 앱 설정값을 복사해서 입력하세요.
+                            <a href="https://console.firebase.google.com/" target="_blank" style="color: #3b82f6;">Firebase Console 열기</a>
+                        </p>
+
+                        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                            <button type="submit" class="btn btn-primary">설정 저장</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
-        <!-- Firebase 수동 설정 (웹 환경 또는 고급 사용자용) -->
-        <div class="settings-card">
-            <h2 style="cursor: pointer;" onclick="toggleManualSettings()">
-                <span>☁️</span>
-                Firebase 수동 설정
-                <span id="connectionStatus" class="status-badge disconnected">● 미연결</span>
-                <span id="manualSettingsToggle" style="margin-left: auto; font-size: 0.875rem; color: #64748b;">▼ 펼치기</span>
+        <!-- 암호화 설정 -->
+        <div class="settings-card" id="encryptionSection">
+            <h2>
+                <span>🔒</span>
+                암호화 설정
+                <span id="encryptionStatus" class="status-badge disconnected">● 확인 중</span>
             </h2>
 
-            <div id="manualSettingsContent" style="display: none;">
-                <div class="alert alert-warning">
-                    <strong>참고:</strong> Electron 앱에서는 인증 파일 사용을 권장합니다.
-                    웹 환경이거나 직접 설정이 필요한 경우에만 이 섹션을 사용하세요.
-                </div>
-
-                <form id="firebaseForm">
-                    <div class="form-group">
-                        <label for="apiKey">API Key</label>
-                        <input type="text" id="apiKey" placeholder="AIzaSy...">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="projectId">Project ID</label>
-                        <input type="text" id="projectId" placeholder="your-project-id">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="authDomain">Auth Domain</label>
-                        <input type="text" id="authDomain" placeholder="your-project-id.firebaseapp.com">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="storageBucket">Storage Bucket</label>
-                        <input type="text" id="storageBucket" placeholder="your-project-id.appspot.com">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="messagingSenderId">Messaging Sender ID</label>
-                        <input type="text" id="messagingSenderId" placeholder="123456789">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="appId">App ID</label>
-                        <input type="text" id="appId" placeholder="1:123456789:web:abcdef">
-                    </div>
-
-                    <p class="help-text">
-                        Firebase Console에서 프로젝트를 생성하고 웹 앱 설정값을 복사해서 입력하세요.
-                        <a href="https://console.firebase.google.com/" target="_blank" style="color: #3b82f6;">Firebase Console 열기</a>
-                    </p>
-
-                    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                        <button type="submit" class="btn btn-primary">설정 저장</button>
-                    </div>
-                </form>
+            <div class="alert alert-info">
+                <strong>데이터 암호화</strong><br>
+                민감한 개인정보(이름, 전화번호, 주소 등)는 AES-256-GCM으로 암호화되어 저장됩니다.
             </div>
+
+            <div id="encStatusInfo" style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 0.85rem; color: #64748b;">
+                    <div style="margin-bottom: 0.5rem;">상태: <strong id="encStatusText">확인 중...</strong></div>
+                    <div>키 소스: <strong id="encKeySourceText">-</strong></div>
+                </div>
+            </div>
+
+            <!-- 비활성 상태: 비밀번호 입력 -->
+            <div id="encInactiveActions" style="display: none; margin-top: 1rem;">
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.75rem;">
+                    암호화가 활성화되지 않았습니다. 비밀번호를 입력하여 활성화하세요.
+                </p>
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <button id="encEnterPwBtn" class="btn btn-primary">🔑 비밀번호 입력</button>
+                    <button id="encRecoverBtn" class="btn btn-secondary" style="display: none;">🔐 비밀번호 복구</button>
+                    <button id="encImportKeyBtnInactive" class="btn btn-secondary" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">📂 키 파일 가져오기</button>
+                </div>
+            </div>
+
+            <!-- 활성 상태: 비밀번호 변경 + 복구 키 재발급 + 키 파일 관리 -->
+            <div id="encActiveActions" style="display: none; margin-top: 1rem;">
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <button id="encChangePwBtn" class="btn btn-warning">🔄 비밀번호 변경</button>
+                    <button id="encRegenRecoveryBtn" class="btn btn-secondary">🔑 복구 키 발급/재발급</button>
+                    <button id="encExportKeyBtn" class="btn btn-secondary" style="background: linear-gradient(135deg, #22c55e, #16a34a);">📤 키 파일 내보내기</button>
+                    <button id="encImportKeyBtn" class="btn btn-secondary" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">📂 키 파일 가져오기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 암호화 마이그레이션 -->
+        <div class="settings-card" id="encMigrationSection" style="display: none;">
+            <h2>
+                <span>🔄</span>
+                암호화 마이그레이션
+                <span id="encMigrationStatus" class="status-badge disconnected">● 대기</span>
+            </h2>
+
+            <div class="alert alert-info">
+                <strong>암호화 마이그레이션이란?</strong><br>
+                Firebase 및 로컬 자동저장 파일의 평문 데이터를 AES-256-GCM으로 일괄 암호화합니다.
+            </div>
+
+            <div id="encMigrationList" class="migration-list">
+                <div style="text-align: center; color: #94a3b8; padding: 1rem;">
+                    "평문 데이터 스캔" 버튼을 눌러 현황을 확인하세요.
+                </div>
+            </div>
+
+            <div id="encMigrationProgress" style="display: none; margin-top: 1rem;">
+                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem;" id="encMigrationProgressText">진행 중...</div>
+                <div style="height: 6px; background: #eee; border-radius: 3px; overflow: hidden;">
+                    <div id="encMigrationProgressBar" style="height: 100%; background: #3b82f6; border-radius: 3px; width: 0; transition: width 0.3s;"></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                <button id="scanPlaintextBtn" class="btn btn-secondary">🔍 평문 데이터 스캔</button>
+                <button id="encryptAllBtn" class="btn btn-warning" disabled>🔒 전체 암호화</button>
+            </div>
+
+            <!-- 평문 마이그레이션 (복호화) -->
+            <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e2e8f0;">
+
+            <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🔓</span>
+                평문 마이그레이션 (복호화)
+                <span id="decMigrationStatus" class="status-badge disconnected" style="font-size: 0.75rem;">● 대기</span>
+            </h3>
+
+            <div class="alert alert-info">
+                <strong>평문 마이그레이션이란?</strong><br>
+                Firebase 및 로컬 자동저장 파일의 암호화된 데이터를 평문으로 복호화합니다.<br>
+                <small style="color: #dc2626;">⚠️ 복호화 후 민감 정보가 노출될 수 있으니 주의하세요.</small>
+            </div>
+
+            <div id="decMigrationList" class="migration-list">
+                <div style="text-align: center; color: #94a3b8; padding: 1rem;">
+                    "암호화 데이터 스캔" 버튼을 눌러 현황을 확인하세요.
+                </div>
+            </div>
+
+            <div id="decMigrationProgress" style="display: none; margin-top: 1rem;">
+                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem;" id="decMigrationProgressText">진행 중...</div>
+                <div style="height: 6px; background: #eee; border-radius: 3px; overflow: hidden;">
+                    <div id="decMigrationProgressBar" style="height: 100%; background: #3b82f6; border-radius: 3px; width: 0; transition: width 0.3s;"></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                <button id="scanEncryptedBtn" class="btn btn-secondary">🔍 암호화 데이터 스캔</button>
+                <button id="decryptAllBtn" class="btn btn-warning" disabled>🔓 전체 평문 변환</button>
+            </div>
+        </div>
+
+        <!-- 기관명 설정 -->
+        <div class="settings-card">
+            <h2>
+                <span>🏢</span>
+                기관명 설정
+            </h2>
+
+            <div class="form-group">
+                <label for="orgName">기관명 (메인 페이지 하단에 표시)</label>
+                <input type="text" id="orgName" placeholder="봉화군농업기술센터 안전성분석센터">
+            </div>
+
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button type="button" id="saveOrgNameBtn" class="btn btn-primary">저장</button>
+                <button type="button" id="resetOrgNameBtn" class="btn btn-secondary">기본값 복원</button>
+                <span id="orgNameSaveStatus" style="font-size: 0.8rem; color: #16a34a; display: none;">저장됨</span>
+            </div>
+
+            <p class="help-text">
+                메인 페이지 하단과 각 시료 페이지에 표시되는 기관명을 변경할 수 있습니다.
+            </p>
         </div>
 
         <!-- 네트워크 접근 제어 (웹 환경용) -->
@@ -527,680 +1036,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (compat 버전 - Electron 호환) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <!-- 네트워크 접근 제어 (Firebase 초기화 전에 로드) -->
-    <script src="../shared/logger.js"></script>
-    <script src="../shared/network-config.js"></script>
-    <script src="../shared/network-access.js"></script>
-    <!-- Firebase 스크립트 -->
-    <script src="../shared/firebase-config.js"></script>
-    <script src="../shared/firestore-db.js"></script>
-    <script src="../shared/storage-manager.js"></script>
-    <!-- XSS 방지를 위한 DOMPurify -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-    <script src="../shared/sanitize.js"></script>
-    <script src="../shared/theme.js"></script>
-    <!-- 캐시 관리 -->
-    <script src="../shared/cache-manager.js"></script>
-    <script>
-        // SETTINGS_FIREBASE_KEY는 firebase-config.js에서 이미 정의됨
-        const SETTINGS_FIREBASE_KEY = 'firebase_config';
-        const SAMPLE_TYPES = [
-            { key: 'soil', name: '토양', icon: '🌱', storagePrefix: 'soilSampleLogs' },
-            { key: 'water', name: '수질분석', icon: '💧', storagePrefix: 'waterSampleLogs' },
-            { key: 'pesticide', name: '잔류농약', icon: '🧪', storagePrefix: 'pesticideSampleLogs' },
-            { key: 'compost', name: '가축분뇨퇴비', icon: '🐄', storagePrefix: 'compostSampleLogs' },
-            { key: 'heavyMetal', name: '토양 중금속', icon: '⚗️', storagePrefix: 'heavyMetalSampleLogs' }
-        ];
-
-        // Electron 환경 확인
-        const isElectron = window.electronAPI?.isElectron === true;
-
-        // ========================================
-        // 인증 파일 관련 함수 (Electron 전용)
-        // ========================================
-
-        // 인증 파일 상태 확인 및 UI 업데이트
-        async function checkAuthFileStatus() {
-            const statusEl = document.getElementById('authFileStatus');
-            const uploadArea = document.getElementById('authFileUploadArea');
-            const infoArea = document.getElementById('authFileInfo');
-
-            if (!isElectron) {
-                // 웹 환경: localStorage에서 설정 확인
-                if (window.firebaseConfig?.isEnabled?.()) {
-                    statusEl.className = 'status-badge connected';
-                    statusEl.textContent = '● 연결됨';
-                    uploadArea.style.display = 'none';
-                    infoArea.style.display = 'block';
-                    document.getElementById('authFileProjectId').textContent = '웹 환경 - 설정 저장됨';
-                } else {
-                    statusEl.className = 'status-badge disconnected';
-                    statusEl.textContent = '● 미등록';
-                    uploadArea.style.display = 'block';
-                    infoArea.style.display = 'none';
-                }
-                // 웹 환경에서도 인증 파일 업로드 가능하도록 섹션 표시
-                document.querySelector('#authFileSection .alert-info').innerHTML = sanitizeHTML(
-                    '<strong>인증 파일이란?</strong><br>' +
-                    'Firebase 접근을 위한 인증 파일을 업로드하면 자동으로 설정됩니다.<br>' +
-                    '<small style="color: #64748b;">(웹 환경: 설정이 브라우저에 저장됩니다)</small>'
-                );
-                return;
-            }
-
-            try {
-                const result = await window.electronAPI.readAuthFile();
-
-                if (result.exists && result.content) {
-                    try {
-                        const config = JSON.parse(result.content);
-                        if (config.projectId) {
-                            // 인증 파일 등록됨
-                            statusEl.className = 'status-badge connected';
-                            statusEl.textContent = '● 등록됨';
-                            uploadArea.style.display = 'none';
-                            infoArea.style.display = 'block';
-                            document.getElementById('authFileProjectId').textContent = `프로젝트: ${config.projectId}`;
-                            return;
-                        }
-                    } catch (e) {
-                        console.error('인증 파일 파싱 오류:', e);
-                    }
-                }
-
-                // 인증 파일 미등록
-                statusEl.className = 'status-badge disconnected';
-                statusEl.textContent = '● 미등록';
-                uploadArea.style.display = 'block';
-                infoArea.style.display = 'none';
-            } catch (error) {
-                console.error('인증 파일 확인 오류:', error);
-            }
-        }
-
-        // 인증 파일 저장
-        async function saveAuthFile(content) {
-            try {
-                // JSON 파싱 검증
-                const config = JSON.parse(content);
-                if (!config.apiKey || !config.projectId) {
-                    alert('유효하지 않은 인증 파일입니다.\nAPI Key와 Project ID가 필요합니다.');
-                    return false;
-                }
-
-                if (!isElectron) {
-                    // 웹 환경: localStorage에 저장
-                    if (window.firebaseConfig?.saveConfig) {
-                        window.firebaseConfig.saveConfig(config);
-                    }
-
-                    // Firebase 재초기화
-                    if (window.firebaseConfig?.reinitialize) {
-                        const initResult = await window.firebaseConfig.reinitialize();
-                        if (initResult) {
-                            alert('인증 파일이 적용되고 Firebase가 연결되었습니다.\n프로젝트: ' + config.projectId);
-                        } else {
-                            alert('인증 파일이 저장되었지만 Firebase 연결에 실패했습니다.\n페이지를 새로고침해주세요.');
-                        }
-                    } else {
-                        alert('인증 파일이 저장되었습니다.\n페이지를 새로고침하면 적용됩니다.');
-                    }
-                    await checkAuthFileStatus();
-                    updateConnectionStatus();
-                    return true;
-                }
-
-                // Electron 환경: 파일 시스템에 저장
-                const result = await window.electronAPI.saveAuthFile(content);
-                if (result.success) {
-                    // Firebase 재초기화 (새 인증 파일 적용)
-                    if (window.firebaseConfig?.reinitialize) {
-                        const initResult = await window.firebaseConfig.reinitialize();
-                        if (initResult) {
-                            alert('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + config.projectId);
-                        } else {
-                            alert('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
-                        }
-                    } else {
-                        alert('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.');
-                    }
-                    await checkAuthFileStatus();
-                    updateConnectionStatus();
-                    return true;
-                } else {
-                    alert('인증 파일 저장 실패: ' + (result.error || '알 수 없는 오류'));
-                    return false;
-                }
-            } catch (error) {
-                alert('인증 파일 형식이 올바르지 않습니다.\nJSON 형식의 파일이 필요합니다.');
-                return false;
-            }
-        }
-
-        // 인증 파일 삭제
-        async function deleteAuthFile() {
-            if (!confirm('인증 파일을 삭제하시겠습니까?\nFirebase 연결이 해제됩니다.')) {
-                return;
-            }
-
-            if (!isElectron) {
-                // 웹 환경: localStorage에서 삭제
-                if (window.firebaseConfig?.resetConfig) {
-                    window.firebaseConfig.resetConfig();
-                }
-                alert('Firebase 설정이 삭제되었습니다.');
-                await checkAuthFileStatus();
-                updateConnectionStatus();
-                return;
-            }
-
-            try {
-                const result = await window.electronAPI.deleteAuthFile();
-                if (result.success) {
-                    // Firebase 설정도 초기화
-                    if (window.firebaseConfig?.resetConfig) {
-                        window.firebaseConfig.resetConfig();
-                    }
-                    alert('인증 파일이 삭제되었습니다.');
-                    await checkAuthFileStatus();
-                    updateConnectionStatus();
-                } else {
-                    alert('인증 파일 삭제 실패: ' + (result.error || '알 수 없는 오류'));
-                }
-            } catch (error) {
-                alert('인증 파일 삭제 중 오류 발생: ' + error.message);
-            }
-        }
-
-        // 파일 선택 버튼 클릭 (Electron 네이티브 다이얼로그 사용)
-        document.getElementById('selectAuthFileBtn')?.addEventListener('click', async () => {
-            if (isElectron && window.electronAPI?.selectAuthFile) {
-                // Electron 네이티브 파일 선택 다이얼로그
-                try {
-                    const result = await window.electronAPI.selectAuthFile();
-                    if (result.canceled) {
-                        return;
-                    }
-                    if (result.success) {
-                        // Firebase 재초기화 (새 인증 파일 적용)
-                        if (window.firebaseConfig?.reinitialize) {
-                            const initResult = await window.firebaseConfig.reinitialize();
-                            if (initResult) {
-                                alert('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + result.projectId);
-                            } else {
-                                alert('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
-                            }
-                        } else {
-                            alert('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.\n프로젝트: ' + result.projectId);
-                        }
-                        await checkAuthFileStatus();
-                        updateConnectionStatus();
-                    } else {
-                        alert('인증 파일 등록 실패: ' + (result.error || '알 수 없는 오류'));
-                    }
-                } catch (error) {
-                    alert('파일 선택 중 오류 발생: ' + error.message);
-                }
-            } else {
-                // 웹 환경 폴백
-                document.getElementById('authFileInput').click();
-            }
-        });
-
-        // 파일 선택 처리 (웹 환경용)
-        document.getElementById('authFileInput')?.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                await saveAuthFile(event.target.result);
-            };
-            reader.readAsText(file);
-
-            // 입력 초기화
-            e.target.value = '';
-        });
-
-        // 인증 파일 삭제 버튼
-        document.getElementById('deleteAuthFileBtn')?.addEventListener('click', deleteAuthFile);
-
-        // 드래그 앤 드롭 지원
-        const uploadArea = document.getElementById('authFileUploadArea');
-        if (uploadArea) {
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.querySelector('div').style.borderColor = '#3b82f6';
-                uploadArea.querySelector('div').style.background = '#eff6ff';
-            });
-
-            uploadArea.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                uploadArea.querySelector('div').style.borderColor = '#cbd5e1';
-                uploadArea.querySelector('div').style.background = '#f8fafc';
-            });
-
-            uploadArea.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                uploadArea.querySelector('div').style.borderColor = '#cbd5e1';
-                uploadArea.querySelector('div').style.background = '#f8fafc';
-
-                const file = e.dataTransfer.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    await saveAuthFile(event.target.result);
-                };
-                reader.readAsText(file);
-            });
-        }
-
-        // 수동 설정 토글
-        function toggleManualSettings() {
-            const content = document.getElementById('manualSettingsContent');
-            const toggle = document.getElementById('manualSettingsToggle');
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                toggle.textContent = '▲ 접기';
-            } else {
-                content.style.display = 'none';
-                toggle.textContent = '▼ 펼치기';
-            }
-        }
-
-        // ========================================
-        // 기존 Firebase 설정 관련 함수
-        // ========================================
-
-        // 저장된 설정 로드
-        function loadSavedConfig() {
-            const saved = localStorage.getItem(SETTINGS_FIREBASE_KEY);
-            if (saved) {
-                const config = JSON.parse(saved);
-                document.getElementById('apiKey').value = config.apiKey || '';
-                document.getElementById('projectId').value = config.projectId || '';
-                document.getElementById('authDomain').value = config.authDomain || '';
-                document.getElementById('storageBucket').value = config.storageBucket || '';
-                document.getElementById('messagingSenderId').value = config.messagingSenderId || '';
-                document.getElementById('appId').value = config.appId || '';
-            }
-        }
-
-        // 설정 저장
-        document.getElementById('firebaseForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const config = {
-                apiKey: document.getElementById('apiKey').value.trim(),
-                projectId: document.getElementById('projectId').value.trim(),
-                authDomain: document.getElementById('authDomain').value.trim(),
-                storageBucket: document.getElementById('storageBucket').value.trim(),
-                messagingSenderId: document.getElementById('messagingSenderId').value.trim(),
-                appId: document.getElementById('appId').value.trim()
-            };
-
-            localStorage.setItem(SETTINGS_FIREBASE_KEY, JSON.stringify(config));
-
-            const statusEl = document.getElementById('connectionStatus');
-            statusEl.className = 'status-badge';
-            statusEl.style.background = '#e0f2fe';
-            statusEl.style.color = '#0369a1';
-            statusEl.textContent = '● 저장됨';
-
-            alert('설정이 저장되었습니다. "연결 테스트" 버튼을 눌러 연결을 확인하세요.');
-        });
-
-        // 연결 상태 업데이트
-        function updateConnectionStatus() {
-            const statusEl = document.getElementById('connectionStatus');
-            if (window.firebaseConfig?.isEnabled?.()) {
-                statusEl.className = 'status-badge connected';
-                statusEl.textContent = '● 연결됨';
-                document.getElementById('migrateAllBtn').disabled = false;
-            } else {
-                statusEl.className = 'status-badge disconnected';
-                statusEl.textContent = '● 미연결';
-            }
-        }
-
-        // 연결 테스트
-        document.getElementById('testConnectionBtn').addEventListener('click', async () => {
-            const statusEl = document.getElementById('connectionStatus');
-            const authStatusEl = document.getElementById('authFileStatus');
-
-            statusEl.className = 'status-badge';
-            statusEl.style.background = '#fef3c7';
-            statusEl.style.color = '#92400e';
-            statusEl.textContent = '● 연결 중...';
-
-            try {
-                // Firebase 초기화 시도
-                const initialized = await window.firebaseConfig.initialize();
-
-                if (initialized) {
-                    statusEl.className = 'status-badge connected';
-                    statusEl.style.background = '#dcfce7';
-                    statusEl.style.color = '#16a34a';
-                    statusEl.textContent = '● 연결됨';
-
-                    if (authStatusEl) {
-                        authStatusEl.className = 'status-badge connected';
-                        authStatusEl.textContent = '● 연결됨';
-                    }
-
-                    document.getElementById('migrateAllBtn').disabled = false;
-                    renderMigrationList();
-                    alert('Firebase 연결 성공!');
-                } else {
-                    statusEl.className = 'status-badge disconnected';
-                    statusEl.style.background = '#fef3c7';
-                    statusEl.style.color = '#d97706';
-                    statusEl.textContent = '● 미연결';
-
-                    if (isElectron) {
-                        alert('Firebase 연결 실패.\n인증 파일이 등록되어 있는지 확인하세요.');
-                    } else {
-                        alert('Firebase 연결 실패.\n수동 설정값을 확인해주세요.');
-                    }
-                }
-            } catch (error) {
-                statusEl.className = 'status-badge error';
-                statusEl.style.background = '#fee2e2';
-                statusEl.style.color = '#dc2626';
-                statusEl.textContent = '● 연결 실패';
-                console.error('연결 테스트 실패:', error);
-                alert('연결 실패: ' + error.message);
-            }
-        });
-
-        // 마이그레이션 목록 렌더링 (모든 연도 포함, DOM API 사용 - XSS 방지)
-        function renderMigrationList() {
-            const container = document.getElementById('migrationList');
-            const currentYear = new Date().getFullYear();
-            const MIN_YEAR = 2020;
-
-            container.innerHTML = '';
-
-            SAMPLE_TYPES.forEach(type => {
-                // 모든 연도의 데이터 수집
-                let totalCount = 0;
-                const yearDetails = [];
-
-                for (let year = MIN_YEAR; year <= currentYear; year++) {
-                    const storageKey = `${type.storagePrefix}_${year}`;
-                    const data = localStorage.getItem(storageKey);
-                    const count = data ? JSON.parse(data).length : 0;
-                    if (count > 0) {
-                        totalCount += count;
-                        yearDetails.push(`${year}년: ${count}건`);
-                    }
-                }
-
-                // DOM 요소 생성
-                const item = document.createElement('div');
-                item.className = 'migration-item';
-
-                const info = document.createElement('div');
-                info.className = 'migration-item-info';
-
-                const icon = document.createElement('span');
-                icon.className = 'migration-item-icon';
-                icon.textContent = type.icon;
-
-                const textDiv = document.createElement('div');
-
-                const name = document.createElement('div');
-                name.className = 'migration-item-name';
-                name.textContent = type.name;
-
-                const count = document.createElement('div');
-                count.className = 'migration-item-count';
-                count.textContent = `${totalCount}건 ${yearDetails.length > 0 ? '(' + yearDetails.join(', ') + ')' : ''}`;
-
-                textDiv.appendChild(name);
-                textDiv.appendChild(count);
-                info.appendChild(icon);
-                info.appendChild(textDiv);
-
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-primary btn-sm';
-                btn.textContent = '마이그레이션';
-                btn.disabled = totalCount === 0;
-                btn.addEventListener('click', () => migrateTypeAllYears(type.key, type.storagePrefix));
-
-                item.appendChild(info);
-                item.appendChild(btn);
-                container.appendChild(item);
-            });
-        }
-
-        // 개별 타입의 모든 연도 마이그레이션
-        async function migrateTypeAllYears(sampleType, storagePrefix) {
-            if (!window.storageManager?.isCloudEnabled()) {
-                alert('Firebase가 연결되지 않았습니다.');
-                return;
-            }
-
-            const currentYear = new Date().getFullYear();
-            const MIN_YEAR = 2020;
-            let totalCount = 0;
-            let successYears = [];
-
-            try {
-                for (let year = MIN_YEAR; year <= currentYear; year++) {
-                    const storageKey = `${storagePrefix}_${year}`;
-                    const data = localStorage.getItem(storageKey);
-                    if (data) {
-                        const result = await window.storageManager.migrate(sampleType, year, storageKey);
-                        if (result.success && result.count > 0) {
-                            totalCount += result.count;
-                            successYears.push(`${year}년: ${result.count}건`);
-                        }
-                    }
-                }
-
-                if (totalCount > 0) {
-                    alert(`마이그레이션 완료!\n\n총 ${totalCount}건\n${successYears.join('\n')}`);
-                    renderMigrationList();
-                } else {
-                    alert('마이그레이션할 데이터가 없습니다.');
-                }
-            } catch (error) {
-                alert('마이그레이션 중 오류 발생: ' + error.message);
-            }
-        }
-
-        // 전체 마이그레이션 (모든 타입, 모든 연도)
-        document.getElementById('migrateAllBtn').addEventListener('click', async () => {
-            if (!confirm('모든 데이터를 Firebase로 마이그레이션하시겠습니까?\n(2020년 ~ 현재 연도의 모든 데이터)')) {
-                return;
-            }
-
-            const currentYear = new Date().getFullYear();
-            const MIN_YEAR = 2020;
-            let totalCount = 0;
-            let details = [];
-
-            for (const type of SAMPLE_TYPES) {
-                let typeCount = 0;
-
-                for (let year = MIN_YEAR; year <= currentYear; year++) {
-                    const storageKey = `${type.storagePrefix}_${year}`;
-                    const data = localStorage.getItem(storageKey);
-                    if (data) {
-                        try {
-                            const result = await window.storageManager.migrate(type.key, year, storageKey);
-                            if (result.success && result.count > 0) {
-                                totalCount += result.count;
-                                typeCount += result.count;
-                            }
-                        } catch (error) {
-                            console.error(`${type.name} ${year}년 마이그레이션 실패:`, error);
-                        }
-                    }
-                }
-
-                if (typeCount > 0) {
-                    details.push(`${type.name}: ${typeCount}건`);
-                }
-            }
-
-            alert(`전체 마이그레이션 완료!\n\n총 ${totalCount}건\n${details.join('\n')}`);
-            renderMigrationList();
-        });
-
-        // 전체 데이터 내보내기
-        document.getElementById('exportAllBtn').addEventListener('click', () => {
-            const currentYear = new Date().getFullYear();
-            const allData = {};
-
-            SAMPLE_TYPES.forEach(type => {
-                const storageKey = `${type.storagePrefix}_${currentYear}`;
-                const data = localStorage.getItem(storageKey);
-                if (data) {
-                    allData[type.key] = JSON.parse(data);
-                }
-            });
-
-            const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `sample-log-backup-${currentYear}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        });
-
-        // ========================================
-        // 캐시 관리 UI
-        // ========================================
-
-        // 캐시 상태 표시
-        function updateCacheStatusUI() {
-            if (!window.CacheManager) return;
-
-            const status = CacheManager.getCacheStatus();
-
-            document.getElementById('cacheDataCount').textContent = `${status.totalKeys}건`;
-            document.getElementById('cacheDataSize').textContent = `${status.totalSizeMB} MB`;
-
-            const lastClearEl = document.getElementById('lastCacheClear');
-            if (status.lastClear.lastClear) {
-                const lastDate = status.lastClear.lastClear;
-                lastClearEl.textContent = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}-${String(lastDate.getDate()).padStart(2, '0')} ${String(lastDate.getHours()).padStart(2, '0')}:${String(lastDate.getMinutes()).padStart(2, '0')}`;
-            } else {
-                lastClearEl.textContent = '없음';
-            }
-        }
-
-        // 캐시 삭제 버튼
-        document.getElementById('clearCacheBtn').addEventListener('click', () => {
-            if (!confirm('캐시된 시료 데이터를 삭제하시겠습니까?\n\n삭제 후 앱을 새로고침하면 Firebase에서 데이터를 다시 불러옵니다.\n(Firebase 설정 및 연결 정보는 유지됩니다)')) {
-                return;
-            }
-
-            if (window.CacheManager) {
-                CacheManager.clearCache(true);
-                updateCacheStatusUI();
-            }
-        });
-
-        // 상태 새로고침 버튼
-        document.getElementById('refreshCacheStatusBtn').addEventListener('click', () => {
-            updateCacheStatusUI();
-        });
-
-        // 초기 상태 표시
-        updateCacheStatusUI();
-
-        // ========================================
-        // 네트워크 접근 제어 UI
-        // ========================================
-
-        function initNetworkAccessUI() {
-            if (!window.NetworkAccess) return;
-
-            const statusEl = document.getElementById('networkAccessStatus');
-            const envEl = document.getElementById('currentEnvironment');
-            const gatewayEl = document.getElementById('allowedGateway');
-            const publicIPEl = document.getElementById('currentPublicIP');
-            const accessEl = document.getElementById('currentAccessStatus');
-
-            // 환경 표시
-            const isElectron = window.electronAPI?.isElectron === true || window.location.protocol === 'file:';
-            envEl.textContent = isElectron ? 'Electron (항상 허용)' : '웹 브라우저';
-
-            // 허용된 게이트웨이 표시
-            const allowedGateway = NetworkAccess.getAllowedGateway();
-            if (allowedGateway) {
-                gatewayEl.textContent = allowedGateway;
-            } else {
-                gatewayEl.textContent = '설정 없음';
-                gatewayEl.style.color = '#dc2626';
-            }
-
-            // 네트워크 상태 확인
-            async function refreshNetworkStatus() {
-                publicIPEl.textContent = '확인 중...';
-                accessEl.textContent = '확인 중...';
-
-                const publicIP = await NetworkAccess.getCurrentIP();
-                publicIPEl.textContent = publicIP || '확인 불가';
-
-                const access = await NetworkAccess.checkAccess();
-                accessEl.textContent = access.allowed ? `허용 (${access.reason})` : `거부 (${access.reason})`;
-                accessEl.style.color = access.allowed ? '#16a34a' : '#dc2626';
-
-                // 상태 배지 업데이트
-                if (access.allowed) {
-                    statusEl.className = 'status-badge connected';
-                    statusEl.textContent = '● 허용';
-                } else {
-                    statusEl.className = 'status-badge disconnected';
-                    statusEl.textContent = '● 거부';
-                }
-            }
-
-            document.getElementById('checkNetworkBtn').addEventListener('click', refreshNetworkStatus);
-
-            // 초기 상태 확인
-            refreshNetworkStatus();
-        }
-
-        initNetworkAccessUI();
-
-        // 초기화
-        loadSavedConfig();
-        renderMigrationList();
-
-        // 인증 파일 상태 확인 (Electron)
-        checkAuthFileStatus();
-
-        // 연결 상태 확인
-        (async function() {
-            if (window.storageManager) {
-                const mode = await window.storageManager.init();
-                const statusEl = document.getElementById('connectionStatus');
-                if (mode === 'cloud') {
-                    statusEl.className = 'status-badge connected';
-                    statusEl.textContent = '● 연결됨';
-                    document.getElementById('migrateAllBtn').disabled = false;
-
-                    // 인증 파일 섹션도 연결됨으로 표시
-                    const authStatusEl = document.getElementById('authFileStatus');
-                    if (authStatusEl) {
-                        authStatusEl.className = 'status-badge connected';
-                        authStatusEl.textContent = '● 연결됨';
-                    }
-                }
-            }
-        })();
-    </script>
 </body>
 
 </html>

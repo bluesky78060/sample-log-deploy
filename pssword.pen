@@ -1,0 +1,406 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "yqZkL",
+      "x": 0,
+      "y": 0,
+      "name": "Password Modal",
+      "width": 420,
+      "fill": "#FFFFFF",
+      "cornerRadius": 20,
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 36,
+      "children": [
+        {
+          "type": "frame",
+          "id": "ztEas",
+          "name": "Icon Wrap",
+          "width": "fill_container",
+          "height": 64,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "rXR8l",
+              "name": "Icon Circle",
+              "width": 64,
+              "height": 64,
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 180,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "#22C55E",
+                    "position": 0
+                  },
+                  {
+                    "color": "#16A34A",
+                    "position": 1
+                  }
+                ]
+              },
+              "cornerRadius": 32,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "XdwRS",
+                  "name": "Lock",
+                  "width": 28,
+                  "height": 28,
+                  "iconFontName": "lock",
+                  "iconFontFamily": "lucide",
+                  "fill": "#FFFFFF"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "eAW6C",
+          "name": "Title",
+          "fill": "#111827",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "암호화 비밀번호 입력",
+          "textAlign": "center",
+          "fontFamily": "Inter",
+          "fontSize": 22,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "R5Vdb",
+          "name": "Subtitle",
+          "fill": "#6B7280",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "데이터 복호화를 위해 비밀번호를 입력해주세요.",
+          "lineHeight": 1.5,
+          "textAlign": "center",
+          "fontFamily": "Inter",
+          "fontSize": 14
+        },
+        {
+          "type": "frame",
+          "id": "0zGQ7",
+          "name": "Rules Card",
+          "width": "fill_container",
+          "fill": "#F0FDF4",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#BBF7D0"
+          },
+          "layout": "vertical",
+          "gap": 10,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "J95fo",
+              "name": "Rules Title",
+              "fill": "#166534",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "비밀번호 규칙",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "0aQwe",
+              "name": "Rule 1",
+              "fill": "#15803D",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 8~64자 길이",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "DhOKY",
+              "name": "Rule 2",
+              "fill": "#15803D",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 소문자 포함 (필수)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "bskLw",
+              "name": "Rule 3",
+              "fill": "#15803D",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 숫자 포함 (필수)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "8zzMQ",
+              "name": "Rule 4",
+              "fill": "#15803D",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 특수문자 포함 (필수)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "9yyYf",
+              "name": "Rule 5",
+              "fill": "#9CA3AF",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 대문자 포함 (권장)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "a4QdQ",
+          "name": "Strength Section",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "Yc4gS",
+              "name": "Strength Row",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "0itAZ",
+                  "name": "Strength Label",
+                  "fill": "#6B7280",
+                  "content": "비밀번호 강도",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "text",
+                  "id": "MaBYS",
+                  "name": "Strength Value",
+                  "fill": "#F59E0B",
+                  "content": "보통",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KM6Cy",
+              "name": "Bar BG",
+              "width": "fill_container",
+              "height": 6,
+              "fill": "#E5E7EB",
+              "cornerRadius": 3,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "RqOC5",
+                  "name": "Bar Fill",
+                  "width": 180,
+                  "height": 6,
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 90,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#F59E0B",
+                        "position": 0
+                      },
+                      {
+                        "color": "#EAB308",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "cornerRadius": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VB20Y",
+          "name": "Input Section",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "Fr9Ca",
+              "name": "Input Label",
+              "fill": "#374151",
+              "content": "비밀번호",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "StY7N",
+              "name": "Input Field",
+              "width": "fill_container",
+              "height": 46,
+              "fill": "#F9FAFB",
+              "cornerRadius": 10,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#D1D5DB"
+              },
+              "padding": [
+                0,
+                14
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pGJQ3",
+                  "name": "Placeholder",
+                  "fill": "#9CA3AF",
+                  "content": "비밀번호를 입력하세요",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "icon_font",
+                  "id": "wNR0a",
+                  "name": "Eye",
+                  "width": 20,
+                  "height": 20,
+                  "iconFontName": "eye-off",
+                  "iconFontFamily": "lucide",
+                  "fill": "#9CA3AF"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ipEfm",
+          "name": "Button Row",
+          "width": "fill_container",
+          "gap": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "JY0EJ",
+              "name": "Skip Button",
+              "width": "fill_container",
+              "height": 46,
+              "fill": "#FFFFFF",
+              "cornerRadius": 10,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#D1D5DB"
+              },
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "5Zy1H",
+                  "name": "Skip Text",
+                  "fill": "#6B7280",
+                  "content": "건너뛰기",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "flQ9P",
+              "name": "Confirm Button",
+              "width": "fill_container",
+              "height": 46,
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 180,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "#22C55E",
+                    "position": 0
+                  },
+                  {
+                    "color": "#16A34A",
+                    "position": 1
+                  }
+                ]
+              },
+              "cornerRadius": 10,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Pos57",
+                  "name": "Confirm Text",
+                  "fill": "#FFFFFF",
+                  "content": "확인",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

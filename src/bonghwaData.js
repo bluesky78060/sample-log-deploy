@@ -884,3 +884,15 @@ function parseParcelAddress(input) {
 
     return null;
 }
+
+// ESM 모듈 스코프에서도 다른 스크립트가 접근할 수 있도록 window에 등록
+window.REGION_DATA = REGION_DATA;
+window.BONGHWA_DATA = BONGHWA_DATA;
+window.MAX_AUTOCOMPLETE_RESULTS = MAX_AUTOCOMPLETE_RESULTS;
+window.SIDO_PATTERN = SIDO_PATTERN;
+window.REGION_NAMES = REGION_NAMES;
+window.parseRegionAddress = parseRegionAddress;
+window.parseBonghwaAddress = parseBonghwaAddress;
+window.suggestRegionVillages = suggestRegionVillages;
+window.suggestBonghwaVillages = suggestBonghwaVillages;
+window.checkCrossRegionDuplicate = checkCrossRegionDuplicate;

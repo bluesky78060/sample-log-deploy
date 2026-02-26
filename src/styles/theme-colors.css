@@ -1,0 +1,13 @@
+/* 페이지별 테마 색상 (CSS 변수) */
+:root {
+  --color-primary: #7C9082;  /* 기본: sage green */
+}
+
+[data-sample-type="soil"] {
+  --color-primary: #22C55E;  /* 토양: 초록 */
+}
+
+[data-sample-type="heavy-metal"],
+[data-sample-type="pesticide"] {
+  --color-primary: #8B5CF6;  /* 중금속/잔류농약: 보라 */
+}

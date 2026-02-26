@@ -21,12 +21,13 @@ const CacheManager = (function() {
     ];
 
     // 시료 데이터 키 패턴 (이 패턴의 데이터가 클리어 대상)
+    // 연도 포함 키(예: soilSampleLogs_2026)와 레거시 키(예: waterSampleLogs) 모두 매칭
     const SAMPLE_DATA_PATTERNS = [
-        'soilSampleLogs_',
-        'waterSampleLogs_',
-        'pesticideSampleLogs_',
-        'compostSampleLogs_',
-        'heavyMetalSampleLogs_'
+        'soilSampleLogs',
+        'waterSampleLogs',
+        'pesticideSampleLogs',
+        'compostSampleLogs',
+        'heavyMetalSampleLogs'
     ];
 
     /**

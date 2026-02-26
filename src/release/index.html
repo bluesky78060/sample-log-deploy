@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>릴리즈 노트 - 시료 접수 대장</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+            min-height: 100vh;
+            padding: 1.5rem;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 노이즈 텍스처 오버레이 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 컨테이너 */
+        .container {
+            max-width: 780px;
+            width: 100%;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 헤더 */
+        .header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header-icon {
+            font-size: 1.75rem;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e293b 0%, #22c55e 30%, #3b82f6 60%, #1e293b 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientFlow 4s ease-in-out infinite;
+        }
+
+        @keyframes gradientFlow {
+            0%, 100% { background-position: 0% center; }
+            50% { background-position: 100% center; }
+        }
+
+        .header .subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 400;
+        }
+
+        /* 다크 모드 토글 (팝업용 컴팩트) */
+        .theme-toggle-container {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 50px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .theme-toggle-btn {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: #cbd5e1;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+        }
+
+        .theme-toggle-btn::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+        }
+
+        .theme-toggle-btn.dark::before {
+            transform: translateX(16px);
+        }
+
+        .theme-toggle-btn.dark {
+            background: #6366f1;
+        }
+
+        .theme-icon {
+            font-size: 0.8rem;
+        }
+
+        /* 타임라인 */
+        .timeline {
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #22c55e, #3b82f6, #f59e0b, #ef4444, #8b5cf6);
+            border-radius: 2px;
+        }
+
+        /* 버전 항목 */
+        .version-entry {
+            position: relative;
+            margin-bottom: 1.25rem;
+        }
+
+        /* 타임라인 점 */
+        .version-dot {
+            position: absolute;
+            left: -1.85rem;
+            top: 0.9rem;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #3b82f6;
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #3b82f6;
+            z-index: 1;
+        }
+
+        .version-dot.latest {
+            background: #22c55e;
+            box-shadow: 0 0 0 2px #22c55e;
+            width: 12px;
+            height: 12px;
+            left: -1.95rem;
+            top: 0.85rem;
+        }
+
+        .version-dot.in-dev {
+            background: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+            animation: dotPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes dotPulse {
+            0%, 100% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6); }
+            50% { box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2); }
+        }
+
+        /* 버전 카드 */
+        .version-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: all 0.2s ease;
+        }
+
+        .version-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .version-card.in-dev {
+            border-color: rgba(59, 130, 246, 0.3);
+            background: rgba(239, 246, 255, 0.9);
+        }
+
+        /* 카드 헤더 */
+        .version-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .version-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .version-number {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1e293b;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .version-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .version-date {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-weight: 400;
+        }
+
+        /* 배지들 */
+        .badge-row {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .badge-latest {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+
+        .badge-in-dev {
+            background: #dbeafe;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
+
+        .badge-feature {
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+
+        .badge-security {
+            background: #fff7ed;
+            color: #c2410c;
+            border: 1px solid #fed7aa;
+        }
+
+        .badge-fix {
+            background: #fefce8;
+            color: #a16207;
+            border: 1px solid #fde68a;
+        }
+
+        .badge-perf {
+            background: #faf5ff;
+            color: #7c3aed;
+            border: 1px solid #e9d5ff;
+        }
+
+        .badge-ui {
+            background: #f0f9ff;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+        }
+
+        /* 변경 목록 */
+        .change-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .change-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 0.82rem;
+            color: #475569;
+            line-height: 1.45;
+        }
+
+        .change-list li::before {
+            content: '\25B8';
+            color: #94a3b8;
+            flex-shrink: 0;
+            margin-top: 0.05rem;
+        }
+
+        .change-list li strong {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        /* 하단 */
+        .footer-note {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        /* 닫기 버튼 */
+        .close-btn {
+            display: block;
+            margin: 1rem auto 0;
+            padding: 0.6rem 2rem;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 3px 12px rgba(59, 130, 246, 0.3);
+            transition: all 0.2s ease;
+            font-family: 'Noto Sans KR', sans-serif;
+            text-decoration: none;
+            text-align: center;
+            width: fit-content;
+        }
+
+        .close-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        /* 접기/펼치기 */
+        .version-card.collapsed .change-list {
+            display: none;
+        }
+
+        .version-card .toggle-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .version-card .toggle-btn:hover {
+            background: rgba(148, 163, 184, 0.1);
+            color: #64748b;
+        }
+
+        /* 다크 모드 */
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0c4a6e 100%);
+        }
+
+        [data-theme="dark"] body::before {
+            opacity: 0.05;
+        }
+
+        [data-theme="dark"] .theme-toggle-container {
+            background: rgba(30, 41, 59, 0.9);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .header {
+            border-bottom-color: rgba(148, 163, 184, 0.1);
+        }
+
+        [data-theme="dark"] .header h1 {
+            background: linear-gradient(135deg, #f1f5f9 0%, #4ade80 30%, #60a5fa 60%, #f1f5f9 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        [data-theme="dark"] .header .subtitle {
+            color: #94a3b8;
+        }
+
+        [data-theme="dark"] .version-dot {
+            border-color: #1e293b;
+        }
+
+        [data-theme="dark"] .version-card {
+            background: rgba(30, 41, 59, 0.9);
+            border-color: rgba(148, 163, 184, 0.15);
+        }
+
+        [data-theme="dark"] .version-card.in-dev {
+            background: rgba(23, 37, 84, 0.85);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        [data-theme="dark"] .version-card:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .version-number {
+            color: #f1f5f9;
+        }
+
+        [data-theme="dark"] .version-title {
+            color: #cbd5e1;
+        }
+
+        [data-theme="dark"] .version-date {
+            color: #64748b;
+        }
+
+        [data-theme="dark"] .badge-latest {
+            background: rgba(74, 222, 128, 0.12);
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+
+        [data-theme="dark"] .badge-in-dev {
+            background: rgba(96, 165, 250, 0.12);
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        [data-theme="dark"] .badge-feature {
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.2);
+        }
+
+        [data-theme="dark"] .badge-security {
+            background: rgba(251, 146, 60, 0.1);
+            color: #fb923c;
+            border-color: rgba(251, 146, 60, 0.2);
+        }
+
+        [data-theme="dark"] .badge-fix {
+            background: rgba(250, 204, 21, 0.1);
+            color: #fbbf24;
+            border-color: rgba(250, 204, 21, 0.2);
+        }
+
+        [data-theme="dark"] .badge-perf {
+            background: rgba(167, 139, 250, 0.1);
+            color: #a78bfa;
+            border-color: rgba(167, 139, 250, 0.2);
+        }
+
+        [data-theme="dark"] .badge-ui {
+            background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.2);
+        }
+
+        [data-theme="dark"] .change-list li {
+            color: #94a3b8;
+        }
+
+        [data-theme="dark"] .change-list li::before {
+            color: #64748b;
+        }
+
+        [data-theme="dark"] .change-list li strong {
+            color: #e2e8f0;
+        }
+
+        [data-theme="dark"] .footer-note {
+            color: #64748b;
+            border-top-color: rgba(148, 163, 184, 0.1);
+        }
+
+        [data-theme="dark"] .version-card .toggle-btn {
+            color: #64748b;
+        }
+
+        [data-theme="dark"] .version-card .toggle-btn:hover {
+            background: rgba(148, 163, 184, 0.15);
+            color: #94a3b8;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 다크 모드 토글 -->
+    <div class="theme-toggle-container">
+        <span class="theme-icon">☀️</span>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="다크 모드 전환"></button>
+        <span class="theme-icon">🌙</span>
+    </div>
+
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header">
+            <div class="header-top">
+                <span class="header-icon">📋</span>
+                <h1>릴리즈 노트</h1>
+            </div>
+            <p class="subtitle">봉화군 농업기술센터 시료 접수 대장</p>
+        </div>
+
+        <!-- 타임라인 -->
+        <div class="timeline">
+
+            <!-- v1.8.0 (개발중) -->
+            <div class="version-entry">
+                <div class="version-dot in-dev"></div>
+                <div class="version-card in-dev">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.8.0</span>
+                                <span class="version-date">개발 진행중</span>
+                            </div>
+                            <div class="version-title">데이터 암호화 시스템</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-in-dev">● 개발중</span>
+                            <span class="badge badge-security">🔒 보안</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>AES-256-GCM 기반 민감 데이터 암호화</strong> — 이름, 전화번호, 주소 등 개인정보 보호</li>
+                        <li><strong>PBKDF2 키 유도</strong> — 600,000 iterations 고강도 키 생성</li>
+                        <li><strong>비밀번호 복구 시스템</strong> — 복구 키 기반 비밀번호 분실 대응</li>
+                        <li><strong>기존 평문 데이터 자동 마이그레이션</strong> — 암호화 전환 자동 처리</li>
+                        <li><strong>Electron safeStorage 기반 키 관리</strong> — 운영체제 키체인 연동</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.56 -->
+            <div class="version-entry">
+                <div class="version-dot latest"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.56</span>
+                                <span class="version-date">2026-02-23</span>
+                            </div>
+                            <div class="version-title">성명 클릭 일괄 선택 및 체크박스 개선</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-latest">★ 최신</span>
+                            <span class="badge badge-feature">기능</span>
+                            <span class="badge badge-fix">수정</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>성명 클릭 일괄 선택</strong> — 목록에서 성명을 클릭하면 같은 이름의 시료가 일괄 선택됩니다 (전체 5개 시료 타입)</li>
+                        <li><strong>전체 선택 체크박스 상태 동기화</strong> — 개별 체크박스 변경 시 헤더 전체 선택 체크박스 상태가 정확히 반영됩니다 (수질·퇴액비·중금속)</li>
+                        <li><strong>선택 카운트 배지</strong> — 체크박스 선택 시 "N건 선택" 배지가 표시됩니다</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.55 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.55</span>
+                                <span class="version-date">2026-02-21</span>
+                            </div>
+                            <div class="version-title">Scandinavian Warm 디자인 적용</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-ui">UI</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>Scandinavian Warm 컬러 팔레트</strong> — Sage Green(#7C9082) 기반 따뜻한 톤으로 전면 전환</li>
+                        <li><strong>Fraunces + Inter 서체 적용</strong> — 타이틀에 Fraunces serif, 본문에 Inter sans-serif 조합</li>
+                        <li><strong>라벨인쇄 페이지 디자인 통합</strong> — CSS 변수 + 다크모드 Warm 톤 전면 적용</li>
+                        <li><strong>설정 페이지 디자인 통합</strong> — 입력 필드, 버튼, 다크모드 Scandinavian Warm 스타일</li>
+                        <li>메인 페이지 인라인 CSS 전면 교체 (배경, 카드, 푸터, 동기화 모달)</li>
+                        <li>다크모드 전체 Stone 계열(#1C1917, #292524) 따뜻한 어두운 톤 적용</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.54 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.54</span>
+                                <span class="version-date">2026-02-20</span>
+                            </div>
+                            <div class="version-title">상단 툴바 통합 리디자인</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-ui">UI</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>통합 상단 바</strong> — 개별 고정 버튼 5개를 하나의 top-bar로 통합</li>
+                        <li><strong>모노크롬 SVG 아이콘</strong> — 이모지를 인라인 SVG로 교체, 라이트/다크 모드 자동 적응</li>
+                        <li><strong>동기화 버튼 필(pill) 스타일</strong> — 초록색 라운드 버튼 + 텍스트 레이블</li>
+                        <li>설정·릴리즈·설명서 버튼 흰색 원형 디자인</li>
+                        <li>다크모드 상단 바 스타일 적용</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.53 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.53</span>
+                                <span class="version-date">2026-02-19</span>
+                            </div>
+                            <div class="version-title">릴리즈 노트 페이지 및 다크모드 보완</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <span class="badge badge-ui">UI</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>릴리즈 노트 페이지 추가</strong> — 버전별 변경 이력 타임라인 UI</li>
+                        <li><strong>다크모드 누락 요소 수정</strong> — 전체보기 버튼, 라벨인쇄 버튼, 농가 구분선, 퇴비 버튼, 수질 배지</li>
+                        <li><strong>비고 컬럼 전체 보기</strong> — 고정 너비 제거, 내용에 맞춰 자동 조절</li>
+                        <li>메인 페이지 카드 크기 조정</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.52 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.52</span>
+                                <span class="version-date">2026-02-13</span>
+                            </div>
+                            <div class="version-title">엑셀 관리 강화 및 UI 개선</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <span class="badge badge-security">보안</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>토양 시료 목록 농가별 구분선 추가</strong> — 농가 단위로 시각적 구분 개선</li>
+                        <li><strong>엑셀 가져오기 공통화 (ExcelImportManager)</strong> — 5개 시료 타입 ~1,730줄 중복 제거</li>
+                        <li><strong>엑셀 가져오기 XSS 방지</strong> — escapeHTML 적용으로 보안 강화</li>
+                        <li>코드 리뷰 2차 검증 완료 — 19건 발견, 12건 수정</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.51 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.51</span>
+                                <span class="version-date">2026-02-12</span>
+                            </div>
+                            <div class="version-title">엑셀 서식 및 내보내기 기능</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>엑셀 서식 다운로드</strong> — 입력 양식 엑셀 파일 제공</li>
+                        <li><strong>엑셀 데이터 가져오기</strong> — 엑셀 파일에서 시료 데이터 일괄 등록</li>
+                        <li><strong>선택 항목 엑셀 내보내기</strong> — 원하는 항목만 선택해서 내보내기</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.50 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.50</span>
+                                <span class="version-date">2026-02-09</span>
+                            </div>
+                            <div class="version-title">필지 관리 개선 및 멀티탭 지원</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <span class="badge badge-perf">성능</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>필지 구분/용도 드롭다운 변경</strong> — 선택 편의성 개선</li>
+                        <li><strong>Firebase 멀티탭 동기화 지원</strong> — 여러 탭에서 동시 사용 가능</li>
+                        <li><strong>캐시 관리 기능</strong> — 매주 금요일 자동 캐시 정리</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.49 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.49</span>
+                                <span class="version-date">2026-02-04</span>
+                            </div>
+                            <div class="version-title">UI 개선 및 버그 수정</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-fix">버그수정</span>
+                            <span class="badge badge-ui">UI</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li>완료 행 스타일 클래스명 통일</li>
+                        <li><strong>주소 자동완성 개선</strong> — 더 정확한 주소 입력 지원</li>
+                        <li><strong>퇴·액비 테이블에 부숙도/함수율 컬럼 추가</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.46 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.46</span>
+                                <span class="version-date">2026-01-31</span>
+                            </div>
+                            <div class="version-title">네트워크 접근 제어 및 코드 품질</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-security">보안</span>
+                            <span class="badge badge-ui">UI</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>네트워크 접근 제어 간소화</strong></li>
+                        <li>잔류농약 성명 컬럼 정렬 개선</li>
+                        <li>퇴·액비 농장주소 전체 표시</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.42 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.42</span>
+                                <span class="version-date">2026-01-28</span>
+                            </div>
+                            <div class="version-title">보안 강화 및 코드 리뷰</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-security">보안</span>
+                            <span class="badge badge-perf">성능</span>
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>코드 리뷰 이슈 수정</strong> — CRITICAL/HIGH/MEDIUM 등급 이슈 수정</li>
+                        <li><strong>CSP 보안 설정 최적화</strong></li>
+                        <li>등록 결과 모달에 수정 버튼 추가</li>
+                        <li><strong>Water 모듈 리팩토링</strong> — 82.4% 코드 감소</li>
+                        <li><strong>BaseSampleManager 공통 클래스 구현</strong> — 5개 시료 타입 공통 로직 통합</li>
+                        <li><strong>경로 순회(Path Traversal) 방어 강화</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.38 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.38</span>
+                                <span class="version-date">2026-01-26</span>
+                            </div>
+                            <div class="version-title">보안 이슈 일괄 수정</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-security">보안</span>
+                            <span class="badge badge-fix">버그수정</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>innerHTML XSS 취약점 수정</strong></li>
+                        <li><strong>CSP 보안 강화</strong> — unsafe-eval 제거</li>
+                        <li>프로덕션 console.log 제거</li>
+                        <li>생년월일 입력 8자리 변경</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.35 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.35</span>
+                                <span class="version-date">2026-01-23</span>
+                            </div>
+                            <div class="version-title">보안 강화 및 동기화 개선</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-security">보안</span>
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>Electron 인증 보안 강화</strong></li>
+                        <li><strong>네트워크 기반 Firebase 접근 제어</strong></li>
+                        <li><strong>완료 필터 기능 추가</strong></li>
+                        <li>툴팁 및 주소 표시 개선</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.32 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.32</span>
+                                <span class="version-date">2026-01-19</span>
+                            </div>
+                            <div class="version-title">Firebase 동기화 안정화</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-fix">버그수정</span>
+                            <span class="badge badge-perf">성능</span>
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>Firebase 동기화 후 자동저장 기능</strong></li>
+                        <li>클라우드 삭제 항목 로컬 동기화</li>
+                        <li>Electron Firebase 삭제 호환성 개선</li>
+                        <li>성능 최적화 및 메인 페이지 UI 개선</li>
+                        <li><strong>토양 접수 목록 목적(용도) 필터 추가</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.20 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.20</span>
+                                <span class="version-date">2026-01-16</span>
+                            </div>
+                            <div class="version-title">Firebase 우선 로드 및 기능 확장</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-perf">성능</span>
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>Firebase 우선 데이터 로드 방식 변경</strong></li>
+                        <li>스마트 동기화 로직 개선</li>
+                        <li><strong>모든 모듈 우편발송일자 일괄 입력</strong></li>
+                        <li>Firestore ID 고유성 보장</li>
+                        <li>batchSave 500개 제한 해결</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.10 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.10</span>
+                                <span class="version-date">2026-01-15</span>
+                            </div>
+                            <div class="version-title">멀티 모듈 확장 및 자동 동기화</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>잔류농약/수질/중금속 판정 컬럼 추가</strong></li>
+                        <li><strong>데이터 저장 시 Firebase 자동 동기화</strong></li>
+                        <li>클라우드 데이터 로딩 및 마이그레이션</li>
+                        <li>토양 중금속 필드 확장</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.0</span>
+                                <span class="version-date">2026-01-14</span>
+                            </div>
+                            <div class="version-title">Firebase 클라우드 동기화</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>Firebase Firestore 클라우드 동기화 기능 도입</strong></li>
+                        <li>코드 품질 개선 및 공통 모듈 추가</li>
+                        <li>연도 선택기 및 자동 저장 로딩</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.6.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.6.0</span>
+                                <span class="version-date">2025-12-17</span>
+                            </div>
+                            <div class="version-title">다크 모드 및 디자인 개편</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-ui">UI</span>
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>다크 모드 지원</strong></li>
+                        <li><strong>메인 페이지 대규모 디자인 개선</strong></li>
+                        <li>조회 뷰 연도 선택 기능</li>
+                        <li>macOS 앱 아이콘 추가</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.5.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.5.0</span>
+                                <span class="version-date">2025-12-16</span>
+                            </div>
+                            <div class="version-title">UI 디자인 대규모 개선</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-ui">UI</span>
+                            <span class="badge badge-security">보안</span>
+                            <span class="badge badge-perf">성능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>메인 페이지 및 전체 UI 디자인 리뉴얼</strong></li>
+                        <li>E2E 테스트 178개 작성</li>
+                        <li>공통 유틸리티 모듈 추출</li>
+                        <li><strong>보안 강화</strong> — DOMPurify SRI, 파일 경로 검증</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.4.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.4.0</span>
+                                <span class="version-date">2025-12-16</span>
+                            </div>
+                            <div class="version-title">자동 업데이트 및 사용 설명서</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>자동 업데이트 기능</strong> — electron-updater 기반</li>
+                        <li>사용 설명서 추가</li>
+                        <li>토양 필지별 구분 라디오 버튼</li>
+                        <li>접수번호 중복 검증</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.0.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card collapsed">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.0.0</span>
+                                <span class="version-date">2025-12-11</span>
+                            </div>
+                            <div class="version-title">최초 릴리즈</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-feature">신규기능</span>
+                            <button class="toggle-btn">▼ 펼치기</button>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>토양/수질/퇴액비/중금속/잔류농약 5종 시료 접수 시스템</strong></li>
+                        <li><strong>Electron 데스크톱 + GitHub Pages 웹 듀얼 환경</strong></li>
+                        <li>라벨 인쇄 기능</li>
+                        <li>자동 저장 기능</li>
+                        <li>GitHub Actions CI/CD</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div><!-- /timeline -->
+
+        <!-- 하단 -->
+        <p class="footer-note">봉화군 농업기술센터 안전성분석센터</p>
+        <a href="../index.html" class="close-btn">닫기</a>
+    </div>
+
+    <script>
+        // 다크 모드 토글
+        const html = document.documentElement;
+        const toggleBtn = document.getElementById('themeToggleBtn');
+
+        // 저장된 테마 로드
+        const savedTheme = localStorage.getItem('theme-preference') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        if (savedTheme === 'dark') {
+            toggleBtn.classList.add('dark');
+        }
+
+        toggleBtn.addEventListener('click', function() {
+            var isDark = html.getAttribute('data-theme') === 'dark';
+            var newTheme = isDark ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme-preference', newTheme);
+            toggleBtn.classList.toggle('dark', !isDark);
+        });
+
+        // 접기/펼치기 토글
+        document.querySelectorAll('.toggle-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var card = btn.closest('.version-card');
+                if (card.classList.contains('collapsed')) {
+                    card.classList.remove('collapsed');
+                    btn.textContent = '▲ 접기';
+                } else {
+                    card.classList.add('collapsed');
+                    btn.textContent = '▼ 펼치기';
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

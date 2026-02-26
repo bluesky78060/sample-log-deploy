@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON 데이터 뷰어</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
+
+  .header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .header h1 { font-size: 20px; font-weight: 600; white-space: nowrap; }
+
+  .drop-zone {
+    border: 2px dashed #aaa; border-radius: 8px; padding: 40px 20px;
+    text-align: center; color: #888; cursor: pointer; transition: all 0.2s;
+    background: #fff; margin-bottom: 20px;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #4a90d9; background: #eef4fb; color: #4a90d9; }
+  .drop-zone p { font-size: 15px; margin-bottom: 8px; }
+  .drop-zone small { font-size: 12px; color: #aaa; }
+
+  .info-bar {
+    display: flex; gap: 16px; align-items: center; margin-bottom: 12px;
+    padding: 10px 16px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0;
+    font-size: 13px; flex-wrap: wrap;
+  }
+  .info-bar .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 12px; font-weight: 600;
+  }
+  .badge-blue { background: #e8f0fe; color: #1a73e8; }
+  .badge-green { background: #e6f4ea; color: #137333; }
+  .badge-gray { background: #f1f3f4; color: #5f6368; }
+
+  .search-bar { margin-bottom: 12px; }
+  .search-bar input {
+    width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 14px; outline: none; transition: border-color 0.2s;
+  }
+  .search-bar input:focus { border-color: #4a90d9; }
+
+  .table-wrap { overflow-x: auto; background: #fff; border-radius: 8px; border: 1px solid #e0e0e0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: #f8f9fa; border-bottom: 2px solid #dee2e6;
+    padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; cursor: pointer;
+    user-select: none;
+  }
+  thead th:hover { background: #e8eaed; }
+  thead th .sort-arrow { margin-left: 4px; font-size: 10px; color: #999; }
+  thead th .sort-arrow.active { color: #333; }
+  tbody td {
+    padding: 8px 12px; border-bottom: 1px solid #f0f0f0;
+    max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  tbody tr:hover { background: #f8f9fa; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody tr:nth-child(even):hover { background: #f0f2f4; }
+  td.expanded { white-space: normal; word-break: break-all; }
+
+  .empty { text-align: center; padding: 60px 20px; color: #999; }
+  .hidden { display: none; }
+  #fileInput { display: none; }
+
+  .col-toggle { margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .col-toggle button {
+    padding: 4px 10px; font-size: 11px; border: 1px solid #ddd; border-radius: 4px;
+    background: #fff; cursor: pointer; transition: all 0.15s;
+  }
+  .col-toggle button.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+  .col-toggle button:hover { border-color: #4a90d9; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>JSON 데이터 뷰어</h1>
+</div>
+
+<div id="dropZone" class="drop-zone">
+  <p>JSON 파일을 여기에 드래그하거나 클릭하여 선택</p>
+  <small>auto-save-*.json 또는 일반 JSON 배열/객체 파일</small>
+</div>
+<input type="file" id="fileInput" accept=".json">
+
+<div id="content" class="hidden">
+  <div id="infoBar" class="info-bar"></div>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="검색어 입력 (모든 컬럼 대상)">
+  </div>
+  <div id="colToggle" class="col-toggle"></div>
+  <div class="table-wrap">
+    <table>
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const content = document.getElementById('content');
+const infoBar = document.getElementById('infoBar');
+const colToggle = document.getElementById('colToggle');
+const thead = document.getElementById('thead');
+const tbody = document.getElementById('tbody');
+const searchInput = document.getElementById('searchInput');
+
+let allData = [];
+let columns = [];
+let visibleCols = new Set();
+let sortCol = null;
+let sortAsc = true;
+let fileName = '';
+
+// 드래그 & 드롭
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files.length) loadFile(e.target.files[0]); });
+
+function loadFile(file) {
+  fileName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      const records = Array.isArray(parsed) ? parsed : (parsed.data || [parsed]);
+      const meta = Array.isArray(parsed) ? null : parsed;
+      processData(records, meta);
+    } catch (err) {
+      alert('JSON 파싱 오류: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// 우선 표시할 컬럼 순서
+const PRIORITY_COLS = [
+  'receptionNumber', 'date', 'name', 'sampleName', 'sampleType',
+  'testItems', 'purpose', 'address', 'phoneNumber', 'isComplete', 'note'
+];
+
+function processData(records, meta) {
+  allData = records;
+
+  // 모든 키 추출
+  const colSet = new Set();
+  records.forEach(r => Object.keys(r).forEach(k => colSet.add(k)));
+
+  // 우선순위 정렬
+  const priority = PRIORITY_COLS.filter(c => colSet.has(c));
+  const rest = [...colSet].filter(c => !PRIORITY_COLS.includes(c)).sort();
+  columns = [...priority, ...rest];
+
+  // 기본 표시 컬럼 (우선순위 + 나머지 중 일부)
+  visibleCols = new Set(priority.length > 0 ? priority : columns.slice(0, 10));
+
+  // 메타 정보
+  let infoHtml = `<span><b>${fileName}</b></span>`;
+  infoHtml += `<span class="badge badge-green">${records.length}건</span>`;
+  if (meta?.version) infoHtml += `<span class="badge badge-gray">v${meta.version}</span>`;
+  if (meta?.exportDate) {
+    const d = new Date(meta.exportDate);
+    infoHtml += `<span class="badge badge-blue">${d.toLocaleString('ko-KR')}</span>`;
+  }
+  infoHtml += `<span style="color:#999">전체 ${columns.length}개 컬럼</span>`;
+  infoBar.innerHTML = infoHtml;
+
+  renderColToggle();
+  renderTable();
+  content.classList.remove('hidden');
+  dropZone.style.display = 'none';
+}
+
+function renderColToggle() {
+  colToggle.innerHTML = columns.map(col => {
+    const active = visibleCols.has(col) ? ' active' : '';
+    return `<button data-col="${col}" class="${active}" onclick="toggleCol('${col}')">${col}</button>`;
+  }).join('');
+}
+
+function toggleCol(col) {
+  if (visibleCols.has(col)) visibleCols.delete(col);
+  else visibleCols.add(col);
+  renderColToggle();
+  renderTable();
+}
+
+function renderTable() {
+  const query = searchInput.value.toLowerCase();
+  const cols = columns.filter(c => visibleCols.has(c));
+
+  // 헤더
+  thead.innerHTML = '<tr>' + cols.map(col => {
+    const arrow = sortCol === col ? (sortAsc ? '&#9650;' : '&#9660;') : '&#9650;';
+    const activeClass = sortCol === col ? ' active' : '';
+    return `<th onclick="sortBy('${col}')">${col}<span class="sort-arrow${activeClass}">${arrow}</span></th>`;
+  }).join('') + '</tr>';
+
+  // 필터
+  let filtered = allData;
+  if (query) {
+    filtered = allData.filter(row =>
+      cols.some(col => {
+        const val = row[col];
+        if (val == null) return false;
+        return String(typeof val === 'object' ? JSON.stringify(val) : val).toLowerCase().includes(query);
+      })
+    );
+  }
+
+  // 정렬
+  if (sortCol) {
+    filtered = [...filtered].sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (va == null) va = '';
+      if (vb == null) vb = '';
+      if (typeof va === 'object') va = JSON.stringify(va);
+      if (typeof vb === 'object') vb = JSON.stringify(vb);
+      const na = Number(va), nb = Number(vb);
+      if (!isNaN(na) && !isNaN(nb)) return sortAsc ? na - nb : nb - na;
+      return sortAsc ? String(va).localeCompare(String(vb), 'ko') : String(vb).localeCompare(String(va), 'ko');
+    });
+  }
+
+  // 본문
+  tbody.innerHTML = filtered.map(row => '<tr>' + cols.map(col => {
+    const val = row[col];
+    let display;
+    if (val == null) display = '';
+    else if (typeof val === 'boolean') display = val ? 'O' : 'X';
+    else if (typeof val === 'object') display = JSON.stringify(val);
+    else display = String(val);
+    const escaped = display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<td title="${escaped}" ondblclick="this.classList.toggle('expanded')">${escaped}</td>`;
+  }).join('') + '</tr>').join('');
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  renderTable();
+}
+
+searchInput.addEventListener('input', renderTable);
+</script>
+</body>
+</html>

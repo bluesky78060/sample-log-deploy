@@ -5,6 +5,8 @@
  * 인증 파일(firebase-auth.json)이 있어야 Firebase에 접근 가능
  * 인증 파일이 없으면 로컬 모드로만 동작
  */
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
 
 // ========================================
 // Firebase 초기화 상태
@@ -186,6 +188,13 @@ async function initializeFirebase() {
         return true;
     }
 
+    // 오프라인 상태 확인
+    if (!navigator.onLine) {
+        logFirebase('오프라인 상태 - 로컬 모드로 동작');
+        (window.logger?.info || console.info)('[Firebase] 인터넷 연결 없음. 로컬 모드로 동작합니다.');
+        return false;
+    }
+
     // 네트워크 접근 체크 (웹 환경용)
     if (window.NetworkAccess) {
         const accessResult = await window.NetworkAccess.checkAccess();
@@ -260,11 +269,11 @@ async function initializeFirebase() {
             }
         }
 
-        // 오프라인 지원 활성화
+        // 오프라인 지원 활성화 (멀티탭 동기화 모드)
         try {
-            await db.enablePersistence();
+            await db.enablePersistence({ synchronizeTabs: true });
             isOfflineEnabled = true;
-            logFirebase('오프라인 지원 활성화됨');
+            logFirebase('오프라인 지원 활성화됨 (멀티탭 동기화)');
         } catch (err) {
             (window.logger?.warn || console.warn)('[Firebase] 오프라인 지원 에러:', err.code, err.message);
             if (err.code === 'failed-precondition') {
@@ -276,6 +285,21 @@ async function initializeFirebase() {
 
         isFirebaseEnabled = true;
         logFirebase('초기화 완료:', firebaseConfigData.projectId);
+
+        // 오프라인/온라인 전환 시 Firestore 네트워크 제어
+        window.addEventListener('offline', () => {
+            logFirebase('네트워크 끊김 감지 - Firestore 네트워크 비활성화');
+            if (db) {
+                db.disableNetwork().catch(() => {});
+            }
+        });
+        window.addEventListener('online', () => {
+            logFirebase('네트워크 복구 감지 - Firestore 네트워크 활성화');
+            if (db) {
+                db.enableNetwork().catch(() => {});
+            }
+        });
+
         return true;
     } catch (error) {
         (window.logger?.error || console.error)('[Firebase] 초기화 실패:', error);

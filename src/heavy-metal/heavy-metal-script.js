@@ -1,432 +1,84 @@
 /**
- * @fileoverview 토양 중금속 시료 전용 스크립트
+ * @fileoverview 토양 중금속 시료 전용 스크립트 (BaseSampleManager 확장)
  * @description 중금속 분석용 토양 시료 접수/관리 기능
  */
 
-// ========================================
-// 상수 정의
-// ========================================
+class HeavyMetalSampleManager extends window.BaseSampleManager {
+    constructor() {
+        super({
+            moduleKey: 'heavyMetal',
+            moduleName: '토양 중금속',
+            storageKey: 'test_heavyMetalSampleLogs',
+            sampleType: '중금속',
+            autoSaveFile: 'heavy-metal-autosave.json',
+            debug: !!window.DEBUG
+        });
 
-/** @type {string} */
-const SAMPLE_TYPE = '중금속';
+        this.ANALYSIS_ITEMS = ['구리', '납', '니켈', '비소', '수은', '아연', '카드뮴', '6가크롬'];
+        this.isAllSelected = false;
+        this.autoSaveFileHandle = null;
+        this.listViewStale = true;
+        this.currentSearchFilter = {
+            dateFrom: '', dateTo: '', name: '',
+            receptionFrom: '', receptionTo: '', completed: ''
+        };
+        this.currentRegistrationData = null;
+        this.pendingMailDateIndices = [];
 
-/** @type {string} */
-const STORAGE_KEY = 'heavyMetalSampleLogs';
-
-/** @type {string} */
-const AUTO_SAVE_FILE = 'heavy-metal-autosave.json';
-
-/**
- * 디버그 로그 함수 (window.DEBUG 사용 - constants.js에서 설정)
- * @param {...any} args - 로그 인자
- * @returns {void}
- */
-const log = (...args) => window.DEBUG && console.log(...args);
-
-// ========================================
-// 페이지네이션 상태
-// ========================================
-
-/** @type {number} */
-let currentPage = 1;
-
-/** @type {number} */
-let itemsPerPage = parseInt(localStorage.getItem('heavyMetalItemsPerPage'), 10) || 100;
-
-/** @type {number} */
-let totalPages = 1;
-
-/** @type {HeavyMetalSampleLog[]} */
-let currentLogsData = [];
-
-// 중금속 분석 항목 목록
-const ANALYSIS_ITEMS = ['구리', '납', '니켈', '비소', '수은', '아연', '카드뮴', '6가크롬'];
-
-// 년도별 스토리지 키 생성
-function getStorageKey(year) {
-    return `${STORAGE_KEY}_${year}`;
-}
-
-// 데이터가 있는 연도 자동 감지 (현재 연도부터 과거로 검색)
-function findYearWithData() {
-    const currentYear = new Date().getFullYear();
-    for (let year = currentYear; year >= 2020; year--) {
-        const key = getStorageKey(year);
-        const data = localStorage.getItem(key);
-        if (data) {
-            try {
-                const parsed = JSON.parse(data);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return year.toString();
-                }
-            } catch (e) {}
-        }
+        // 경상북도 지역명
+        this.GYEONGBUK_REGION_NAMES = [
+            '포항시', '경주시', '김천시', '안동시', '구미시',
+            '영천시', '상주시', '문경시', '경산시',
+            '군위군', '의성군', '청송군', '영양군', '영덕군',
+            '청도군', '고령군', '성주군', '칠곡군', '예천군',
+            '봉화군', '울릉군', '영주시', '울진군'
+        ];
     }
-    return currentYear.toString();
-}
-
-// 년도 선택 관련 변수
-let selectedYear = findYearWithData();
-
-// 공통 모듈에서 가져온 변수/함수 사용 (../shared/*.js)
-// window.isElectron, window.createFileAPI 등 전역 변수 사용
-const FileAPI = window.createFileAPI('heavy-metal');
-
-// heavy-metal 전용 웹 환경 자동저장 확장
-FileAPI.autoSaveFolderHandle = null;
-const originalAutoSave = FileAPI.autoSave.bind(FileAPI);
-FileAPI.autoSave = async function(content) {
-    // Electron 환경에서는 기본 autoSave 사용
-    if (window.isElectron) {
-        return originalAutoSave(content);
-    }
-    // 웹 환경에서 폴더 핸들이 있으면 사용
-    if (this.autoSaveFolderHandle) {
-        try {
-            const fileHandle = await this.autoSaveFolderHandle.getFileHandle(AUTO_SAVE_FILE, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(content);
-            await writable.close();
-            return true;
-        } catch (e) {
-            window.logger.error('자동 저장 실패:', e);
-            return false;
-        }
-    }
-    return false;
-};
-
-document.addEventListener('DOMContentLoaded', async () => {
-    log('🚀 중금속 페이지 로드 시작');
-    log(window.isElectron ? '🖥️ Electron 환경' : '🌐 웹 브라우저 환경');
-
-    await FileAPI.init(selectedYear);
-
-    // Firebase 초기화와 AutoSave 초기화를 병렬로 실행
-    let firebaseReady = false;
-
-    // Firebase 초기화 Promise
-    const firebaseInitPromise = (async () => {
-        try {
-            if (window.firebaseConfig?.initialize) {
-                const firebaseInitialized = await window.firebaseConfig.initialize();
-                if (firebaseInitialized && window.firestoreDb?.init) {
-                    await window.firestoreDb.init();
-                    log('☁️ Firebase 초기화 완료');
-                    return true;
-                }
-            }
-        } catch (err) {
-            window.logger.warn('Firebase 초기화 실패, 로컬 모드로 동작:', err);
-        }
-        return false;
-    })();
-
-    // AutoSave 초기화 Promise
-    const autoSaveInitPromise = SampleUtils.initAutoSave({
-        moduleKey: 'heavyMetal',
-        moduleName: '중금속',
-        FileAPI: FileAPI,
-        currentYear: selectedYear,
-        log: log,
-        showToast: window.showToast
-    });
-
-    // 병렬 실행 후 결과 대기
-    const [firebaseResult] = await Promise.all([firebaseInitPromise, autoSaveInitPromise]);
-    firebaseReady = firebaseResult;
-
-    // 자동 저장 파일에서 데이터 로드하는 함수 (공통 모듈 사용)
-    window.loadFromAutoSaveFile = async function() {
-        return await SampleUtils.loadFromAutoSaveFile(FileAPI, log);
-    };
 
     // ========================================
-    // DOM 요소 참조
+    // 오버라이드: DOM 요소 캐싱
     // ========================================
-    const form = document.getElementById('sampleForm');
-    const tableBody = document.getElementById('logTableBody');
-    const emptyState = document.getElementById('emptyState');
-    const dateInput = document.getElementById('date');
-    const samplingDateInput = document.getElementById('samplingDate');
-    const recordCountEl = document.getElementById('recordCount');
-    const navItems = document.querySelectorAll('.nav-btn');
-    const views = document.querySelectorAll('.view');
-
-    // 분석항목 체크박스
-    const analysisCheckboxes = document.querySelectorAll('input[name="analysisItems"]');
-    const selectedItemsCount = document.getElementById('selectedItemsCount');
-    const selectAllItemsBtn = document.getElementById('selectAllItemsBtn');
-
-    // 목적 라디오 버튼
-    const purposeRadios = document.querySelectorAll('input[name="purpose"]');
-    const certificationNotice = document.getElementById('certificationNotice');
-
-    // 주소 관련
-    const searchAddressBtn = document.getElementById('searchAddressBtn');
-    const addressPostcode = document.getElementById('addressPostcode');
-    const addressRoad = document.getElementById('addressRoad');
-    const addressDetail = document.getElementById('addressDetail');
-    const addressHidden = document.getElementById('address');
-    const addressModal = document.getElementById('addressModal');
-    const closeAddressModalBtn = document.getElementById('closeAddressModal');
-    const daumPostcodeContainer = document.getElementById('daumPostcodeContainer');
-
-    // 채취장소 자동완성
-    const samplingLocationInput = document.getElementById('samplingLocation');
-    const samplingLocationAutocomplete = document.getElementById('samplingLocationAutocomplete');
-
-    // 작물 검색
-    const cropNameInput = document.getElementById('cropName');
-    const searchCropBtn = document.getElementById('searchCropBtn');
-    const cropModal = document.getElementById('cropModal');
+    cacheElements() {
+        super.cacheElements();
+        this.form = document.getElementById('sampleForm');
+        this.tableBody = document.getElementById('logTableBody');
+        this.emptyState = document.getElementById('emptyState');
+        this.recordCountEl = document.getElementById('recordCount');
+    }
 
     // ========================================
-    // 데이터 초기화
+    // 오버라이드: 완료 필드 마이그레이션 (isComplete 사용)
     // ========================================
-    // 기존 데이터 마이그레이션 (년도 없는 데이터 → 현재 년도로)
-    const oldData = localStorage.getItem(STORAGE_KEY);
-    if (oldData) {
-        const currentYearKey = getStorageKey(selectedYear);
-        if (!localStorage.getItem(currentYearKey)) {
-            localStorage.setItem(currentYearKey, oldData);
-            log('📦 기존 중금속 데이터를 현재 년도로 마이그레이션 완료');
-        }
-    }
-
-    // safeParseJSON 사용으로 에러 핸들링
-    let sampleLogs = SampleUtils.safeParseJSON(getStorageKey(selectedYear), []);
-    let editingIndex = -1;
-    let isAllSelected = false;
-    let autoSaveFileHandle = null;  // Web 환경 자동저장 파일 핸들
-
-    // 오늘 날짜 설정
-    const today = new Date().toISOString().split('T')[0];
-    if (dateInput) dateInput.value = today;
-    if (samplingDateInput) samplingDateInput.value = today;
-
-    // ========================================
-    // 년도 선택 기능
-    // ========================================
-    const yearSelect = document.getElementById('yearSelect');
-    const listYearSelect = document.getElementById('listYearSelect');
-    const listViewTitle = document.getElementById('listViewTitle');
-
-    // 현재 년도 선택
-    if (yearSelect) {
-        yearSelect.value = selectedYear;
-    }
-    if (listYearSelect) {
-        listYearSelect.value = selectedYear;
-    }
-
-    // 두 연도 선택 드롭다운 동기화
-    function syncYearSelects(newYear) {
-        if (yearSelect) yearSelect.value = newYear;
-        if (listYearSelect) listYearSelect.value = newYear;
-    }
-
-    // 목록 뷰 타이틀 업데이트
-    function updateListViewTitle() {
-        if (listViewTitle) {
-            listViewTitle.textContent = `${selectedYear}년 토양 중금속 접수 목록`;
-        }
-    }
-
-    // Firebase에서 데이터 로드 (클라우드 동기화)
-    async function loadFromFirebase(year) {
-        try {
-            // storageManager가 클라우드 모드인지 확인
-            if (window.storageManager?.isCloudEnabled()) {
-                const cloudData = await window.storageManager.load('heavyMetal', parseInt(year), getStorageKey(year));
-                if (cloudData && cloudData.length > 0) {
-                    // localStorage에도 저장 (캐시)
-                    localStorage.setItem(getStorageKey(year), JSON.stringify(cloudData));
-                    log('☁️ Firebase에서 데이터 로드:', cloudData.length, '건');
-                    return cloudData;
-                }
+    migrateCompletedField(logs) {
+        if (!Array.isArray(logs)) return logs;
+        return logs.map(log => {
+            if (log.completed !== undefined || log.isCompleted !== undefined) {
+                log.isComplete = log.isComplete || log.isCompleted || log.completed || false;
+                delete log.completed;
+                delete log.isCompleted;
             }
-            // firestoreDb 직접 사용 (storageManager가 초기화되지 않은 경우)
-            if (window.firestoreDb?.isEnabled()) {
-                const cloudData = await window.firestoreDb.getAll('heavyMetal', parseInt(year));
-                if (cloudData && cloudData.length > 0) {
-                    // localStorage에도 저장 (캐시)
-                    localStorage.setItem(getStorageKey(year), JSON.stringify(cloudData));
-                    log('☁️ Firebase에서 데이터 로드 (직접):', cloudData.length, '건');
-                    return cloudData;
-                }
-            }
-        } catch (error) {
-            window.logger.error('Firebase 데이터 로드 실패:', error);
-        }
-        return null;
-    }
-
-    // 년도별 데이터 로드 함수 (Firebase 우선, 로컬 폴백)
-    async function loadYearData(year) {
-        const yearStorageKey = getStorageKey(year);
-
-        // 1. Firebase에서 먼저 로드 시도
-        if (window.firestoreDb?.isEnabled()) {
-            try {
-                log('☁️ Firebase에서 데이터 로드 중...');
-                const cloudData = await window.firestoreDb.getAll('heavyMetal', parseInt(year), { skipOrder: true });
-
-                if (cloudData && cloudData.length > 0) {
-                    // Firebase 데이터를 primary로 사용
-                    sampleLogs = cloudData;
-                    log('☁️ Firebase 데이터 로드 완료:', sampleLogs.length, '건');
-
-                    // localStorage에 캐싱
-                    localStorage.setItem(yearStorageKey, JSON.stringify(sampleLogs));
-                    log('💾 로컬 캐싱 완료');
-
-                    renderLogs(sampleLogs);
-                    const receptionInput = document.getElementById('receptionNumber');
-                    if (receptionInput) {
-                        receptionInput.value = generateNextReceptionNumber();
-                    }
-                    updateListViewTitle();
-
-                    // 자동저장 실행 (JSON 파일)
-                    const autoSaveEnabled = localStorage.getItem('heavyMetalAutoSaveEnabled') === 'true';
-                    if (autoSaveEnabled && window.isElectron && FileAPI.autoSavePath) {
-                        SampleUtils.performAutoSave({
-                            FileAPI: FileAPI,
-                            moduleKey: 'heavyMetal',
-                            data: sampleLogs,
-                            log: log
-                        });
-                    }
-                    return;
-                } else {
-                    log('☁️ Firebase에 데이터 없음, localStorage 확인');
-                }
-            } catch (error) {
-                window.logger.error('Firebase 로드 실패, 로컬 데이터 사용:', error);
-            }
-        }
-
-        // 2. Firebase 사용 불가 또는 데이터 없음 → 로컬에서 로드
-        sampleLogs = SampleUtils.safeParseJSON(yearStorageKey, []);
-        renderLogs(sampleLogs);
-
-        const receptionInput = document.getElementById('receptionNumber');
-        if (receptionInput) {
-            receptionInput.value = generateNextReceptionNumber();
-        }
-        updateListViewTitle();
-    }
-
-    // 클라우드 동기화 함수 (백그라운드 실행)
-    async function syncWithCloud(year) {
-        try {
-            if (!window.firestoreDb?.isEnabled()) return;
-
-            log('☁️ 클라우드 동기화 시작...');
-            const cloudData = await window.firestoreDb.getAll('heavyMetal', parseInt(year), { skipOrder: true });
-
-            if (!cloudData || cloudData.length === 0) {
-                log('☁️ 클라우드에 데이터 없음');
-                return;
-            }
-
-            const yearStorageKey = getStorageKey(year);
-            const localData = SampleUtils.safeParseJSON(yearStorageKey, []);
-
-            // 스마트 병합: ID 기반으로 최신 데이터 선택
-            const mergedData = smartMerge(localData, cloudData);
-
-            // 변경사항이 있으면 업데이트
-            if (mergedData.hasChanges) {
-                sampleLogs = mergedData.data;
-                localStorage.setItem(yearStorageKey, JSON.stringify(mergedData.data));
-                renderLogs(sampleLogs);
-                const receptionInput = document.getElementById('receptionNumber');
-                if (receptionInput) {
-                    receptionInput.value = generateNextReceptionNumber();
-                }
-                log('☁️ 클라우드에서 동기화 완료:', mergedData.data.length, '건');
-                const msgs = [];
-                if (mergedData.updated > 0) msgs.push(`${mergedData.updated}건 업데이트`);
-                if (mergedData.added > 0) msgs.push(`${mergedData.added}건 추가`);
-                if (mergedData.deleted > 0) msgs.push(`${mergedData.deleted}건 삭제`);
-                showToast(`클라우드에서 동기화됨 (${msgs.join(', ')})`, 'success');
-
-                // 자동저장 실행 (JSON 파일)
-                const autoSaveEnabled = localStorage.getItem('heavyMetalAutoSaveEnabled') === 'true';
-                if (autoSaveEnabled && window.isElectron && FileAPI.autoSavePath) {
-                    SampleUtils.performAutoSave({
-                        FileAPI: FileAPI,
-                        moduleKey: 'heavyMetal',
-                        data: sampleLogs,
-                        log: log
-                    });
-                }
-            } else {
-                log('☁️ 로컬과 클라우드 데이터 동일 (', localData.length, '건)');
-            }
-        } catch (error) {
-            window.logger.error('클라우드 동기화 실패:', error);
-        }
-    }
-
-    // 스마트 병합 함수 참조 (공통 모듈 사용)
-    const smartMerge = window.SyncUtils.smartMerge;
-
-    // 연도 전환 시 자동 저장 파일 복원
-    async function loadAutoSaveForSelectedYear() {
-        if (!window.isElectron || !FileAPI.autoSavePath || sampleLogs.length > 0) return;
-
-        const autoSaveData = await window.loadFromAutoSaveFile();
-        if (autoSaveData && autoSaveData.length > 0) {
-            sampleLogs = autoSaveData;
-            localStorage.setItem(getStorageKey(selectedYear), JSON.stringify(sampleLogs));
-            renderLogs(sampleLogs);
-            const receptionInput = document.getElementById('receptionNumber');
-            if (receptionInput) {
-                receptionInput.value = generateNextReceptionNumber();
-            }
-            log(`📂 ${selectedYear}년 자동 저장 데이터 로드:`, autoSaveData.length, '건');
-        }
-    }
-
-    // 년도 선택 변경 이벤트
-    if (yearSelect) {
-        yearSelect.addEventListener('change', async (e) => {
-            selectedYear = e.target.value;
-            syncYearSelects(selectedYear);
-            loadYearData(selectedYear);
-            // 자동 저장 경로도 연도별로 업데이트
-            if (window.isElectron) {
-                await FileAPI.updateAutoSavePath(selectedYear);
-                await loadAutoSaveForSelectedYear();
-            }
-            showToast(`${selectedYear}년 데이터를 불러왔습니다.`, 'success');
+            return log;
         });
     }
 
-    if (listYearSelect) {
-        listYearSelect.addEventListener('change', async (e) => {
-            selectedYear = e.target.value;
-            syncYearSelects(selectedYear);
-            loadYearData(selectedYear);
-            // 자동 저장 경로도 연도별로 업데이트
-            if (window.isElectron) {
-                await FileAPI.updateAutoSavePath(selectedYear);
-                await loadAutoSaveForSelectedYear();
-            }
-            showToast(`${selectedYear}년 데이터를 불러왔습니다.`, 'success');
+    // ========================================
+    // 오버라이드: 렌더링 전 데이터 정렬
+    // ========================================
+    prepareDataForRender(logs) {
+        return [...logs].sort((a, b) => {
+            const numA = parseInt(a.receptionNumber, 10) || 0;
+            const numB = parseInt(b.receptionNumber, 10) || 0;
+            return numA - numB;
         });
     }
 
-    // 초기 타이틀 설정
-    updateListViewTitle();
+    // ========================================
+    // 오버라이드: 뷰 전환 (listViewStale 지원)
+    // ========================================
+    switchView(viewName) {
+        const views = document.querySelectorAll('.view');
+        const navItems = document.querySelectorAll('.nav-btn');
 
-    // ========================================
-    // 뷰 전환 기능
-    // ========================================
-    function switchView(viewName) {
         views.forEach(view => view.classList.remove('active'));
         navItems.forEach(nav => nav.classList.remove('active'));
 
@@ -436,387 +88,195 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (targetView) targetView.classList.add('active');
         if (targetNav) targetNav.classList.add('active');
 
-        if (viewName === 'list') {
-            renderLogs();
-        }
-    }
-
-    navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            switchView(item.dataset.view);
-        });
-    });
-
-    // 빈 상태에서 폼으로 이동
-    const btnGoForm = document.querySelector('.btn-go-form');
-    if (btnGoForm) {
-        btnGoForm.addEventListener('click', () => switchView('form'));
-    }
-
-    // 토스트 메시지 - 공통 모듈 사용 (../shared/toast.js)
-    const showToast = window.showToast;
-
-    // ========================================
-    // 분석항목 선택 관리
-    // ========================================
-    function updateSelectedItemsCount() {
-        const checked = document.querySelectorAll('input[name="analysisItems"]:checked');
-        if (selectedItemsCount) {
-            selectedItemsCount.textContent = checked.length;
-        }
-    }
-
-    analysisCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateSelectedItemsCount);
-    });
-
-    // 전체 선택 버튼
-    if (selectAllItemsBtn) {
-        selectAllItemsBtn.addEventListener('click', () => {
-            isAllSelected = !isAllSelected;
-            analysisCheckboxes.forEach(cb => {
-                cb.checked = isAllSelected;
-            });
-            selectAllItemsBtn.textContent = isAllSelected ? '전체 해제' : '전체 선택';
-            updateSelectedItemsCount();
-        });
-    }
-
-    // ========================================
-    // 목적 선택 - 인증용 안내
-    // ========================================
-    purposeRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            const isCertification = ['무농약', '유기농', 'GAP', '저탄소'].includes(radio.value);
-            if (certificationNotice) {
-                certificationNotice.classList.toggle('hidden', !isCertification);
-            }
-            // 인증용 선택 시 전체 항목 자동 선택
-            if (isCertification) {
-                analysisCheckboxes.forEach(cb => cb.checked = true);
-                isAllSelected = true;
-                if (selectAllItemsBtn) selectAllItemsBtn.textContent = '전체 해제';
-                updateSelectedItemsCount();
-            }
-        });
-    });
-
-    // ========================================
-    // 법인여부 선택 (개인/법인)
-    // ========================================
-    const applicantTypeSelect = document.getElementById('applicantType');
-    const birthDateField = document.getElementById('birthDateField');
-    const corpNumberField = document.getElementById('corpNumberField');
-    const birthDateInput = document.getElementById('birthDate');
-    const corpNumberInput = document.getElementById('corpNumber');
-
-    if (applicantTypeSelect) {
-        applicantTypeSelect.addEventListener('change', () => {
-            const isCorpSelected = applicantTypeSelect.value === '법인';
-            if (isCorpSelected) {
-                birthDateField.classList.add('hidden');
-                corpNumberField.classList.remove('hidden');
-                birthDateInput.value = '';
-            } else {
-                birthDateField.classList.remove('hidden');
-                corpNumberField.classList.add('hidden');
-                corpNumberInput.value = '';
-            }
-        });
-    }
-
-    // ========================================
-    // 수령 방법 선택
-    // ========================================
-    const receptionMethodBtns = document.querySelectorAll('.reception-method-btn');
-    const receptionMethodInput = document.getElementById('receptionMethod');
-
-    receptionMethodBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            receptionMethodBtns.forEach(b => b.classList.remove('active', 'selected'));
-            btn.classList.add('active', 'selected');
-            if (receptionMethodInput) {
-                receptionMethodInput.value = btn.dataset.method;
-            }
-        });
-    });
-
-    // ========================================
-    // 전화번호 자동 하이픈 - 공통 모듈 사용
-    // ========================================
-    const phoneNumberInput = document.getElementById('phoneNumber');
-    window.SampleUtils.setupPhoneNumberInput(phoneNumberInput);
-
-    // 주소 검색 - 공통 모듈 사용 (../shared/address.js)
-    const addressManager = new window.AddressManager({
-        searchBtn: searchAddressBtn,
-        postcodeInput: addressPostcode,
-        roadInput: addressRoad,
-        detailInput: addressDetail,
-        hiddenInput: addressHidden,
-        modal: addressModal,
-        closeBtn: closeAddressModalBtn,
-        container: daumPostcodeContainer
-    });
-
-    // ========================================
-    // 채취장소 자동완성 (경상북도 전체)
-    // ========================================
-    const GYEONGBUK_REGION_NAMES = [
-        '포항시', '경주시', '김천시', '안동시', '구미시',
-        '영천시', '상주시', '문경시', '경산시',
-        '군위군', '의성군', '청송군', '영양군', '영덕군',
-        '청도군', '고령군', '성주군', '칠곡군', '예천군',
-        '봉화군', '울릉군', '영주시', '울진군'
-    ];
-
-    if (samplingLocationInput && samplingLocationAutocomplete) {
-        samplingLocationInput.addEventListener('input', (e) => {
-            const value = e.target.value.trim();
-            samplingLocationAutocomplete.innerHTML = '';
-            samplingLocationAutocomplete.classList.remove('show');
-
-            if (value.length < 1) return;
-
-            // 이미 완성된 주소인지 확인
-            if (GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) {
-                return;
-            }
-
-            // 자동완성 제안 (산 지번 옵션 포함)
-            if (typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, null, true);
-                if (suggestions.length > 0) {
-                    samplingLocationAutocomplete.innerHTML = sanitizeHTML(suggestions.slice(0, 20).map(suggestion => `
-                        <li data-village="${suggestion.village}" data-district="${suggestion.district}" data-region-key="${suggestion.regionKey}" data-region="${suggestion.region || ''}" data-is-mountain="${suggestion.isMountain}">
-                            ${suggestion.displayText}
-                        </li>
-                    `).join(''));
-                    samplingLocationAutocomplete.classList.add('show');
-                }
-            }
-        });
-
-        // Enter 키로 자동완성 확인 - 중복 리 검색 지원
-        samplingLocationInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const value = samplingLocationInput.value.trim();
-
-                // 이미 완전한 주소면 무시
-                if (GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) {
-                    samplingLocationAutocomplete.innerHTML = '';
-                    samplingLocationAutocomplete.classList.remove('show');
-                    return;
-                }
-
-                if (typeof parseParcelAddress === 'function') {
-                    const result = parseParcelAddress(value);
-                    if (result) {
-                        // 여러 지역에서 중복되는 경우 (isDuplicate: true) - 드롭다운 표시
-                        if (result.isDuplicate && result.locations) {
-                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.locations.map(loc => `
-                                <li data-village="${result.villageName}" data-district="${loc.district}" data-region-key="${loc.regionKey}" data-lot="${result.lotNumber || ''}">
-                                    ${loc.fullAddress} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            samplingLocationAutocomplete.classList.add('show');
-                        }
-                        // 단일 지역 내 중복인 경우
-                        else if (result.alternatives && result.alternatives.length > 1) {
-                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.alternatives.map(district => `
-                                <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber || ''}" data-region-key="${result.regionKey}">
-                                    ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            samplingLocationAutocomplete.classList.add('show');
-                        } else if (result.fullAddress) {
-                            // 단일 매칭 - 바로 변환
-                            samplingLocationAutocomplete.innerHTML = '';
-                            samplingLocationAutocomplete.classList.remove('show');
-                            samplingLocationInput.value = result.fullAddress;
-                        }
-                    }
-                }
-            }
-        });
-
-        // 자동완성 목록 클릭 시 (중복 리 선택 포함)
-        samplingLocationAutocomplete.addEventListener('click', (e) => {
-            if (e.target.tagName === 'LI') {
-                const village = e.target.dataset.village;
-                const district = e.target.dataset.district;
-                const regionKey = e.target.dataset.regionKey;
-                const isMountain = e.target.dataset.isMountain === 'true';
-                const lot = e.target.dataset.lot;
-
-                // 로컬 지역명 매핑
-                const LOCAL_REGIONS = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
-                const region = e.target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
-
-                // 산 지번이면 "리 산" 형식
-                const villageWithMountain = isMountain ? `${village} 산` : village;
-
-                // 클릭 시 전체 주소로 변환 (산 키워드 제외)
-                const currentValue = samplingLocationInput.value.trim();
-                const match = currentValue.match(/\d+(-\d+)?$/);
-                const lotNumber = lot || (match ? match[0] : '');
-
-                const fullAddress = lotNumber
-                    ? `${region} ${district} ${villageWithMountain} ${lotNumber}`
-                    : `${region} ${district} ${villageWithMountain}`;
-
-                samplingLocationInput.value = fullAddress;
-                samplingLocationAutocomplete.innerHTML = '';
-                samplingLocationAutocomplete.classList.remove('show');
-            }
-        });
-
-        // 포커스 아웃 시 목록 숨김
-        samplingLocationInput.addEventListener('blur', () => {
-            setTimeout(() => {
-                samplingLocationAutocomplete.innerHTML = '';
-                samplingLocationAutocomplete.classList.remove('show');
-            }, 200);
-        });
-    }
-
-    // ========================================
-    // 작물 검색 모달
-    // ========================================
-    if (searchCropBtn && cropModal) {
-        const closeCropModal = document.getElementById('closeCropModal');
-        const cancelCropSelection = document.getElementById('cancelCropSelection');
-        const confirmCropSelection = document.getElementById('confirmCropSelection');
-        const cropSearchInput = document.getElementById('cropSearchInput');
-        const cropList = document.getElementById('cropList');
-        const cropCategoryFilter = document.getElementById('cropCategoryFilter');
-        const cropResultCount = document.getElementById('cropResultCount');
-
-        let selectedCrop = null;
-
-        searchCropBtn.addEventListener('click', () => {
-            cropModal.classList.remove('hidden');
-            if (cropSearchInput) cropSearchInput.focus();
-            renderCropList();
-        });
-
-        function closeCropModalFn() {
-            cropModal.classList.add('hidden');
-        }
-
-        if (closeCropModal) closeCropModal.addEventListener('click', closeCropModalFn);
-        if (cancelCropSelection) cancelCropSelection.addEventListener('click', closeCropModalFn);
-        cropModal.querySelector('.modal-overlay')?.addEventListener('click', closeCropModalFn);
-
-        function renderCropList() {
-            if (!cropList || typeof CROP_DATA === 'undefined') return;
-
-            const searchTerm = cropSearchInput?.value.toLowerCase() || '';
-            const category = cropCategoryFilter?.value || '전체';
-            let crops = [];
-
-            // 카테고리 옵션 채우기
-            if (cropCategoryFilter && cropCategoryFilter.options.length === 1) {
-                Object.keys(CROP_DATA).forEach(cat => {
-                    const option = document.createElement('option');
-                    option.value = cat;
-                    option.textContent = cat;
-                    cropCategoryFilter.appendChild(option);
-                });
-            }
-
-            // 작물 필터링
-            if (category === '전체') {
-                Object.values(CROP_DATA).forEach(arr => crops.push(...arr));
-            } else {
-                crops = CROP_DATA[category] || [];
-            }
-
-            if (searchTerm) {
-                crops = crops.filter(c => c.toLowerCase().includes(searchTerm));
-            }
-
-            cropList.innerHTML = '';
-            crops.forEach(crop => {
-                const li = document.createElement('li');
-                li.textContent = crop;
-                li.className = selectedCrop === crop ? 'selected' : '';
-                li.addEventListener('click', () => {
-                    selectedCrop = crop;
-                    renderCropList();
-                });
-                cropList.appendChild(li);
-            });
-
-            if (cropResultCount) {
-                cropResultCount.textContent = `${crops.length}개 작물`;
-            }
-        }
-
-        if (cropSearchInput) {
-            cropSearchInput.addEventListener('input', renderCropList);
-        }
-        if (cropCategoryFilter) {
-            cropCategoryFilter.addEventListener('change', renderCropList);
-        }
-
-        if (confirmCropSelection) {
-            confirmCropSelection.addEventListener('click', () => {
-                if (selectedCrop && cropNameInput) {
-                    cropNameInput.value = selectedCrop;
-                }
-                closeCropModalFn();
-            });
+        if (viewName === 'list' && this.listViewStale) {
+            this.renderLogs(this.sampleLogs);
+            this.listViewStale = false;
         }
     }
 
     // ========================================
-    // 접수번호 생성
+    // 오버라이드: 테이블 행 빌드
     // ========================================
-    const receptionNumberInput = document.getElementById('receptionNumber');
+    buildTableRow(item, index) {
+        const tr = document.createElement('tr');
+        tr.dataset.id = item.id;
 
-    // 다음 접수번호 생성
-    function generateNextReceptionNumber() {
-        let maxNumber = 0;
+        const analysisItemsStr = item.analysisItems ? item.analysisItems.join(', ') : '';
+        const isAllItems = item.analysisItems && item.analysisItems.length === this.ANALYSIS_ITEMS.length;
+        const analysisItemsDisplay = !item.analysisItems || item.analysisItems.length === 0
+            ? '-'
+            : isAllItems ? '전체 항목' : analysisItemsStr;
 
-        // 기존 데이터에서 최대 번호 찾기
-        // 형식: 1, 2, 3 (숫자만)
-        sampleLogs.forEach(log => {
-            if (log.receptionNumber) {
-                const num = parseInt(log.receptionNumber, 10);
-                if (!isNaN(num) && num > maxNumber) {
-                    maxNumber = num;
-                }
-            }
-        });
+        const methodText = item.receptionMethod || '-';
 
-        // 다음 번호 생성
-        const nextNumber = maxNumber + 1;
-        log(`📋 다음 접수번호 생성: ${nextNumber} (기존 최대: ${maxNumber})`);
-        return String(nextNumber);
-    }
+        // 뷰용 주소: 시도 패턴이 있을 때만 제거
+        const addressRoadVal = item.addressRoad || '-';
+        const displayAddress = addressRoadVal !== '-' && SIDO_PATTERN.test(addressRoadVal)
+            ? addressRoadVal.replace(SIDO_PATTERN, '')
+            : addressRoadVal;
 
-    // 초기 접수번호 설정
-    if (receptionNumberInput) {
-        receptionNumberInput.value = generateNextReceptionNumber();
+        // XSS 방지
+        const safeName = escapeHTML(item.name || '-');
+        const safeDisplayAddress = escapeHTML(displayAddress);
+        const safePhone = escapeHTML(item.phoneNumber || '-');
+        const safeSamplingLocation = escapeHTML(item.samplingLocation || '-');
+        const safeCropName = escapeHTML(item.cropName || '-');
+        const safeNote = escapeHTML(item.note || '-');
+
+        const applicantType = item.applicantType || '개인';
+        const birthOrCorp = applicantType === '법인' ? (item.corpNumber || '-') : (item.birthDate || '-');
+
+        // 1. Checkbox
+        const tdCheckbox = document.createElement('td');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'row-checkbox';
+        checkbox.dataset.id = item.id;
+        tdCheckbox.appendChild(checkbox);
+        tr.appendChild(tdCheckbox);
+
+        // 2. Complete button
+        const tdComplete = document.createElement('td');
+        const btnComplete = document.createElement('button');
+        btnComplete.className = item.isComplete ? 'btn-complete completed' : 'btn-complete';
+        btnComplete.dataset.id = item.id;
+        btnComplete.title = item.isComplete ? '완료됨' : '미완료';
+        btnComplete.textContent = item.isComplete ? '✓' : '○';
+        tdComplete.appendChild(btnComplete);
+        tr.appendChild(tdComplete);
+
+        // 3. Result button
+        const tdResult = document.createElement('td');
+        tdResult.className = 'col-result';
+        const btnResult = document.createElement('button');
+        btnResult.className = 'btn-result' +
+            (item.testResult === 'pass' ? ' pass' :
+             item.testResult === 'fail' ? ' fail' : '');
+        btnResult.dataset.id = item.id;
+        btnResult.title = item.testResult === 'pass' ? '적합' :
+                         item.testResult === 'fail' ? '부적합' : '미판정 (클릭하여 변경)';
+        btnResult.textContent = item.testResult === 'pass' ? '적합' :
+                               item.testResult === 'fail' ? '부적합' : '-';
+        tdResult.appendChild(btnResult);
+        tr.appendChild(tdResult);
+
+        // 4. Reception number
+        const tdReceptionNumber = document.createElement('td');
+        tdReceptionNumber.textContent = item.receptionNumber || '-';
+        tr.appendChild(tdReceptionNumber);
+
+        // 5. Date
+        const tdDate = document.createElement('td');
+        tdDate.textContent = item.date || '-';
+        tr.appendChild(tdDate);
+
+        // 6. Name (클릭 시 같은 이름 일괄 선택)
+        const tdName = document.createElement('td');
+        tdName.className = 'col-name';
+        tdName.dataset.name = item.name || '';
+        tdName.textContent = safeName;
+        tdName.title = `"${safeName}" 클릭하면 같은 이름 일괄 선택`;
+        tr.appendChild(tdName);
+
+        // 7. Applicant type (hidden)
+        const tdApplicantType = document.createElement('td');
+        tdApplicantType.className = 'col-applicant-type col-hidden';
+        tdApplicantType.textContent = applicantType;
+        tr.appendChild(tdApplicantType);
+
+        // 8. Birth/Corp number (hidden)
+        const tdBirthCorp = document.createElement('td');
+        tdBirthCorp.className = 'col-birth-corp col-hidden';
+        tdBirthCorp.textContent = birthOrCorp;
+        tr.appendChild(tdBirthCorp);
+
+        // 9. Address
+        const tdAddress = document.createElement('td');
+        tdAddress.className = 'col-address';
+        tdAddress.textContent = safeDisplayAddress;
+        tr.appendChild(tdAddress);
+
+        // 10. Phone
+        const tdPhone = document.createElement('td');
+        tdPhone.textContent = safePhone;
+        tr.appendChild(tdPhone);
+
+        // 11. Sampling location
+        const tdSamplingLocation = document.createElement('td');
+        tdSamplingLocation.textContent = safeSamplingLocation;
+        tr.appendChild(tdSamplingLocation);
+
+        // 12. Crop name (with tree age if present)
+        const tdCropName = document.createElement('td');
+        tdCropName.textContent = safeCropName + (item.treeAge ? ' (' + item.treeAge + '년생)' : '');
+        tr.appendChild(tdCropName);
+
+        // 13. Sampling date
+        const tdSamplingDate = document.createElement('td');
+        tdSamplingDate.textContent = item.samplingDate || '-';
+        tr.appendChild(tdSamplingDate);
+
+        // 14. Analysis items (with tooltip)
+        const tdAnalysisItems = document.createElement('td');
+        tdAnalysisItems.className = 'text-truncate';
+        tdAnalysisItems.setAttribute('data-tooltip', analysisItemsStr);
+        tdAnalysisItems.textContent = analysisItemsDisplay;
+        tr.appendChild(tdAnalysisItems);
+
+        // 15. Purpose
+        const tdPurpose = document.createElement('td');
+        tdPurpose.textContent = item.purpose || '-';
+        tr.appendChild(tdPurpose);
+
+        // 16. Reception method
+        const tdMethod = document.createElement('td');
+        tdMethod.textContent = methodText;
+        tr.appendChild(tdMethod);
+
+        // 17. Note (with tooltip)
+        const tdNote = document.createElement('td');
+        tdNote.className = 'text-truncate';
+        tdNote.setAttribute('data-tooltip', safeNote);
+        tdNote.textContent = safeNote;
+        tr.appendChild(tdNote);
+
+        // 18. Mail date
+        const tdMailDate = document.createElement('td');
+        tdMailDate.className = 'col-mail-date';
+        tdMailDate.textContent = item.mailDate || '-';
+        tr.appendChild(tdMailDate);
+
+        // 19. Action buttons
+        const tdActions = document.createElement('td');
+        const actionDiv = document.createElement('div');
+        actionDiv.className = 'action-btns';
+
+        const btnEdit = document.createElement('button');
+        btnEdit.className = 'btn-edit';
+        btnEdit.dataset.id = item.id;
+        btnEdit.title = '수정';
+        btnEdit.textContent = '✏️';
+
+        const btnDelete = document.createElement('button');
+        btnDelete.className = 'btn-delete';
+        btnDelete.dataset.id = item.id;
+        btnDelete.title = '삭제';
+        btnDelete.textContent = '🗑️';
+
+        actionDiv.appendChild(btnEdit);
+        actionDiv.appendChild(btnDelete);
+        tdActions.appendChild(actionDiv);
+        tr.appendChild(tdActions);
+
+        return tr;
     }
 
     // ========================================
-    // 폼 제출 처리
+    // 오버라이드: 폼 제출
     // ========================================
-    const navSubmitBtn = document.getElementById('navSubmitBtn');
-    const navResetBtn = document.getElementById('navResetBtn');
+    submitForm() {
+        const showToast = window.showToast;
 
-    if (navSubmitBtn) {
-        navSubmitBtn.addEventListener('click', submitForm);
-    }
-
-    if (navResetBtn) {
-        navResetBtn.addEventListener('click', resetForm);
-    }
-
-    function submitForm() {
         // 필수 필드 검증
         const name = document.getElementById('name')?.value.trim();
         const phoneNumber = document.getElementById('phoneNumber')?.value.trim();
@@ -826,57 +286,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         const selectedPurpose = document.querySelector('input[name="purpose"]:checked')?.value;
         const selectedItems = Array.from(document.querySelectorAll('input[name="analysisItems"]:checked')).map(cb => cb.value);
 
-        if (!name) {
-            showToast('성명을 입력해주세요.', 'error');
-            document.getElementById('name')?.focus();
-            return;
-        }
-        if (!phoneNumber) {
-            showToast('연락처를 입력해주세요.', 'error');
-            document.getElementById('phoneNumber')?.focus();
-            return;
-        }
-        if (!samplingLocation) {
-            showToast('시료채취 장소를 입력해주세요.', 'error');
-            document.getElementById('samplingLocation')?.focus();
-            return;
-        }
-        if (!cropName) {
-            showToast('재배 작물을 입력해주세요.', 'error');
-            document.getElementById('cropName')?.focus();
-            return;
-        }
-        if (!samplingDate) {
-            showToast('시료 채취일을 선택해주세요.', 'error');
-            document.getElementById('samplingDate')?.focus();
-            return;
-        }
-        if (selectedItems.length === 0) {
-            showToast('분석의뢰 항목을 1개 이상 선택해주세요.', 'error');
-            return;
-        }
-        if (!selectedPurpose) {
-            showToast('목적(용도)을 선택해주세요.', 'error');
-            return;
-        }
+        if (!name) { showToast('성명을 입력해주세요.', 'error'); document.getElementById('name')?.focus(); return; }
+        if (!phoneNumber) { showToast('연락처를 입력해주세요.', 'error'); document.getElementById('phoneNumber')?.focus(); return; }
+        if (!samplingLocation) { showToast('시료채취 장소를 입력해주세요.', 'error'); document.getElementById('samplingLocation')?.focus(); return; }
+        if (!cropName) { showToast('재배 작물을 입력해주세요.', 'error'); document.getElementById('cropName')?.focus(); return; }
+        if (!samplingDate) { showToast('시료 채취일을 선택해주세요.', 'error'); document.getElementById('samplingDate')?.focus(); return; }
+        if (selectedItems.length === 0) { showToast('분석의뢰 항목을 1개 이상 선택해주세요.', 'error'); return; }
+        if (!selectedPurpose) { showToast('목적(용도)을 선택해주세요.', 'error'); return; }
 
-        // 법인여부 데이터 가져오기
+        const applicantTypeSelect = document.getElementById('applicantType');
         const applicantType = applicantTypeSelect?.value || '개인';
+        const today = new Date().toISOString().split('T')[0];
 
-        // 데이터 수집
         const data = {
-            id: editingIndex >= 0 ? sampleLogs[editingIndex].id : Date.now(),
-            receptionNumber: document.getElementById('receptionNumber')?.value || generateNextReceptionNumber(),
+            id: this.editingId || SampleUtils.generateUUID(),
+            receptionNumber: document.getElementById('receptionNumber')?.value || this.generateNextReceptionNumber(),
             date: document.getElementById('date')?.value || today,
             name: name,
             phoneNumber: phoneNumber,
             applicantType: applicantType,
-            birthDate: applicantType === '개인' ? (birthDateInput?.value || '') : '',
-            corpNumber: applicantType === '법인' ? (corpNumberInput?.value || '') : '',
-            addressPostcode: addressPostcode?.value || '',
-            addressRoad: addressRoad?.value || '',
-            addressDetail: addressDetail?.value || '',
-            address: addressHidden?.value || '',
+            birthDate: applicantType === '개인' ? (document.getElementById('birthDate')?.value || '') : '',
+            corpNumber: applicantType === '법인' ? (document.getElementById('corpNumber')?.value || '') : '',
+            addressPostcode: document.getElementById('addressPostcode')?.value || '',
+            addressRoad: document.getElementById('addressRoad')?.value || '',
+            addressDetail: document.getElementById('addressDetail')?.value || '',
+            address: document.getElementById('address')?.value || '',
             samplingLocation: samplingLocation,
             cropName: cropName,
             treeAge: document.getElementById('treeAge')?.value || '',
@@ -884,459 +318,54 @@ document.addEventListener('DOMContentLoaded', async () => {
             sampleCount: document.getElementById('sampleCount')?.value || 1,
             analysisItems: selectedItems,
             purpose: selectedPurpose,
-            receptionMethod: receptionMethodInput?.value || '',
+            receptionMethod: document.getElementById('receptionMethod')?.value || '',
             note: document.getElementById('note')?.value || '',
-            isCompleted: editingIndex >= 0 ? sampleLogs[editingIndex].isCompleted : false,
-            createdAt: editingIndex >= 0 ? sampleLogs[editingIndex].createdAt : new Date().toISOString(),
+            isComplete: this.editingId ? (this.sampleLogs.find(l => l.id === this.editingId)?.isComplete || false) : false,
+            createdAt: this.editingId ? (this.sampleLogs.find(l => l.id === this.editingId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
 
-        if (editingIndex >= 0) {
-            sampleLogs[editingIndex] = data;
+        if (this.editingId) {
+            const editIdx = this.sampleLogs.findIndex(l => l.id === this.editingId);
+            if (editIdx >= 0) this.sampleLogs[editIdx] = data;
             showToast('접수 정보가 수정되었습니다.', 'success');
-            editingIndex = -1;
+            this.editingId = null;
         } else {
-            sampleLogs.push(data);
+            this.sampleLogs.push(data);
             showToast('접수가 등록되었습니다.', 'success');
-            // 등록 결과 모달 표시
-            showRegistrationResult(data);
+            this.showRegistrationResult(data);
         }
 
-        saveData();
-        resetForm();
-        renderLogs();
-    }
-
-    function resetForm() {
-        form?.reset();
-        editingIndex = -1;
-
-        // 네비게이션 바 버튼 원래대로 복원
-        const navSubmitBtn = document.getElementById('navSubmitBtn');
-        if (navSubmitBtn) {
-            navSubmitBtn.title = '접수 등록';
-            navSubmitBtn.classList.remove('btn-edit-mode');
-        }
-
-        // 오늘 날짜 재설정
-        if (dateInput) dateInput.value = today;
-        if (samplingDateInput) samplingDateInput.value = today;
-
-        // 다음 접수번호 자동 생성
-        if (receptionNumberInput) receptionNumberInput.value = generateNextReceptionNumber();
-
-        // 수령 방법 선택 초기화
-        receptionMethodBtns.forEach(btn => btn.classList.remove('active', 'selected'));
-        if (receptionMethodInput) receptionMethodInput.value = '';
-
-        // 법인여부 초기화 (개인으로 복원)
-        if (applicantTypeSelect) applicantTypeSelect.value = '개인';
-        if (birthDateField) birthDateField.classList.remove('hidden');
-        if (corpNumberField) corpNumberField.classList.add('hidden');
-        if (birthDateInput) birthDateInput.value = '';
-        if (corpNumberInput) corpNumberInput.value = '';
-
-        // 분석항목 초기화
-        analysisCheckboxes.forEach(cb => cb.checked = false);
-        isAllSelected = false;
-        if (selectAllItemsBtn) selectAllItemsBtn.textContent = '전체 선택';
-        updateSelectedItemsCount();
-
-        // 인증용 안내 숨기기
-        if (certificationNotice) certificationNotice.classList.add('hidden');
+        this.listViewStale = true;
+        this.saveLogs();
+        this.resetForm();
+        this.renderLogs(this.sampleLogs);
     }
 
     // ========================================
-    // 데이터 저장 및 로드
+    // 오버라이드: 편집 (ID 기반)
     // ========================================
-    async function saveData() {
-        const yearStorageKey = getStorageKey(selectedYear);
-
-        // 1. ID가 없는 항목에 ID 추가
-        sampleLogs = sampleLogs.map(item => ({
-            ...item,
-            id: item.id || (Date.now().toString(36) + Math.random().toString(36).substring(2, 11))
-        }));
-
-        // 2. Firebase가 활성화되어 있으면 Firebase에 먼저 저장
-        if (window.firestoreDb?.isEnabled()) {
-            try {
-                log('☁️ Firebase에 데이터 저장 중...');
-                await window.firestoreDb.batchSave('heavyMetal', parseInt(selectedYear), sampleLogs);
-                log('☁️ Firebase 저장 완료:', sampleLogs.length, '건');
-
-                // Firebase 저장 성공 후 localStorage에 캐싱
-                localStorage.setItem(yearStorageKey, JSON.stringify(sampleLogs));
-                log('💾 로컬 캐싱 완료');
-            } catch (err) {
-                window.logger.error('Firebase 저장 실패:', err);
-                showToast('클라우드 저장 실패', 'error');
-
-                // Firebase 실패 시 localStorage를 primary로 사용
-                localStorage.setItem(yearStorageKey, JSON.stringify(sampleLogs));
-                log('💾 로컬 저장으로 폴백');
-            }
-        } else {
-            // Firebase가 비활성화된 경우에만 localStorage 사용
-            localStorage.setItem(yearStorageKey, JSON.stringify(sampleLogs));
-            log('💾 로컬 저장 완료:', sampleLogs.length, '건');
-        }
-
-        // 3. 자동 저장
-        autoSaveToFile();
-    }
-
-    // 자동 저장 수행 함수 (공통 모듈 사용)
-    async function autoSaveToFile() {
-        return await SampleUtils.performAutoSave({
-            FileAPI: FileAPI,
-            moduleKey: 'heavyMetal',
-            data: sampleLogs,
-            webFileHandle: autoSaveFileHandle,
-            log: log
-        });
-    }
-
-    // ========================================
-    // 목록 렌더링
-    // ========================================
-
-    // 페이지네이션 DOM 요소
-    const paginationInfo = document.getElementById('paginationInfo');
-    const itemsPerPageSelect = document.getElementById('itemsPerPage');
-    const pageNumbersContainer = document.getElementById('pageNumbers');
-    const firstPageBtn = document.getElementById('firstPage');
-    const prevPageBtn = document.getElementById('prevPage');
-    const nextPageBtn = document.getElementById('nextPage');
-    const lastPageBtn = document.getElementById('lastPage');
-    const paginationContainer = document.getElementById('pagination');
-
-    // 페이지네이션 초기화
-    if (itemsPerPageSelect) {
-        itemsPerPageSelect.value = itemsPerPage;
-        itemsPerPageSelect.addEventListener('change', (e) => {
-            itemsPerPage = parseInt(e.target.value, 10);
-            localStorage.setItem('heavyMetalItemsPerPage', itemsPerPage);
-            currentPage = 1;
-            renderCurrentPage();
-        });
-    }
-
-    // 페이지네이션 버튼 이벤트
-    if (firstPageBtn) firstPageBtn.addEventListener('click', () => goToPage(1));
-    if (prevPageBtn) prevPageBtn.addEventListener('click', () => goToPage(currentPage - 1));
-    if (nextPageBtn) nextPageBtn.addEventListener('click', () => goToPage(currentPage + 1));
-    if (lastPageBtn) lastPageBtn.addEventListener('click', () => goToPage(totalPages));
-
-    function goToPage(page) {
-        if (page < 1 || page > totalPages) return;
-        currentPage = page;
-        renderCurrentPage();
-        const tableWrapper = document.querySelector('.table-wrapper');
-        if (tableWrapper) tableWrapper.scrollTop = 0;
-    }
-
-    function renderCurrentPage() {
-        if (!tableBody) return;
-
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        const pageData = currentLogsData.slice(startIndex, endIndex);
-
-        tableBody.innerHTML = '';
-        pageData.forEach((logItem) => {
-            const tr = document.createElement('tr');
-            tr.dataset.index = sampleLogs.indexOf(logItem);
-
-            const analysisItemsStr = logItem.analysisItems ? logItem.analysisItems.join(', ') : '';
-            const isAllItems = logItem.analysisItems && logItem.analysisItems.length === ANALYSIS_ITEMS.length;
-            const analysisItemsDisplay = !logItem.analysisItems || logItem.analysisItems.length === 0
-                ? '-'
-                : isAllItems
-                    ? '전체 항목'
-                    : analysisItemsStr;
-
-            // 접수 방법 텍스트
-            const methodText = logItem.receptionMethod || '-';
-
-            // 뷰용 주소: 시도 패턴이 있을 때만 제거
-            const addressRoad = logItem.addressRoad || '-';
-            const displayAddress = addressRoad !== '-' && SIDO_PATTERN.test(addressRoad)
-                ? addressRoad.replace(SIDO_PATTERN, '')
-                : addressRoad;
-
-            // XSS 방지: 사용자 입력 데이터 이스케이프
-            const safeName = escapeHTML(logItem.name || '-');
-            const safeAddress = escapeHTML(logItem.address || '');
-            const safeAddressRoad = escapeHTML(logItem.addressRoad || '-');
-            const safeDisplayAddress = escapeHTML(displayAddress);
-            const safePhone = escapeHTML(logItem.phoneNumber || '-');
-            const safeSamplingLocation = escapeHTML(logItem.samplingLocation || '-');
-            const safeCropName = escapeHTML(logItem.cropName || '-');
-            const safeNote = escapeHTML(logItem.note || '-');
-
-            // 법인여부 및 생년월일/법인번호
-            const applicantType = logItem.applicantType || '개인';
-            const birthOrCorp = applicantType === '법인' ? (logItem.corpNumber || '-') : (logItem.birthDate || '-');
-
-            // 테이블 행 생성: DOM 요소로 직접 생성 (XSS 방지)
-
-            // 1. Checkbox
-            const tdCheckbox = document.createElement('td');
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'row-checkbox';
-            checkbox.setAttribute('data-index', tr.dataset.index);
-            tdCheckbox.appendChild(checkbox);
-            tr.appendChild(tdCheckbox);
-
-            // 2. Complete button
-            const tdComplete = document.createElement('td');
-            const btnComplete = document.createElement('button');
-            btnComplete.className = logItem.isCompleted ? 'btn-complete completed' : 'btn-complete';
-            btnComplete.title = logItem.isCompleted ? '완료됨' : '미완료';
-            btnComplete.textContent = logItem.isCompleted ? '✓' : '○';
-            tdComplete.appendChild(btnComplete);
-            tr.appendChild(tdComplete);
-
-            // 3. Result button
-            const tdResult = document.createElement('td');
-            tdResult.className = 'col-result';
-            const btnResult = document.createElement('button');
-            btnResult.className = 'btn-result' +
-                (logItem.testResult === 'pass' ? ' pass' :
-                 logItem.testResult === 'fail' ? ' fail' : '');
-            btnResult.title = logItem.testResult === 'pass' ? '적합' :
-                             logItem.testResult === 'fail' ? '부적합' : '미판정 (클릭하여 변경)';
-            btnResult.textContent = logItem.testResult === 'pass' ? '적합' :
-                                   logItem.testResult === 'fail' ? '부적합' : '-';
-            tdResult.appendChild(btnResult);
-            tr.appendChild(tdResult);
-
-            // 4. Reception number
-            const tdReceptionNumber = document.createElement('td');
-            tdReceptionNumber.textContent = logItem.receptionNumber || '-';
-            tr.appendChild(tdReceptionNumber);
-
-            // 5. Date
-            const tdDate = document.createElement('td');
-            tdDate.textContent = logItem.date || '-';
-            tr.appendChild(tdDate);
-
-            // 6. Name
-            const tdName = document.createElement('td');
-            tdName.textContent = safeName;
-            tr.appendChild(tdName);
-
-            // 7. Applicant type (hidden)
-            const tdApplicantType = document.createElement('td');
-            tdApplicantType.className = 'col-applicant-type col-hidden';
-            tdApplicantType.textContent = applicantType;
-            tr.appendChild(tdApplicantType);
-
-            // 8. Birth/Corp number (hidden)
-            const tdBirthCorp = document.createElement('td');
-            tdBirthCorp.className = 'col-birth-corp col-hidden';
-            tdBirthCorp.textContent = birthOrCorp;
-            tr.appendChild(tdBirthCorp);
-
-            // 9. Address - 시도 제외하고 전체 표시
-            const tdAddress = document.createElement('td');
-            tdAddress.className = 'col-address';
-            tdAddress.textContent = safeDisplayAddress;
-            tr.appendChild(tdAddress);
-
-            // 10. Phone
-            const tdPhone = document.createElement('td');
-            tdPhone.textContent = safePhone;
-            tr.appendChild(tdPhone);
-
-            // 11. Sampling location
-            const tdSamplingLocation = document.createElement('td');
-            tdSamplingLocation.textContent = safeSamplingLocation;
-            tr.appendChild(tdSamplingLocation);
-
-            // 12. Crop name (with tree age if present)
-            const tdCropName = document.createElement('td');
-            tdCropName.textContent = safeCropName + (logItem.treeAge ? ' (' + logItem.treeAge + '년생)' : '');
-            tr.appendChild(tdCropName);
-
-            // 13. Sampling date
-            const tdSamplingDate = document.createElement('td');
-            tdSamplingDate.textContent = logItem.samplingDate || '-';
-            tr.appendChild(tdSamplingDate);
-
-            // 14. Analysis items (with tooltip)
-            const tdAnalysisItems = document.createElement('td');
-            tdAnalysisItems.className = 'text-truncate';
-            tdAnalysisItems.setAttribute('data-tooltip', analysisItemsStr);
-            tdAnalysisItems.textContent = analysisItemsDisplay;
-            tr.appendChild(tdAnalysisItems);
-
-            // 15. Purpose
-            const tdPurpose = document.createElement('td');
-            tdPurpose.textContent = logItem.purpose || '-';
-            tr.appendChild(tdPurpose);
-
-            // 16. Reception method
-            const tdMethod = document.createElement('td');
-            tdMethod.textContent = methodText;
-            tr.appendChild(tdMethod);
-
-            // 17. Note (with tooltip)
-            const tdNote = document.createElement('td');
-            tdNote.className = 'text-truncate';
-            tdNote.setAttribute('data-tooltip', safeNote);
-            tdNote.textContent = safeNote;
-            tr.appendChild(tdNote);
-
-            // 18. Mail date
-            const tdMailDate = document.createElement('td');
-            tdMailDate.className = 'col-mail-date';
-            tdMailDate.textContent = logItem.mailDate || '-';
-            tr.appendChild(tdMailDate);
-
-            // 19. Action buttons
-            const tdActions = document.createElement('td');
-            const actionDiv = document.createElement('div');
-            actionDiv.className = 'action-btns';
-
-            const btnEdit = document.createElement('button');
-            btnEdit.className = 'btn-edit';
-            btnEdit.title = '수정';
-            btnEdit.textContent = '✏️';
-
-            const btnDelete = document.createElement('button');
-            btnDelete.className = 'btn-delete';
-            btnDelete.title = '삭제';
-            btnDelete.textContent = '🗑️';
-
-            actionDiv.appendChild(btnEdit);
-            actionDiv.appendChild(btnDelete);
-            tdActions.appendChild(actionDiv);
-            tr.appendChild(tdActions);
-
-            tableBody.appendChild(tr);
-        });
-
-        updatePaginationUI();
-    }
-
-    function updatePaginationUI() {
-        const totalItems = currentLogsData.length;
-        totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-
-        if (currentPage > totalPages) currentPage = totalPages;
-
-        const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-        const endItem = Math.min(currentPage * itemsPerPage, totalItems);
-
-        if (paginationInfo) {
-            paginationInfo.textContent = `${totalItems}건 중 ${startItem}-${endItem}`;
-        }
-
-        if (firstPageBtn) firstPageBtn.disabled = currentPage === 1;
-        if (prevPageBtn) prevPageBtn.disabled = currentPage === 1;
-        if (nextPageBtn) nextPageBtn.disabled = currentPage === totalPages;
-        if (lastPageBtn) lastPageBtn.disabled = currentPage === totalPages;
-
-        renderPageNumbers();
-    }
-
-    function renderPageNumbers() {
-        if (!pageNumbersContainer) return;
-        pageNumbersContainer.innerHTML = '';
-
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-        if (endPage - startPage + 1 < maxVisiblePages) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-
-        if (startPage > 1) {
-            pageNumbersContainer.appendChild(createPageButton(1));
-            if (startPage > 2) {
-                const ellipsis = document.createElement('span');
-                ellipsis.className = 'page-ellipsis';
-                ellipsis.textContent = '...';
-                pageNumbersContainer.appendChild(ellipsis);
-            }
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
-            pageNumbersContainer.appendChild(createPageButton(i));
-        }
-
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                const ellipsis = document.createElement('span');
-                ellipsis.className = 'page-ellipsis';
-                ellipsis.textContent = '...';
-                pageNumbersContainer.appendChild(ellipsis);
-            }
-            pageNumbersContainer.appendChild(createPageButton(totalPages));
-        }
-    }
-
-    function createPageButton(pageNum) {
-        const btn = document.createElement('button');
-        btn.className = `page-btn ${pageNum === currentPage ? 'active' : ''}`;
-        btn.textContent = pageNum;
-        btn.addEventListener('click', () => goToPage(pageNum));
-        return btn;
-    }
-
-    function renderLogs(logsToRender = sampleLogs) {
-        if (!tableBody) return;
-
-        tableBody.innerHTML = '';
-
-        if (logsToRender.length === 0) {
-            if (emptyState) emptyState.style.display = 'block';
-            if (paginationContainer) paginationContainer.style.display = 'none';
-            if (recordCountEl) recordCountEl.textContent = '0건';
-            currentLogsData = [];
-            updatePaginationUI();
-            return;
-        }
-
-        if (emptyState) emptyState.style.display = 'none';
-        if (paginationContainer) paginationContainer.style.display = 'flex';
-        if (recordCountEl) recordCountEl.textContent = `${logsToRender.length}건`;
-
-        // 접수번호 기준 오름차순 정렬
-        currentLogsData = [...logsToRender].sort((a, b) => {
-            const numA = parseInt(a.receptionNumber, 10) || 0;
-            const numB = parseInt(b.receptionNumber, 10) || 0;
-            return numA - numB;
-        });
-
-        totalPages = Math.ceil(currentLogsData.length / itemsPerPage) || 1;
-        if (currentPage > totalPages) currentPage = totalPages;
-
-        renderCurrentPage();
-    }
-
-    // ========================================
-    // 수정 기능
-    // ========================================
-    function editLog(index) {
-        const log = sampleLogs[index];
+    editSample(id) {
+        const log = this.sampleLogs.find(l => String(l.id) === String(id));
         if (!log) return;
 
-        editingIndex = index;
+        this.editingId = id;
 
         // 폼에 데이터 채우기
         document.getElementById('receptionNumber').value = log.receptionNumber || '';
         document.getElementById('date').value = log.date || '';
         document.getElementById('name').value = log.name || '';
         document.getElementById('phoneNumber').value = log.phoneNumber || '';
+
+        const addressPostcode = document.getElementById('addressPostcode');
+        const addressRoad = document.getElementById('addressRoad');
+        const addressDetail = document.getElementById('addressDetail');
+        const addressHidden = document.getElementById('address');
         if (addressPostcode) addressPostcode.value = log.addressPostcode || '';
         if (addressRoad) addressRoad.value = log.addressRoad || '';
         if (addressDetail) addressDetail.value = log.addressDetail || '';
         if (addressHidden) addressHidden.value = log.address || '';
+
         document.getElementById('samplingLocation').value = log.samplingLocation || '';
         document.getElementById('cropName').value = log.cropName || '';
         document.getElementById('treeAge').value = log.treeAge || '';
@@ -1345,35 +374,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('note').value = log.note || '';
 
         // 분석항목 체크
-        analysisCheckboxes.forEach(cb => {
+        document.querySelectorAll('input[name="analysisItems"]').forEach(cb => {
             cb.checked = log.analysisItems?.includes(cb.value) || false;
         });
-        updateSelectedItemsCount();
+        this.updateSelectedItemsCount();
 
         // 목적 선택
-        purposeRadios.forEach(radio => {
+        document.querySelectorAll('input[name="purpose"]').forEach(radio => {
             radio.checked = radio.value === log.purpose;
         });
 
         // 수령방법 선택
+        const receptionMethodBtns = document.querySelectorAll('.reception-method-btn');
         receptionMethodBtns.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.method === log.receptionMethod);
             btn.classList.toggle('selected', btn.dataset.method === log.receptionMethod);
         });
+        const receptionMethodInput = document.getElementById('receptionMethod');
         if (receptionMethodInput) receptionMethodInput.value = log.receptionMethod || '';
 
         // 법인여부/생년월일/법인번호 설정
         const applicantType = log.applicantType || '개인';
+        const applicantTypeSelect = document.getElementById('applicantType');
+        const birthDateField = document.getElementById('birthDateField');
+        const corpNumberField = document.getElementById('corpNumberField');
+        const birthDateInput = document.getElementById('birthDate');
+        const corpNumberInput = document.getElementById('corpNumber');
+
         if (applicantTypeSelect) {
             applicantTypeSelect.value = applicantType;
             if (applicantType === '법인') {
-                birthDateField.classList.add('hidden');
-                corpNumberField.classList.remove('hidden');
+                if (birthDateField) birthDateField.classList.add('hidden');
+                if (corpNumberField) corpNumberField.classList.remove('hidden');
                 if (corpNumberInput) corpNumberInput.value = log.corpNumber || '';
                 if (birthDateInput) birthDateInput.value = '';
             } else {
-                birthDateField.classList.remove('hidden');
-                corpNumberField.classList.add('hidden');
+                if (birthDateField) birthDateField.classList.remove('hidden');
+                if (corpNumberField) corpNumberField.classList.add('hidden');
                 if (birthDateInput) birthDateInput.value = log.birthDate || '';
                 if (corpNumberInput) corpNumberInput.value = '';
             }
@@ -1387,659 +424,290 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // 폼 뷰로 전환
-        switchView('form');
-        showToast('수정 모드입니다.', 'warning');
+        this.switchView('form');
+        this.showToast('수정 모드입니다.', 'warning');
     }
 
     // ========================================
-    // 엑셀 내보내기
+    // 오버라이드: 폼 초기화
     // ========================================
+    resetForm() {
+        this.form?.reset();
+        this.editingId = null;
 
-    // parseAddressParts는 ../shared/address-parser.js에서 전역으로 제공됨
-
-    const exportBtn = document.getElementById('exportBtn');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', () => {
-            if (sampleLogs.length === 0) {
-                showToast('내보낼 데이터가 없습니다.', 'error');
-                return;
-            }
-
-            const exportData = sampleLogs.map(log => {
-                // 분석항목 표시
-                const isAllItems = log.analysisItems && log.analysisItems.length === ANALYSIS_ITEMS.length;
-                const analysisDisplay = !log.analysisItems || log.analysisItems.length === 0
-                    ? '-'
-                    : isAllItems
-                        ? '전체 항목'
-                        : log.analysisItems.join(', ');
-
-                // 주소 파싱 (시도, 시군구, 읍면동, 나머지주소 분리)
-                const addressParts = parseAddressParts(log.addressRoad || log.address || '');
-                // 전체 주소
-                const fullAddress = [log.addressRoad, log.addressDetail].filter(Boolean).join(' ') || '-';
-
-                // 법인여부 및 생년월일/법인번호
-                const applicantType = log.applicantType || '개인';
-                const birthOrCorp = applicantType === '법인' ? (log.corpNumber || '-') : (log.birthDate || '-');
-
-                return {
-                    '접수번호': log.receptionNumber || '-',
-                    '접수일자': log.date || '-',
-                    '성명': log.name || '-',
-                    '법인여부': applicantType,
-                    '생년월일/법인번호': birthOrCorp,
-                    '연락처': log.phoneNumber || '-',
-                    '우편번호': log.addressPostcode || '-',
-                    '시도': addressParts.sido || '-',
-                    '시군구': addressParts.sigungu || '-',
-                    '읍면동': addressParts.eupmyeondong || '-',
-                    '나머지주소': (addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-',
-                    '전체주소': fullAddress,
-                    '시료채취장소': log.samplingLocation || '-',
-                    '재배작물': log.cropName || '-',
-                    '과수년생': log.treeAge || '-',
-                    '채취일': log.samplingDate || '-',
-                    '시료수': log.sampleCount || '-',
-                    '분석항목': analysisDisplay,
-                    '목적': log.purpose || '-',
-                    '수령방법': log.receptionMethod || '-',
-                    '비고': log.note || '-',
-                    '완료여부': (log.isCompleted || log.completed) ? '완료' : '미완료',
-                    '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
-                };
-            });
-
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-
-            // 열 너비 설정
-            ws['!cols'] = [
-                { wch: 10 },  // 접수번호
-                { wch: 12 },  // 접수일자
-                { wch: 10 },  // 성명
-                { wch: 8 },   // 법인여부
-                { wch: 15 },  // 생년월일/법인번호
-                { wch: 15 },  // 연락처
-                { wch: 8 },   // 우편번호
-                { wch: 12 },  // 시도
-                { wch: 10 },  // 시군구
-                { wch: 10 },  // 읍면동
-                { wch: 25 },  // 나머지주소
-                { wch: 25 },  // 시료채취장소
-                { wch: 12 },  // 재배작물
-                { wch: 10 },  // 과수년생
-                { wch: 12 },  // 채취일
-                { wch: 8 },   // 시료수
-                { wch: 40 },  // 분석항목
-                { wch: 15 },  // 목적
-                { wch: 10 },  // 수령방법
-                { wch: 20 },  // 비고
-                { wch: 8 },   // 완료여부
-                { wch: 20 }   // 등록일시
-            ];
-
-            XLSX.utils.book_append_sheet(wb, ws, '토양중금속접수');
-
-            const fileName = `토양중금속_접수대장_${new Date().toISOString().split('T')[0]}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-            showToast('엑셀 파일이 다운로드되었습니다.', 'success');
-        });
-    }
-
-    // ========================================
-    // JSON 저장/불러오기 (공통 모듈 사용)
-    // ========================================
-    SampleUtils.setupJSONSaveHandler({
-        buttonElement: document.getElementById('saveJsonBtn'),
-        sampleType: SAMPLE_TYPE,
-        getData: () => sampleLogs,
-        FileAPI: FileAPI,
-        filePrefix: '토양중금속',
-        showToast: showToast
-    });
-
-    SampleUtils.setupJSONLoadHandler({
-        inputElement: document.getElementById('loadJsonInput'),
-        getData: () => sampleLogs,
-        setData: (data) => { sampleLogs = data; },
-        saveData: saveData,
-        renderData: renderLogs,
-        showToast: showToast
-    });
-
-    // ========================================
-    // 자동저장 설정 (공통 모듈 사용)
-    // ========================================
-
-    // 자동 저장 폴더/파일 선택 버튼 설정 (공통 모듈 사용)
-    SampleUtils.setupAutoSaveFolderButton({
-        moduleKey: 'heavyMetal',
-        FileAPI: FileAPI,
-        selectedYear: selectedYear,
-        getWebFileHandle: () => autoSaveFileHandle,
-        setWebFileHandle: (handle) => { autoSaveFileHandle = handle; },
-        autoSaveCallback: autoSaveToFile,
-        showToast: showToast
-    });
-
-    // 자동 저장 토글 이벤트 설정 (공통 모듈 사용)
-    SampleUtils.setupAutoSaveToggle({
-        moduleKey: 'heavyMetal',
-        FileAPI: FileAPI,
-        getWebFileHandle: () => autoSaveFileHandle,
-        setWebFileHandle: (handle) => { autoSaveFileHandle = handle; },
-        autoSaveCallback: autoSaveToFile,
-        showToast: showToast,
-        log: log
-    });
-
-    // ========================================
-    // 클라우드 마이그레이션 버튼
-    // ========================================
-    const migrateBtn = document.getElementById('migrateBtn');
-    if (migrateBtn) {
-        migrateBtn.addEventListener('click', async () => {
-            // Firebase 초기화 시도
-            let firebaseInitialized = false;
-            let firestoreInitialized = false;
-            let initError = null;
-
-            try {
-                if (window.firebaseConfig?.initialize) {
-                    firebaseInitialized = await window.firebaseConfig.initialize();
-                    window.logger.info('Firebase 초기화 결과:', firebaseInitialized);
-                }
-            } catch (err) {
-                window.logger.error('Firebase 초기화 에러:', err);
-                initError = err;
-            }
-
-            try {
-                if (firebaseInitialized && window.firestoreDb?.init) {
-                    firestoreInitialized = await window.firestoreDb.init();
-                    window.logger.info('Firestore 초기화 결과:', firestoreInitialized);
-                }
-            } catch (err) {
-                window.logger.error('Firestore 초기화 에러:', err);
-                initError = err;
-            }
-
-            if (!window.firestoreDb?.isEnabled()) {
-                if (initError) {
-                    showToast('Firebase 초기화 실패: ' + initError.message, 'error');
-                } else if (!firebaseInitialized) {
-                    showToast('Firebase 연결 실패. 콘솔에서 에러를 확인하세요.', 'error');
-                } else if (!firestoreInitialized) {
-                    showToast('Firestore 모듈 로드 실패. 페이지를 새로고침하세요.', 'error');
-                } else {
-                    showToast('Firebase가 설정되지 않았습니다.', 'error');
-                }
-                return;
-            }
-
-            if (sampleLogs.length === 0) {
-                showToast('마이그레이션할 데이터가 없습니다.', 'warning');
-                return;
-            }
-
-            if (!confirm(`현재 ${selectedYear}년 데이터 ${sampleLogs.length}건을 클라우드에 업로드하시겠습니까?`)) {
-                return;
-            }
-
-            try {
-                migrateBtn.disabled = true;
-                migrateBtn.textContent = '⏳';
-
-                const dataWithIds = sampleLogs.map(item => ({
-                    ...item,
-                    id: item.id || (Date.now().toString(36) + Math.random().toString(36).substring(2, 11))
-                }));
-
-                await window.firestoreDb.batchSave('heavyMetal', parseInt(selectedYear), dataWithIds);
-
-                sampleLogs = dataWithIds;
-                localStorage.setItem(getStorageKey(selectedYear), JSON.stringify(sampleLogs));
-
-                showToast(`${dataWithIds.length}건 클라우드 업로드 완료`, 'success');
-            } catch (error) {
-                window.logger.error('마이그레이션 실패:', error);
-                showToast('클라우드 업로드 실패: ' + error.message, 'error');
-            } finally {
-                migrateBtn.disabled = false;
-                migrateBtn.textContent = '☁️';
-            }
-        });
-    }
-
-    // Electron 환경에서 자동 저장 파일 로드
-    if (window.isElectron && FileAPI.autoSavePath) {
-        const autoSaveData = await window.loadFromAutoSaveFile();
-        if (autoSaveData && autoSaveData.length > 0) {
-            sampleLogs = autoSaveData;
-            localStorage.setItem(getStorageKey(selectedYear), JSON.stringify(sampleLogs));
-            log('📂 중금속 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
-            renderLogs();
-        }
-    }
-
-    // ========================================
-    // 테이블 이벤트 위임 (한 번만 등록 - Electron 호환)
-    // ========================================
-    tableBody?.addEventListener('click', (e) => {
-        const tr = e.target.closest('tr[data-index]');
-        if (!tr) return;
-        const realIdx = parseInt(tr.dataset.index, 10);
-
-        // 완료 토글
-        if (e.target.closest('.btn-complete')) {
-            sampleLogs[realIdx].isCompleted = !sampleLogs[realIdx].isCompleted;
-            sampleLogs[realIdx].updatedAt = new Date().toISOString();
-            saveData();
-            renderLogs();
-            return;
+        const navSubmitBtn = document.getElementById('navSubmitBtn');
+        if (navSubmitBtn) {
+            navSubmitBtn.title = '접수 등록';
+            navSubmitBtn.classList.remove('btn-edit-mode');
         }
 
-        // 판정 토글 (미판정 → 적합 → 부적합 → 미판정)
-        if (e.target.closest('.btn-result')) {
-            const logItem = sampleLogs[realIdx];
-            if (!logItem.testResult || logItem.testResult === '') {
-                logItem.testResult = 'pass';
-            } else if (logItem.testResult === 'pass') {
-                logItem.testResult = 'fail';
-            } else {
-                logItem.testResult = '';
-            }
-            logItem.updatedAt = new Date().toISOString();
-            saveData();
-            renderLogs();
-            return;
-        }
-
-        // 수정 버튼
-        if (e.target.closest('.btn-edit')) {
-            editLog(realIdx);
-            return;
-        }
-
-        // 삭제 버튼
-        if (e.target.closest('.btn-delete')) {
-            if (confirm('정말 삭제하시겠습니까?')) {
-                const deletedItem = sampleLogs[realIdx];
-                const deletedId = deletedItem?.id;
-
-                sampleLogs.splice(realIdx, 1);
-                saveData();
-                renderLogs();
-                showToast('삭제되었습니다.', 'success');
-
-                // Firebase에서도 삭제
-                if (deletedId && window.firestoreDb?.isEnabled()) {
-                    window.firestoreDb.delete('heavy-metal', parseInt(selectedYear), deletedId)
-                        .catch(err => window.logger.error('Firebase 삭제 실패:', err));
-                }
-            }
-            return;
-        }
-    });
-
-    // ========================================
-    // 선택 삭제
-    // ========================================
-    const btnBulkDelete = document.getElementById('btnBulkDelete');
-    const selectAllCheckbox = document.getElementById('selectAll');
-
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', () => {
-            const checkboxes = document.querySelectorAll('.row-checkbox');
-            checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
-        });
-    }
-
-    if (btnBulkDelete) {
-        btnBulkDelete.addEventListener('click', () => {
-            const checked = document.querySelectorAll('.row-checkbox:checked');
-            if (checked.length === 0) {
-                showToast('삭제할 항목을 선택해주세요.', 'warning');
-                return;
-            }
-
-            if (confirm(`${checked.length}건의 데이터를 삭제하시겠습니까?`)) {
-                const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index, 10)).sort((a, b) => b - a);
-                // 삭제 전 ID들 수집 (인덱스가 변경되기 전에)
-                const deletedIds = indices.map(idx => sampleLogs[idx]?.id).filter(id => id);
-
-                indices.forEach(idx => sampleLogs.splice(idx, 1));
-                saveData();
-                renderLogs();
-                showToast(`${checked.length}건이 삭제되었습니다.`, 'success');
-
-                // Firebase에서도 삭제
-                if (deletedIds.length > 0 && window.firestoreDb?.isEnabled()) {
-                    Promise.all(deletedIds.map(id =>
-                        window.firestoreDb.delete('heavy-metal', parseInt(selectedYear), id)
-                    ))
-                        .then(() => log('☁️ Firebase 일괄 삭제 완료:', deletedIds.length, '건'))
-                        .catch(err => window.logger.error('Firebase 일괄 삭제 실패:', err));
-                }
-            }
-        });
-    }
-
-    // ========================================
-    // 우편발송일자 일괄 입력 (모달 사용)
-    // ========================================
-    const btnBulkMailDate = document.getElementById('btnBulkMailDate');
-    const mailDateModal = document.getElementById('mailDateModal');
-    const closeMailDateModal = document.getElementById('closeMailDateModal');
-    const cancelMailDateBtn = document.getElementById('cancelMailDateBtn');
-    const confirmMailDateBtn = document.getElementById('confirmMailDateBtn');
-    const mailDateInput = document.getElementById('mailDateInput');
-    const mailDateInfo = document.getElementById('mailDateInfo');
-
-    let pendingMailDateIndices = [];
-
-    function openMailDateModal(indices) {
-        pendingMailDateIndices = indices;
         const today = new Date().toISOString().split('T')[0];
-        if (mailDateInput) mailDateInput.value = today;
-        if (mailDateInfo) mailDateInfo.textContent = `선택한 ${indices.length}건의 우편발송일자를 입력하세요.`;
-        if (mailDateModal) mailDateModal.classList.remove('hidden');
+        const dateInput = document.getElementById('date');
+        const samplingDateInput = document.getElementById('samplingDate');
+        if (dateInput) dateInput.value = today;
+        if (samplingDateInput) samplingDateInput.value = today;
+
+        const receptionNumberInput = document.getElementById('receptionNumber');
+        if (receptionNumberInput) receptionNumberInput.value = this.generateNextReceptionNumber();
+
+        // 수령 방법 선택 초기화
+        document.querySelectorAll('.reception-method-btn').forEach(btn => btn.classList.remove('active', 'selected'));
+        const receptionMethodInput = document.getElementById('receptionMethod');
+        if (receptionMethodInput) receptionMethodInput.value = '';
+
+        // 법인여부 초기화
+        const applicantTypeSelect = document.getElementById('applicantType');
+        const birthDateField = document.getElementById('birthDateField');
+        const corpNumberField = document.getElementById('corpNumberField');
+        const birthDateInput = document.getElementById('birthDate');
+        const corpNumberInput = document.getElementById('corpNumber');
+        if (applicantTypeSelect) applicantTypeSelect.value = '개인';
+        if (birthDateField) birthDateField.classList.remove('hidden');
+        if (corpNumberField) corpNumberField.classList.add('hidden');
+        if (birthDateInput) birthDateInput.value = '';
+        if (corpNumberInput) corpNumberInput.value = '';
+
+        // 분석항목 초기화
+        document.querySelectorAll('input[name="analysisItems"]').forEach(cb => cb.checked = false);
+        this.isAllSelected = false;
+        const selectAllItemsBtn = document.getElementById('selectAllItemsBtn');
+        if (selectAllItemsBtn) selectAllItemsBtn.textContent = '전체 선택';
+        this.updateSelectedItemsCount();
+
+        // 인증용 안내 숨기기
+        const certificationNotice = document.getElementById('certificationNotice');
+        if (certificationNotice) certificationNotice.classList.add('hidden');
     }
 
-    function closeMailDateModalFn() {
-        if (mailDateModal) mailDateModal.classList.add('hidden');
-        pendingMailDateIndices = [];
+    // ========================================
+    // 오버라이드: 레코드 수 업데이트
+    // ========================================
+    updateRecordCount() {
+        if (this.recordCountEl) {
+            this.recordCountEl.textContent = `${this.sampleLogs.length}건`;
+        }
     }
 
-    if (closeMailDateModal) closeMailDateModal.addEventListener('click', closeMailDateModalFn);
-    if (cancelMailDateBtn) cancelMailDateBtn.addEventListener('click', closeMailDateModalFn);
-    if (mailDateModal) {
-        mailDateModal.querySelector('.modal-overlay')?.addEventListener('click', closeMailDateModalFn);
+    // ========================================
+    // 오버라이드: 데이터 저장 후 hook
+    // ========================================
+    onAfterSave() {
+        this.listViewStale = true;
+        this.autoSaveToFile();
     }
 
-    if (confirmMailDateBtn) {
-        confirmMailDateBtn.addEventListener('click', () => {
-            const inputDate = mailDateInput?.value;
+    // ========================================
+    // 오버라이드: 연도 변경 hook
+    // ========================================
+    onYearChange(newYear) {
+        this.updateListViewTitle();
+    }
 
-            if (!inputDate) {
-                showToast('날짜를 선택해주세요.', 'warning');
+    // ========================================
+    // 오버라이드: 테이블 이벤트 위임 (ID 기반)
+    // ========================================
+    setupTableEventDelegation() {
+        if (!this.tableBody) return;
+
+        this.tableBody.addEventListener('click', (e) => {
+            const tr = e.target.closest('tr[data-id]');
+            if (!tr) return;
+            const id = tr.dataset.id;
+
+            // 완료 토글
+            if (e.target.closest('.btn-complete')) {
+                this.toggleComplete(id);
                 return;
             }
 
-            // 선택된 항목들의 발송일자 업데이트
-            pendingMailDateIndices.forEach(idx => {
-                if (sampleLogs[idx]) {
-                    sampleLogs[idx].mailDate = inputDate;
-                    sampleLogs[idx].updatedAt = new Date().toISOString();
+            // 판정 토글
+            if (e.target.closest('.btn-result')) {
+                this.toggleResult(id);
+                return;
+            }
+
+            // 수정 버튼
+            if (e.target.closest('.btn-edit')) {
+                this.editSample(id);
+                return;
+            }
+
+            // 삭제 버튼
+            if (e.target.closest('.btn-delete')) {
+                if (confirm('정말 삭제하시겠습니까?')) {
+                    this.deleteSample(String(id));
                 }
-            });
-
-            saveData();
-            renderLogs();
-
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            }
-
-            closeMailDateModalFn();
-            showToast(`${pendingMailDateIndices.length}건의 발송일자가 입력되었습니다.`, 'success');
-        });
-    }
-
-    if (btnBulkMailDate) {
-        btnBulkMailDate.addEventListener('click', () => {
-            const checked = document.querySelectorAll('.row-checkbox:checked');
-            if (checked.length === 0) {
-                showToast('발송일자를 입력할 항목을 선택해주세요.', 'warning');
                 return;
             }
-
-            const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index, 10));
-            openMailDateModal(indices);
         });
     }
 
     // ========================================
-    // 검색 모달
+    // 완료 토글
     // ========================================
-    const listSearchModal = document.getElementById('listSearchModal');
-    const openSearchModalBtn = document.getElementById('openSearchModalBtn');
-    const closeSearchModal = document.getElementById('closeSearchModal');
-    const searchDateFromInput = document.getElementById('searchDateFromInput');
-    const searchDateToInput = document.getElementById('searchDateToInput');
-    const searchNameInput = document.getElementById('searchNameInput');
-    const searchReceptionFromInput = document.getElementById('searchReceptionFromInput');
-    const searchReceptionToInput = document.getElementById('searchReceptionToInput');
-    const clearSearchDate = document.getElementById('clearSearchDate');
-    const clearSearchReception = document.getElementById('clearSearchReception');
-    const applySearchBtn = document.getElementById('applySearchBtn');
-    const resetSearchBtn = document.getElementById('resetSearchBtn');
+    toggleComplete(id) {
+        const log = this.sampleLogs.find(l => String(l.id) === String(id));
+        if (!log) return;
+        log.isComplete = !log.isComplete;
+        log.updatedAt = new Date().toISOString();
+        this.listViewStale = true;
+        this.saveLogs();
+        this.renderLogs(this.sampleLogs);
+    }
 
-    // 현재 검색 필터 상태
-    let currentSearchFilter = {
-        dateFrom: '',
-        dateTo: '',
-        name: '',
-        receptionFrom: '',
-        receptionTo: '',
-        completed: ''
-    };
+    // ========================================
+    // 판정 토글 (미판정 -> 적합 -> 부적합 -> 미판정)
+    // ========================================
+    toggleResult(id) {
+        const log = this.sampleLogs.find(l => String(l.id) === String(id));
+        if (!log) return;
+        if (!log.testResult || log.testResult === '') {
+            log.testResult = 'pass';
+        } else if (log.testResult === 'pass') {
+            log.testResult = 'fail';
+        } else {
+            log.testResult = '';
+        }
+        log.updatedAt = new Date().toISOString();
+        this.listViewStale = true;
+        this.saveLogs();
+        this.renderLogs(this.sampleLogs);
+    }
 
-    // 완료 상태 필터 드롭다운
-    const completedFilter = document.getElementById('completedFilter');
-    if (completedFilter) {
-        completedFilter.addEventListener('change', (e) => {
-            currentSearchFilter.completed = e.target.value;
-            filterAndRenderLogs();
+    // ========================================
+    // 접수번호 생성
+    // ========================================
+    generateNextReceptionNumber() {
+        let maxNumber = 0;
+        this.sampleLogs.forEach(log => {
+            if (log.receptionNumber) {
+                const num = parseInt(log.receptionNumber, 10);
+                if (!isNaN(num) && num > maxNumber) {
+                    maxNumber = num;
+                }
+            }
         });
+        const nextNumber = maxNumber + 1;
+        this.log(`다음 접수번호 생성: ${nextNumber} (기존 최대: ${maxNumber})`);
+        return String(nextNumber);
     }
 
-    // 접수번호에서 숫자 부분 추출
-    function extractReceptionNumber(receptionNumber) {
-        const match = receptionNumber.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-    }
-
-    function filterAndRenderLogs() {
-        const filtered = sampleLogs.filter(log => {
-            // 성명 검색
-            const matchesName = !currentSearchFilter.name ||
-                (log.name || '').toLowerCase().includes(currentSearchFilter.name);
-
-            // 접수번호 범위 검색
-            let matchesReception = true;
-            if (currentSearchFilter.receptionFrom || currentSearchFilter.receptionTo) {
-                const logNum = extractReceptionNumber(log.receptionNumber || '');
-                const fromNum = currentSearchFilter.receptionFrom ? parseInt(currentSearchFilter.receptionFrom, 10) : 0;
-                const toNum = currentSearchFilter.receptionTo ? parseInt(currentSearchFilter.receptionTo, 10) : Infinity;
-                if (fromNum && logNum < fromNum) matchesReception = false;
-                if (toNum !== Infinity && logNum > toNum) matchesReception = false;
-            }
-
-            // 날짜 범위 검색
-            let matchesDate = true;
-            if (currentSearchFilter.dateFrom || currentSearchFilter.dateTo) {
-                const logDate = log.date;
-                if (currentSearchFilter.dateFrom && logDate < currentSearchFilter.dateFrom) matchesDate = false;
-                if (currentSearchFilter.dateTo && logDate > currentSearchFilter.dateTo) matchesDate = false;
-            }
-
-            // 완료 상태 필터
-            let matchesCompleted = true;
-            if (currentSearchFilter.completed === 'completed') {
-                matchesCompleted = log.completed === true;
-            } else if (currentSearchFilter.completed === 'incomplete') {
-                matchesCompleted = !log.completed;
-            }
-
-            return matchesName && matchesReception && matchesDate && matchesCompleted;
-        });
-
-        renderLogs(filtered);
-        updateSearchButtonState();
-        showToast(`${filtered.length}건의 검색 결과`, 'success');
-    }
-
-    function updateSearchButtonState() {
-        const hasFilter = currentSearchFilter.dateFrom || currentSearchFilter.dateTo ||
-            currentSearchFilter.name || currentSearchFilter.receptionFrom || currentSearchFilter.receptionTo ||
-            currentSearchFilter.completed;
-        if (openSearchModalBtn) {
-            if (hasFilter) {
-                openSearchModalBtn.classList.add('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
-            } else {
-                openSearchModalBtn.classList.remove('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
-            }
+    // ========================================
+    // 분석항목 카운트 업데이트
+    // ========================================
+    updateSelectedItemsCount() {
+        const checked = document.querySelectorAll('input[name="analysisItems"]:checked');
+        const selectedItemsCount = document.getElementById('selectedItemsCount');
+        if (selectedItemsCount) {
+            selectedItemsCount.textContent = checked.length;
         }
     }
 
-    if (openSearchModalBtn && listSearchModal) {
-        openSearchModalBtn.addEventListener('click', () => {
-            if (searchDateFromInput) searchDateFromInput.value = currentSearchFilter.dateFrom;
-            if (searchDateToInput) searchDateToInput.value = currentSearchFilter.dateTo;
-            if (searchNameInput) searchNameInput.value = currentSearchFilter.name;
-            if (searchReceptionFromInput) searchReceptionFromInput.value = currentSearchFilter.receptionFrom;
-            if (searchReceptionToInput) searchReceptionToInput.value = currentSearchFilter.receptionTo;
-            listSearchModal.classList.remove('hidden');
-            if (searchNameInput) searchNameInput.focus();
-        });
-    }
-
-    if (closeSearchModal) {
-        closeSearchModal.addEventListener('click', () => {
-            listSearchModal.classList.add('hidden');
-        });
-    }
-    listSearchModal?.querySelector('.modal-overlay')?.addEventListener('click', () => {
-        listSearchModal.classList.add('hidden');
-    });
-
-    if (clearSearchDate) {
-        clearSearchDate.addEventListener('click', () => {
-            if (searchDateFromInput) searchDateFromInput.value = '';
-            if (searchDateToInput) searchDateToInput.value = '';
-        });
-    }
-
-    if (clearSearchReception) {
-        clearSearchReception.addEventListener('click', () => {
-            if (searchReceptionFromInput) searchReceptionFromInput.value = '';
-            if (searchReceptionToInput) searchReceptionToInput.value = '';
-        });
-    }
-
-    if (applySearchBtn) {
-        applySearchBtn.addEventListener('click', () => {
-            currentSearchFilter.dateFrom = searchDateFromInput ? searchDateFromInput.value : '';
-            currentSearchFilter.dateTo = searchDateToInput ? searchDateToInput.value : '';
-            currentSearchFilter.name = searchNameInput ? searchNameInput.value.toLowerCase() : '';
-            currentSearchFilter.receptionFrom = searchReceptionFromInput ? searchReceptionFromInput.value : '';
-            currentSearchFilter.receptionTo = searchReceptionToInput ? searchReceptionToInput.value : '';
-            filterAndRenderLogs();
-            listSearchModal.classList.add('hidden');
-        });
-    }
-
-    if (resetSearchBtn) {
-        resetSearchBtn.addEventListener('click', () => {
-            if (searchDateFromInput) searchDateFromInput.value = '';
-            if (searchDateToInput) searchDateToInput.value = '';
-            if (searchNameInput) searchNameInput.value = '';
-            if (searchReceptionFromInput) searchReceptionFromInput.value = '';
-            if (searchReceptionToInput) searchReceptionToInput.value = '';
-            if (completedFilter) completedFilter.value = '';
-            currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: '' };
-            filterAndRenderLogs();
-            updateSearchButtonState();
-            listSearchModal.classList.add('hidden');
-        });
-    }
-
-    // Enter 키로 검색
-    [searchNameInput, searchReceptionFromInput, searchReceptionToInput].forEach(input => {
-        if (input) {
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && applySearchBtn) applySearchBtn.click();
-            });
+    // ========================================
+    // 목록 타이틀 업데이트
+    // ========================================
+    updateListViewTitle() {
+        const listViewTitle = document.getElementById('listViewTitle');
+        if (listViewTitle) {
+            listViewTitle.textContent = `${this.selectedYear}년 토양 중금속 접수 목록`;
         }
-    });
+    }
 
     // ========================================
-    // 통계 모달
+    // 자동 저장 수행 (공통 모듈 사용)
     // ========================================
-    const statisticsModal = document.getElementById('statisticsModal');
-    const btnStatistics = document.getElementById('btnStatistics');
-    const closeStatisticsModal = document.getElementById('closeStatisticsModal');
-    const closeStatisticsBtn = document.getElementById('closeStatisticsBtn');
-
-    if (btnStatistics && statisticsModal) {
-        btnStatistics.addEventListener('click', () => {
-            updateStatistics();
-            statisticsModal.classList.remove('hidden');
+    async autoSaveToFile() {
+        return await SampleUtils.performAutoSave({
+            FileAPI: this.FileAPI,
+            moduleKey: 'heavyMetal',
+            data: this.sampleLogs,
+            webFileHandle: this.autoSaveFileHandle,
+            log: (...args) => this.log(...args)
         });
     }
 
-    [closeStatisticsModal, closeStatisticsBtn].forEach(btn => {
-        btn?.addEventListener('click', () => statisticsModal.classList.add('hidden'));
-    });
-    statisticsModal?.querySelector('.modal-overlay')?.addEventListener('click', () => {
-        statisticsModal.classList.add('hidden');
-    });
+    // ========================================
+    // 등록 결과 모달
+    // ========================================
+    showRegistrationResult(logData) {
+        this.currentRegistrationData = logData;
+        const resultTableBody = document.getElementById('resultTableBody');
 
-    function updateStatistics() {
-        // 총 접수
-        document.getElementById('statTotalCount').textContent = sampleLogs.length;
+        const rows = [
+            { label: '접수번호', value: logData.receptionNumber },
+            { label: '접수일자', value: logData.date },
+            { label: '성명', value: logData.name },
+            { label: '전화번호', value: logData.phoneNumber },
+            { label: '주소', value: logData.address || '-' },
+            { label: '채취장소', value: logData.samplingLocation || '-' },
+            { label: '재배작물', value: logData.cropName || '-' },
+            { label: '수령', value: logData.treeAge ? `${logData.treeAge}년` : '-' },
+            { label: '시료채취일', value: logData.samplingDate || '-' },
+            { label: '시료수', value: `${logData.sampleCount || 1}점` },
+            { label: '분석항목', value: (logData.analysisItems || []).join(', ') || '-' },
+            { label: '목적(용도)', value: logData.purpose || '-' },
+            { label: '수령방법', value: logData.receptionMethod || '-' },
+            { label: '비고', value: logData.note || '-' }
+        ];
 
-        // 완료/미완료
-        const completed = sampleLogs.filter(l => l.isCompleted).length;
+        BaseSampleManager.buildResultTable(resultTableBody, rows);
+
+        const registrationResultModal = document.getElementById('registrationResultModal');
+        if (registrationResultModal) {
+            registrationResultModal.classList.remove('hidden');
+        }
+    }
+
+    closeRegistrationResultModal() {
+        const registrationResultModal = document.getElementById('registrationResultModal');
+        if (registrationResultModal) {
+            registrationResultModal.classList.add('hidden');
+        }
+        this.currentRegistrationData = null;
+    }
+
+    // ========================================
+    // 통계
+    // ========================================
+    updateStatistics() {
+        document.getElementById('statTotalCount').textContent = this.sampleLogs.length;
+
+        const completed = this.sampleLogs.filter(l => l.isComplete).length;
         document.getElementById('statCompletedCount').textContent = completed;
-        document.getElementById('statPendingCount').textContent = sampleLogs.length - completed;
+        document.getElementById('statPendingCount').textContent = this.sampleLogs.length - completed;
 
         // 분석항목별 통계
         const byAnalysisItem = {};
-        ANALYSIS_ITEMS.forEach(item => byAnalysisItem[item] = 0);
-        sampleLogs.forEach(log => {
+        this.ANALYSIS_ITEMS.forEach(item => byAnalysisItem[item] = 0);
+        this.sampleLogs.forEach(log => {
             (log.analysisItems || []).forEach(item => {
                 if (byAnalysisItem[item] !== undefined) byAnalysisItem[item]++;
             });
         });
-        renderBarChart('statsByAnalysisItem', byAnalysisItem);
+        this.renderBarChart('statsByAnalysisItem', byAnalysisItem);
 
         // 목적별 통계
         const byPurpose = {};
-        sampleLogs.forEach(log => {
+        this.sampleLogs.forEach(log => {
             const p = log.purpose || '미지정';
             byPurpose[p] = (byPurpose[p] || 0) + 1;
         });
-        renderBarChart('statsByPurpose', byPurpose);
+        this.renderBarChart('statsByPurpose', byPurpose);
 
-        // 월별 집계 (1~12월 전체, 완료/미완료 구분)
+        // 월별 집계
         const byMonth = {};
         const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-
-        // 1~12월 초기화
         for (let i = 1; i <= 12; i++) {
             const monthKey = String(i).padStart(2, '0');
-            byMonth[monthKey] = {
-                count: 0,
-                completed: 0,
-                pending: 0,
-                label: monthNames[i - 1],
-                class: 'month'
-            };
+            byMonth[monthKey] = { count: 0, completed: 0, pending: 0, label: monthNames[i - 1], class: 'month' };
         }
 
-        // 데이터 집계
-        sampleLogs.forEach(log => {
+        this.sampleLogs.forEach(log => {
             if (log.date) {
                 const monthNum = log.date.substring(5, 7);
                 if (byMonth[monthNum]) {
                     byMonth[monthNum].count++;
-                    if (log.isCompleted) {
+                    if (log.isComplete) {
                         byMonth[monthNum].completed++;
                     } else {
                         byMonth[monthNum].pending++;
@@ -2069,19 +737,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             byQuarter[quarter].pending += data.pending;
         });
 
-        renderMonthlyChart('statsByMonth', byMonth);
-        renderQuarterlySummary('statsQuarterly', byQuarter);
+        this.renderMonthlyChart('statsByMonth', byMonth);
+        this.renderQuarterlySummary('statsQuarterly', byQuarter);
 
         // 수령방법별 통계
         const byMethod = {};
-        sampleLogs.forEach(log => {
+        this.sampleLogs.forEach(log => {
             const m = log.receptionMethod || '미지정';
             byMethod[m] = (byMethod[m] || 0) + 1;
         });
-        renderBarChart('statsByReceptionMethod', byMethod);
+        this.renderBarChart('statsByReceptionMethod', byMethod);
     }
 
-    function renderMonthlyChart(containerId, byMonth) {
+    renderMonthlyChart(containerId, byMonth) {
         const container = document.getElementById(containerId);
         if (!container) return;
 
@@ -2122,7 +790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         `);
     }
 
-    function renderQuarterlySummary(containerId, byQuarter) {
+    renderQuarterlySummary(containerId, byQuarter) {
         const container = document.getElementById(containerId);
         if (!container) return;
 
@@ -2150,39 +818,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         `);
     }
 
-    function renderBarChart(containerId, data) {
+    renderBarChart(containerId, data) {
         const container = document.getElementById(containerId);
         if (!container) return;
 
         const entries = Object.entries(data);
         const maxVal = Math.max(...entries.map(([, v]) => v), 1);
 
-        // 분석항목별 클래스 매핑
         const analysisClassMap = {
-            '납(Pb)': 'analysis-pb',
-            '카드뮴(Cd)': 'analysis-cd',
-            '비소(As)': 'analysis-as',
-            '수은(Hg)': 'analysis-hg',
-            '크롬(Cr)': 'analysis-cr',
-            '구리(Cu)': 'analysis-cu',
-            '니켈(Ni)': 'analysis-ni',
-            '아연(Zn)': 'analysis-zn'
+            '납(Pb)': 'analysis-pb', '카드뮴(Cd)': 'analysis-cd',
+            '비소(As)': 'analysis-as', '수은(Hg)': 'analysis-hg',
+            '크롬(Cr)': 'analysis-cr', '구리(Cu)': 'analysis-cu',
+            '니켈(Ni)': 'analysis-ni', '아연(Zn)': 'analysis-zn'
         };
-
-        // 목적별 클래스 매핑
         const purposeClassMap = {
-            '농경지': 'purpose-farm',
-            '공장부지': 'purpose-factory',
-            '주거지역': 'purpose-residential',
-            '기타': 'purpose-other'
+            '농경지': 'purpose-farm', '공장부지': 'purpose-factory',
+            '주거지역': 'purpose-residential', '기타': 'purpose-other'
         };
-
-        // 수령방법별 클래스 매핑
         const methodClassMap = {
-            '우편': 'method-mail',
-            '이메일': 'method-email',
-            '팩스': 'method-fax',
-            '직접방문': 'method-visit'
+            '우편': 'method-mail', '이메일': 'method-email',
+            '팩스': 'method-fax', '직접방문': 'method-visit'
         };
 
         container.innerHTML = sanitizeHTML(entries.map(([label, value]) => {
@@ -2200,149 +855,1072 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ========================================
-    // 라벨 인쇄
+    // 검색/필터
     // ========================================
-    const btnLabelPrint = document.getElementById('btnLabelPrint');
-    if (btnLabelPrint) {
-        btnLabelPrint.addEventListener('click', () => {
-            const checked = document.querySelectorAll('.row-checkbox:checked');
-            if (checked.length === 0) {
-                showToast('라벨 인쇄할 항목을 선택해주세요.', 'warning');
-                return;
+    extractReceptionNumber(receptionNumber) {
+        const match = receptionNumber.match(/(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+
+    filterAndRenderLogs() {
+        const filtered = this.sampleLogs.filter(log => {
+            const matchesName = !this.currentSearchFilter.name ||
+                (log.name || '').toLowerCase().includes(this.currentSearchFilter.name);
+
+            let matchesReception = true;
+            if (this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo) {
+                const logNum = this.extractReceptionNumber(log.receptionNumber || '');
+                const fromNum = this.currentSearchFilter.receptionFrom ? parseInt(this.currentSearchFilter.receptionFrom, 10) : 0;
+                const toNum = this.currentSearchFilter.receptionTo ? parseInt(this.currentSearchFilter.receptionTo, 10) : Infinity;
+                if (fromNum && logNum < fromNum) matchesReception = false;
+                if (toNum !== Infinity && logNum > toNum) matchesReception = false;
             }
 
-            const selectedData = Array.from(checked).map(cb => {
-                const idx = parseInt(cb.dataset.index, 10);
-                return sampleLogs[idx];
+            let matchesDate = true;
+            if (this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo) {
+                const logDate = log.date;
+                if (this.currentSearchFilter.dateFrom && logDate < this.currentSearchFilter.dateFrom) matchesDate = false;
+                if (this.currentSearchFilter.dateTo && logDate > this.currentSearchFilter.dateTo) matchesDate = false;
+            }
+
+            let matchesCompleted = true;
+            if (this.currentSearchFilter.completed === 'completed') {
+                matchesCompleted = log.isComplete === true;
+            } else if (this.currentSearchFilter.completed === 'incomplete') {
+                matchesCompleted = !log.isComplete;
+            }
+
+            return matchesName && matchesReception && matchesDate && matchesCompleted;
+        });
+
+        this.renderLogs(filtered);
+        this.updateSearchButtonState();
+        this.showToast(`${filtered.length}건의 검색 결과`, 'success');
+    }
+
+    updateSearchButtonState() {
+        const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
+            this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo ||
+            this.currentSearchFilter.completed;
+        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
+        if (openSearchModalBtn) {
+            if (hasFilter) {
+                openSearchModalBtn.classList.add('has-filter');
+                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
+            } else {
+                openSearchModalBtn.classList.remove('has-filter');
+                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
+            }
+        }
+    }
+
+    // ========================================
+    // 우편발송일자 모달
+    // ========================================
+    openMailDateModal(indices) {
+        this.pendingMailDateIndices = indices;
+        const today = new Date().toISOString().split('T')[0];
+        const mailDateInput = document.getElementById('mailDateInput');
+        const mailDateInfo = document.getElementById('mailDateInfo');
+        const mailDateModal = document.getElementById('mailDateModal');
+        if (mailDateInput) mailDateInput.value = today;
+        if (mailDateInfo) mailDateInfo.textContent = `선택한 ${indices.length}건의 우편발송일자를 입력하세요.`;
+        if (mailDateModal) mailDateModal.classList.remove('hidden');
+    }
+
+    closeMailDateModalFn() {
+        const mailDateModal = document.getElementById('mailDateModal');
+        if (mailDateModal) mailDateModal.classList.add('hidden');
+        this.pendingMailDateIndices = [];
+    }
+
+    // ========================================
+    // 오버라이드: 수령 방법 버튼 설정
+    // ========================================
+    setupReceptionMethod() {
+        const methodBtns = document.querySelectorAll('.reception-method-btn');
+        const methodInput = document.getElementById('receptionMethod');
+
+        methodBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                methodBtns.forEach(b => b.classList.remove('active', 'selected'));
+                btn.classList.add('active', 'selected');
+                if (methodInput) {
+                    methodInput.value = btn.dataset.method;
+                }
             });
-
-            // 라벨 인쇄 페이지로 데이터 전달
-            localStorage.setItem('labelPrintData', JSON.stringify({
-                type: '중금속',
-                data: selectedData
-            }));
-
-            window.location.href = '../label-print/index.html';
         });
     }
 
     // ========================================
-    // 등록 결과 모달
+    // 타입별 이벤트 설정 (모든 중금속 전용 이벤트)
     // ========================================
-    const registrationResultModal = document.getElementById('registrationResultModal');
-    const closeRegistrationModal = document.getElementById('closeRegistrationModal');
-    const closeResultBtn = document.getElementById('closeResultBtn');
-    const exportResultBtn = document.getElementById('exportResultBtn');
-    const resultTableBody = document.getElementById('resultTableBody');
-    let currentRegistrationData = null;
+    setupTypeSpecificEvents() {
+        const showToast = window.showToast;
 
-    function showRegistrationResult(logData) {
-        currentRegistrationData = logData;
+        // 오늘 날짜 설정
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('date');
+        const samplingDateInput = document.getElementById('samplingDate');
+        if (dateInput && !dateInput.value) dateInput.value = today;
+        if (samplingDateInput && !samplingDateInput.value) samplingDateInput.value = today;
 
-        // 테이블 행 데이터
-        const rows = [
-            { label: '접수번호', value: logData.receptionNumber },
-            { label: '접수일자', value: logData.date },
-            { label: '성명', value: logData.name },
-            { label: '전화번호', value: logData.phoneNumber },
-            { label: '주소', value: logData.address || '-' },
-            { label: '채취장소', value: logData.samplingLocation || '-' },
-            { label: '재배작물', value: logData.cropName || '-' },
-            { label: '수령', value: logData.treeAge ? `${logData.treeAge}년` : '-' },
-            { label: '시료채취일', value: logData.samplingDate || '-' },
-            { label: '시료수', value: `${logData.sampleCount || 1}점` },
-            { label: '분석항목', value: (logData.analysisItems || []).join(', ') || '-' },
-            { label: '목적(용도)', value: logData.purpose || '-' },
-            { label: '수령방법', value: logData.receptionMethod || '-' },
-            { label: '비고', value: logData.note || '-' }
-        ];
-
-        // 공통 유틸리티로 테이블 생성 (XSS 방지)
-        BaseSampleManager.buildResultTable(resultTableBody, rows);
-
-        // 모달 표시
-        if (registrationResultModal) {
-            registrationResultModal.classList.remove('hidden');
+        // 기존 데이터 마이그레이션 (연도 없는 데이터 -> 현재 연도로)
+        const oldData = localStorage.getItem('heavyMetalSampleLogs');
+        if (oldData) {
+            const currentYearKey = this.getStorageKey(this.selectedYear);
+            if (!localStorage.getItem(currentYearKey)) {
+                localStorage.setItem(currentYearKey, oldData);
+                this.log('기존 중금속 데이터를 현재 연도로 마이그레이션 완료');
+            }
         }
-    }
 
-    function closeRegistrationResultModal() {
-        if (registrationResultModal) {
-            registrationResultModal.classList.add('hidden');
+        // 빈 상태에서 폼으로 이동
+        const btnGoForm = document.querySelector('.btn-go-form');
+        if (btnGoForm) {
+            btnGoForm.addEventListener('click', () => this.switchView('form'));
         }
-        currentRegistrationData = null;
+
+        // 네비게이션 바 제출/취소 버튼
+        const navSubmitBtn = document.getElementById('navSubmitBtn');
+        const navResetBtn = document.getElementById('navResetBtn');
+        if (navSubmitBtn) navSubmitBtn.addEventListener('click', () => this.submitForm());
+        if (navResetBtn) navResetBtn.addEventListener('click', () => this.resetForm());
+
+        // ========================================
+        // 분석항목 선택 관리
+        // ========================================
+        const analysisCheckboxes = document.querySelectorAll('input[name="analysisItems"]');
+        const selectAllItemsBtn = document.getElementById('selectAllItemsBtn');
+
+        analysisCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => this.updateSelectedItemsCount());
+        });
+
+        if (selectAllItemsBtn) {
+            selectAllItemsBtn.addEventListener('click', () => {
+                this.isAllSelected = !this.isAllSelected;
+                analysisCheckboxes.forEach(cb => cb.checked = this.isAllSelected);
+                selectAllItemsBtn.textContent = this.isAllSelected ? '전체 해제' : '전체 선택';
+                this.updateSelectedItemsCount();
+            });
+        }
+
+        // ========================================
+        // 목적 선택 - 인증용 안내
+        // ========================================
+        const purposeRadios = document.querySelectorAll('input[name="purpose"]');
+        const certificationNotice = document.getElementById('certificationNotice');
+
+        purposeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const isCertification = ['무농약', '유기농', 'GAP', '저탄소'].includes(radio.value);
+                if (certificationNotice) {
+                    certificationNotice.classList.toggle('hidden', !isCertification);
+                }
+                if (isCertification) {
+                    analysisCheckboxes.forEach(cb => cb.checked = true);
+                    this.isAllSelected = true;
+                    if (selectAllItemsBtn) selectAllItemsBtn.textContent = '전체 해제';
+                    this.updateSelectedItemsCount();
+                }
+            });
+        });
+
+        // ========================================
+        // 법인여부 선택
+        // ========================================
+        const applicantTypeSelect = document.getElementById('applicantType');
+        const birthDateField = document.getElementById('birthDateField');
+        const corpNumberField = document.getElementById('corpNumberField');
+        const birthDateInput = document.getElementById('birthDate');
+        const corpNumberInput = document.getElementById('corpNumber');
+
+        if (applicantTypeSelect) {
+            applicantTypeSelect.addEventListener('change', () => {
+                const isCorpSelected = applicantTypeSelect.value === '법인';
+                if (isCorpSelected) {
+                    if (birthDateField) birthDateField.classList.add('hidden');
+                    if (corpNumberField) corpNumberField.classList.remove('hidden');
+                    if (birthDateInput) birthDateInput.value = '';
+                } else {
+                    if (birthDateField) birthDateField.classList.remove('hidden');
+                    if (corpNumberField) corpNumberField.classList.add('hidden');
+                    if (corpNumberInput) corpNumberInput.value = '';
+                }
+            });
+        }
+
+        // ========================================
+        // 주소 검색
+        // ========================================
+        const searchAddressBtn = document.getElementById('searchAddressBtn');
+        const addressPostcode = document.getElementById('addressPostcode');
+        const addressRoad = document.getElementById('addressRoad');
+        const addressDetail = document.getElementById('addressDetail');
+        const addressHidden = document.getElementById('address');
+        const addressModal = document.getElementById('addressModal');
+        const closeAddressModalBtn = document.getElementById('closeAddressModal');
+        const daumPostcodeContainer = document.getElementById('daumPostcodeContainer');
+
+        if (window.AddressManager) {
+            new window.AddressManager({
+                searchBtn: searchAddressBtn,
+                postcodeInput: addressPostcode,
+                roadInput: addressRoad,
+                detailInput: addressDetail,
+                hiddenInput: addressHidden,
+                modal: addressModal,
+                closeBtn: closeAddressModalBtn,
+                container: daumPostcodeContainer
+            });
+        }
+
+        // ========================================
+        // 채취장소 자동완성
+        // ========================================
+        this.bindLocationAutocomplete();
+
+        // ========================================
+        // 작물 검색 모달
+        // ========================================
+        this.setupCropSearch();
+
+        // ========================================
+        // 선택 삭제
+        // ========================================
+        const btnBulkDelete = document.getElementById('btnBulkDelete');
+        const selectAllCheckbox = document.getElementById('selectAll');
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', () => {
+                const checkboxes = document.querySelectorAll('.row-checkbox');
+                checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+            });
+        }
+
+        // 성명 클릭 시 같은 이름 일괄 선택
+        const tableBody = document.getElementById('tableBody') || document.querySelector('tbody');
+        if (tableBody) {
+            tableBody.addEventListener('click', (e) => {
+                const nameCell = e.target.closest('.col-name');
+                if (nameCell && nameCell.dataset.name) {
+                    const targetName = nameCell.dataset.name;
+                    const rowCheckboxes = tableBody.querySelectorAll('.row-checkbox');
+                    const targetCheckboxes = [];
+
+                    rowCheckboxes.forEach(cb => {
+                        const tr = cb.closest('tr');
+                        const nc = tr?.querySelector('.col-name');
+                        if (nc && nc.dataset.name === targetName) {
+                            targetCheckboxes.push(cb);
+                        }
+                    });
+
+                    if (targetCheckboxes.length === 0) return;
+                    const allChecked = targetCheckboxes.every(cb => cb.checked);
+                    targetCheckboxes.forEach(cb => { cb.checked = !allChecked; });
+
+                    // selectAll 상태 업데이트
+                    if (selectAllCheckbox) {
+                        const allBoxes = tableBody.querySelectorAll('.row-checkbox');
+                        const checkedBoxes = tableBody.querySelectorAll('.row-checkbox:checked');
+                        selectAllCheckbox.checked = allBoxes.length > 0 && checkedBoxes.length === allBoxes.length;
+                        selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < allBoxes.length;
+                    }
+                }
+            });
+
+            // 개별 체크박스 변경 시 전체 선택 상태 갱신
+            tableBody.addEventListener('change', (e) => {
+                if (e.target.classList.contains('row-checkbox')) {
+                    const allBoxes = tableBody.querySelectorAll('.row-checkbox');
+                    const checkedBoxes = tableBody.querySelectorAll('.row-checkbox:checked');
+                    if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = allBoxes.length > 0 && checkedBoxes.length === allBoxes.length;
+                        selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < allBoxes.length;
+                    }
+                }
+            });
+        }
+
+        if (btnBulkDelete) {
+            btnBulkDelete.addEventListener('click', () => {
+                const checked = document.querySelectorAll('.row-checkbox:checked');
+                if (checked.length === 0) {
+                    showToast('삭제할 항목을 선택해주세요.', 'warning');
+                    return;
+                }
+
+                if (confirm(`${checked.length}건의 데이터를 삭제하시겠습니까?`)) {
+                    const selectedIds = Array.from(checked).map(cb => cb.dataset.id).filter(id => id);
+
+                    this.sampleLogs = this.sampleLogs.filter(l => !selectedIds.includes(String(l.id)));
+                    this.listViewStale = true;
+                    this.saveLogs();
+                    this.renderLogs(this.sampleLogs);
+                    showToast(`${checked.length}건이 삭제되었습니다.`, 'success');
+
+                    // Firebase에서도 삭제
+                    if (selectedIds.length > 0 && window.firestoreDb?.isEnabled()) {
+                        Promise.all(selectedIds.map(id =>
+                            window.firestoreDb.delete('heavyMetal', parseInt(this.selectedYear), id)
+                        ))
+                            .then(() => this.log('Firebase 일괄 삭제 완료:', selectedIds.length, '건'))
+                            .catch(err => (window.logger?.error || console.error)('Firebase 일괄 삭제 실패:', err));
+                    }
+                }
+            });
+        }
+
+        // ========================================
+        // 우편발송일자 일괄 입력
+        // ========================================
+        const btnBulkMailDate = document.getElementById('btnBulkMailDate');
+        const mailDateModal = document.getElementById('mailDateModal');
+        const closeMailDateModal = document.getElementById('closeMailDateModal');
+        const cancelMailDateBtn = document.getElementById('cancelMailDateBtn');
+        const confirmMailDateBtn = document.getElementById('confirmMailDateBtn');
+
+        if (closeMailDateModal) closeMailDateModal.addEventListener('click', () => this.closeMailDateModalFn());
+        if (cancelMailDateBtn) cancelMailDateBtn.addEventListener('click', () => this.closeMailDateModalFn());
+        if (mailDateModal) {
+            mailDateModal.querySelector('.modal-overlay')?.addEventListener('click', () => this.closeMailDateModalFn());
+        }
+
+        if (confirmMailDateBtn) {
+            confirmMailDateBtn.addEventListener('click', () => {
+                const mailDateInput = document.getElementById('mailDateInput');
+                const inputDate = mailDateInput?.value;
+
+                if (!inputDate) {
+                    showToast('날짜를 선택해주세요.', 'warning');
+                    return;
+                }
+
+                this.pendingMailDateIndices.forEach(id => {
+                    const log = this.sampleLogs.find(l => String(l.id) === String(id));
+                    if (log) {
+                        log.mailDate = inputDate;
+                        log.updatedAt = new Date().toISOString();
+                    }
+                });
+
+                this.listViewStale = true;
+                this.saveLogs();
+                this.renderLogs(this.sampleLogs);
+
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
+
+                this.closeMailDateModalFn();
+                showToast(`${this.pendingMailDateIndices.length}건의 발송일자가 입력되었습니다.`, 'success');
+            });
+        }
+
+        if (btnBulkMailDate) {
+            btnBulkMailDate.addEventListener('click', () => {
+                const checked = document.querySelectorAll('.row-checkbox:checked');
+                if (checked.length === 0) {
+                    showToast('발송일자를 입력할 항목을 선택해주세요.', 'warning');
+                    return;
+                }
+                const ids = Array.from(checked).map(cb => cb.dataset.id).filter(id => id);
+                this.openMailDateModal(ids);
+            });
+        }
+
+        // ========================================
+        // 검색 모달
+        // ========================================
+        this.setupSearchModal();
+
+        // ========================================
+        // 통계 모달
+        // ========================================
+        const statisticsModal = document.getElementById('statisticsModal');
+        const btnStatistics = document.getElementById('btnStatistics');
+        const closeStatisticsModal = document.getElementById('closeStatisticsModal');
+        const closeStatisticsBtn = document.getElementById('closeStatisticsBtn');
+
+        if (btnStatistics && statisticsModal) {
+            btnStatistics.addEventListener('click', () => {
+                this.updateStatistics();
+                statisticsModal.classList.remove('hidden');
+            });
+        }
+
+        [closeStatisticsModal, closeStatisticsBtn].forEach(btn => {
+            btn?.addEventListener('click', () => statisticsModal.classList.add('hidden'));
+        });
+        statisticsModal?.querySelector('.modal-overlay')?.addEventListener('click', () => {
+            statisticsModal.classList.add('hidden');
+        });
+
+        // ========================================
+        // 라벨 인쇄
+        // ========================================
+        const btnLabelPrint = document.getElementById('btnLabelPrint');
+        if (btnLabelPrint) {
+            btnLabelPrint.addEventListener('click', () => {
+                const checked = document.querySelectorAll('.row-checkbox:checked');
+                if (checked.length === 0) {
+                    showToast('라벨 인쇄할 항목을 선택해주세요.', 'warning');
+                    return;
+                }
+
+                const selectedData = Array.from(checked).map(cb => {
+                    const id = cb.dataset.id;
+                    return this.sampleLogs.find(l => String(l.id) === String(id));
+                }).filter(Boolean);
+
+                localStorage.setItem('labelPrintData', JSON.stringify({
+                    type: '중금속',
+                    data: selectedData
+                }));
+
+                window.location.href = '../label-print/index.html';
+            });
+        }
+
+        // ========================================
+        // 등록 결과 모달 이벤트
+        // ========================================
+        const closeRegistrationModal = document.getElementById('closeRegistrationModal');
+        const closeResultBtn = document.getElementById('closeResultBtn');
+        const editResultBtn = document.getElementById('editResultBtn');
+        const exportResultBtn = document.getElementById('exportResultBtn');
+        const registrationResultModal = document.getElementById('registrationResultModal');
+
+        if (closeRegistrationModal) {
+            closeRegistrationModal.addEventListener('click', () => this.closeRegistrationResultModal());
+        }
+        if (closeResultBtn) {
+            closeResultBtn.addEventListener('click', () => this.closeRegistrationResultModal());
+        }
+
+        if (editResultBtn) {
+            editResultBtn.addEventListener('click', () => {
+                if (this.currentRegistrationData) {
+                    const dataToEdit = this.currentRegistrationData;
+                    this.closeRegistrationResultModal();
+                    this.editSample(dataToEdit.id);
+                }
+            });
+        }
+
+        if (registrationResultModal) {
+            const overlay = registrationResultModal.querySelector('.modal-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', () => this.closeRegistrationResultModal());
+            }
+        }
+
+        if (exportResultBtn) {
+            exportResultBtn.addEventListener('click', () => {
+                if (!this.currentRegistrationData) return;
+
+                const d = this.currentRegistrationData;
+                const excelData = [{
+                    '접수번호': d.receptionNumber,
+                    '접수일자': d.date,
+                    '성명': d.name,
+                    '전화번호': d.phoneNumber,
+                    '주소': d.address || '-',
+                    '채취장소': d.samplingLocation || '-',
+                    '재배작물': d.cropName || '-',
+                    '수령': d.treeAge ? `${d.treeAge}년` : '-',
+                    '시료채취일': d.samplingDate || '-',
+                    '시료수': `${d.sampleCount || 1}점`,
+                    '분석항목': (d.analysisItems || []).join(', ') || '-',
+                    '목적(용도)': d.purpose || '-',
+                    '수령방법': d.receptionMethod || '-',
+                    '비고': d.note || '-'
+                }];
+
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, '등록결과');
+
+                const fileName = `중금속_등록결과_${d.receptionNumber}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                showToast('엑셀 파일이 다운로드되었습니다.', 'success');
+            });
+        }
+
+        // ========================================
+        // 엑셀 내보내기
+        // ========================================
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', async () => {
+                if (window.encryptionManager?.isReady()) {
+                    const verified = await window.encryptionManager.verifyPasswordForExport();
+                    if (!verified) return;
+                }
+                this.exportToExcel();
+            });
+        }
+
+        // ========================================
+        // JSON 저장/불러오기
+        // ========================================
+        SampleUtils.setupJSONSaveHandler({
+            buttonElement: document.getElementById('saveJsonBtn'),
+            sampleType: '중금속',
+            getData: () => this.sampleLogs,
+            FileAPI: this.FileAPI,
+            filePrefix: '토양중금속',
+            showToast: showToast
+        });
+
+        SampleUtils.setupJSONLoadHandler({
+            inputElement: document.getElementById('loadJsonInput'),
+            getData: () => this.sampleLogs,
+            setData: (data) => { this.sampleLogs = data; },
+            saveData: () => this.saveLogs(),
+            renderData: () => this.renderLogs(this.sampleLogs),
+            showToast: showToast
+        });
+
+        // ========================================
+        // 자동저장 설정
+        // ========================================
+        SampleUtils.setupAutoSaveFolderButton({
+            moduleKey: 'heavyMetal',
+            FileAPI: this.FileAPI,
+            selectedYear: this.selectedYear,
+            getWebFileHandle: () => this.autoSaveFileHandle,
+            setWebFileHandle: (handle) => { this.autoSaveFileHandle = handle; },
+            autoSaveCallback: () => this.autoSaveToFile(),
+            showToast: showToast
+        });
+
+        SampleUtils.setupAutoSaveToggle({
+            moduleKey: 'heavyMetal',
+            FileAPI: this.FileAPI,
+            getWebFileHandle: () => this.autoSaveFileHandle,
+            setWebFileHandle: (handle) => { this.autoSaveFileHandle = handle; },
+            autoSaveCallback: () => this.autoSaveToFile(),
+            showToast: showToast,
+            log: (...args) => this.log(...args)
+        });
+
+        // ========================================
+        // 엑셀 가져오기 (ExcelImportManager)
+        // ========================================
+        this.setupExcelImport();
+
+        // 초기 타이틀 설정
+        this.updateListViewTitle();
+        this.updateSelectedItemsCount();
     }
 
-    // 모달 닫기 이벤트
-    if (closeRegistrationModal) {
-        closeRegistrationModal.addEventListener('click', closeRegistrationResultModal);
-    }
-    if (closeResultBtn) {
-        closeResultBtn.addEventListener('click', closeRegistrationResultModal);
-    }
+    // ========================================
+    // 채취장소 자동완성
+    // ========================================
+    bindLocationAutocomplete() {
+        const samplingLocationInput = document.getElementById('samplingLocation');
+        const samplingLocationAutocomplete = document.getElementById('samplingLocationAutocomplete');
 
-    // 수정 버튼 클릭 이벤트
-    const editResultBtn = document.getElementById('editResultBtn');
-    if (editResultBtn) {
-        editResultBtn.addEventListener('click', () => {
-            if (currentRegistrationData) {
-                const dataToEdit = currentRegistrationData;  // 데이터 복사 (모달 닫기 전)
-                const idx = sampleLogs.findIndex(l => l.id === dataToEdit.id);
-                closeRegistrationResultModal();
-                if (idx >= 0) {
-                    editLog(idx);
+        if (!samplingLocationInput || !samplingLocationAutocomplete) return;
+
+        samplingLocationInput.addEventListener('input', (e) => {
+            const value = e.target.value.trim();
+            samplingLocationAutocomplete.innerHTML = '';
+            samplingLocationAutocomplete.classList.remove('show');
+
+            if (value.length < 1) return;
+
+            if (this.GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) return;
+
+            if (typeof suggestRegionVillages === 'function') {
+                const suggestions = suggestRegionVillages(value, null, true);
+                if (suggestions.length > 0) {
+                    samplingLocationAutocomplete.innerHTML = sanitizeHTML(suggestions.slice(0, 20).map(suggestion => `
+                        <li data-village="${suggestion.village}" data-district="${suggestion.district}" data-region-key="${suggestion.regionKey}" data-region="${suggestion.region || ''}" data-is-mountain="${suggestion.isMountain}">
+                            ${suggestion.displayText}
+                        </li>
+                    `).join(''));
+                    samplingLocationAutocomplete.classList.add('show');
                 }
             }
         });
-    }
 
-    // 오버레이 클릭으로 닫기
-    if (registrationResultModal) {
-        const overlay = registrationResultModal.querySelector('.modal-overlay');
-        if (overlay) {
-            overlay.addEventListener('click', closeRegistrationResultModal);
-        }
-    }
+        samplingLocationInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const value = samplingLocationInput.value.trim();
 
-    // 엑셀로 내보내기
-    if (exportResultBtn) {
-        exportResultBtn.addEventListener('click', () => {
-            if (!currentRegistrationData) return;
+                if (this.GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) {
+                    samplingLocationAutocomplete.innerHTML = '';
+                    samplingLocationAutocomplete.classList.remove('show');
+                    return;
+                }
 
-            const excelData = [{
-                '접수번호': currentRegistrationData.receptionNumber,
-                '접수일자': currentRegistrationData.date,
-                '성명': currentRegistrationData.name,
-                '전화번호': currentRegistrationData.phoneNumber,
-                '주소': currentRegistrationData.address || '-',
-                '채취장소': currentRegistrationData.samplingLocation || '-',
-                '재배작물': currentRegistrationData.cropName || '-',
-                '수령': currentRegistrationData.treeAge ? `${currentRegistrationData.treeAge}년` : '-',
-                '시료채취일': currentRegistrationData.samplingDate || '-',
-                '시료수': `${currentRegistrationData.sampleCount || 1}점`,
-                '분석항목': (currentRegistrationData.analysisItems || []).join(', ') || '-',
-                '목적(용도)': currentRegistrationData.purpose || '-',
-                '수령방법': currentRegistrationData.receptionMethod || '-',
-                '비고': currentRegistrationData.note || '-'
-            }];
+                if (typeof parseParcelAddress === 'function') {
+                    const result = parseParcelAddress(value);
+                    if (result) {
+                        if (result.isDuplicate && result.locations) {
+                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.locations.map(loc => `
+                                <li data-village="${result.villageName}" data-district="${loc.district}" data-region-key="${loc.regionKey}" data-lot="${result.lotNumber || ''}">
+                                    ${loc.fullAddress} ${result.lotNumber || ''}
+                                </li>
+                            `).join(''));
+                            samplingLocationAutocomplete.classList.add('show');
+                        } else if (result.alternatives && result.alternatives.length > 1) {
+                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.alternatives.map(district => `
+                                <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber || ''}" data-region-key="${result.regionKey}">
+                                    ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
+                                </li>
+                            `).join(''));
+                            samplingLocationAutocomplete.classList.add('show');
+                        } else if (result.fullAddress) {
+                            samplingLocationAutocomplete.innerHTML = '';
+                            samplingLocationAutocomplete.classList.remove('show');
+                            samplingLocationInput.value = result.fullAddress;
+                        }
+                    }
+                }
+            }
+        });
 
-            const ws = XLSX.utils.json_to_sheet(excelData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, '등록결과');
+        samplingLocationAutocomplete.addEventListener('click', (e) => {
+            if (e.target.tagName === 'LI') {
+                const village = e.target.dataset.village;
+                const district = e.target.dataset.district;
+                const regionKey = e.target.dataset.regionKey;
+                const isMountain = e.target.dataset.isMountain === 'true';
+                const lot = e.target.dataset.lot;
 
-            const fileName = `중금속_등록결과_${currentRegistrationData.receptionNumber}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-            showToast('엑셀 파일이 다운로드되었습니다.', 'success');
+                const LOCAL_REGIONS = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
+                const region = e.target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
+
+                const villageWithMountain = isMountain ? `${village} 산` : village;
+
+                const currentValue = samplingLocationInput.value.trim();
+                const match = currentValue.match(/\d+(-\d+)?$/);
+                const lotNumber = lot || (match ? match[0] : '');
+
+                const fullAddress = lotNumber
+                    ? `${region} ${district} ${villageWithMountain} ${lotNumber}`
+                    : `${region} ${district} ${villageWithMountain}`;
+
+                samplingLocationInput.value = fullAddress;
+                samplingLocationAutocomplete.innerHTML = '';
+                samplingLocationAutocomplete.classList.remove('show');
+            }
+        });
+
+        samplingLocationInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                samplingLocationAutocomplete.innerHTML = '';
+                samplingLocationAutocomplete.classList.remove('show');
+            }, 200);
         });
     }
 
     // ========================================
-    // 초기 렌더링
+    // 작물 검색 모달
     // ========================================
+    setupCropSearch() {
+        const cropNameInput = document.getElementById('cropName');
+        const searchCropBtn = document.getElementById('searchCropBtn');
+        const cropModal = document.getElementById('cropModal');
 
-    // 초기 데이터 로드 (Firebase 우선)
-    await loadYearData(selectedYear);
-    updateSelectedItemsCount();
+        if (!searchCropBtn || !cropModal) return;
 
-    log('✅ 중금속 페이지 초기화 완료');
+        const closeCropModal = document.getElementById('closeCropModal');
+        const cancelCropSelection = document.getElementById('cancelCropSelection');
+        const confirmCropSelection = document.getElementById('confirmCropSelection');
+        const cropSearchInput = document.getElementById('cropSearchInput');
+        const cropList = document.getElementById('cropList');
+        const cropCategoryFilter = document.getElementById('cropCategoryFilter');
+        const cropResultCount = document.getElementById('cropResultCount');
+
+        let selectedCrop = null;
+
+        searchCropBtn.addEventListener('click', () => {
+            cropModal.classList.remove('hidden');
+            if (cropSearchInput) cropSearchInput.focus();
+            renderCropList();
+        });
+
+        function closeCropModalFn() {
+            cropModal.classList.add('hidden');
+        }
+
+        if (closeCropModal) closeCropModal.addEventListener('click', closeCropModalFn);
+        if (cancelCropSelection) cancelCropSelection.addEventListener('click', closeCropModalFn);
+        cropModal.querySelector('.modal-overlay')?.addEventListener('click', closeCropModalFn);
+
+        function renderCropList() {
+            if (!cropList || typeof CROP_DATA === 'undefined') return;
+
+            const searchTerm = cropSearchInput?.value.toLowerCase() || '';
+            const category = cropCategoryFilter?.value || '전체';
+            let crops = [];
+
+            if (cropCategoryFilter && cropCategoryFilter.options.length === 1) {
+                Object.keys(CROP_DATA).forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    cropCategoryFilter.appendChild(option);
+                });
+            }
+
+            if (category === '전체') {
+                Object.values(CROP_DATA).forEach(arr => crops.push(...arr));
+            } else {
+                crops = CROP_DATA[category] || [];
+            }
+
+            if (searchTerm) {
+                crops = crops.filter(c => c.toLowerCase().includes(searchTerm));
+            }
+
+            cropList.innerHTML = '';
+            crops.forEach(crop => {
+                const li = document.createElement('li');
+                li.textContent = crop;
+                li.className = selectedCrop === crop ? 'selected' : '';
+                li.addEventListener('click', () => {
+                    selectedCrop = crop;
+                    renderCropList();
+                });
+                cropList.appendChild(li);
+            });
+
+            if (cropResultCount) {
+                cropResultCount.textContent = `${crops.length}개 작물`;
+            }
+        }
+
+        if (cropSearchInput) cropSearchInput.addEventListener('input', renderCropList);
+        if (cropCategoryFilter) cropCategoryFilter.addEventListener('change', renderCropList);
+
+        if (confirmCropSelection) {
+            confirmCropSelection.addEventListener('click', () => {
+                if (selectedCrop && cropNameInput) {
+                    cropNameInput.value = selectedCrop;
+                }
+                closeCropModalFn();
+            });
+        }
+    }
+
+    // ========================================
+    // 검색 모달
+    // ========================================
+    setupSearchModal() {
+        const listSearchModal = document.getElementById('listSearchModal');
+        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
+        const closeSearchModal = document.getElementById('closeSearchModal');
+        const searchDateFromInput = document.getElementById('searchDateFromInput');
+        const searchDateToInput = document.getElementById('searchDateToInput');
+        const searchNameInput = document.getElementById('searchNameInput');
+        const searchReceptionFromInput = document.getElementById('searchReceptionFromInput');
+        const searchReceptionToInput = document.getElementById('searchReceptionToInput');
+        const clearSearchDate = document.getElementById('clearSearchDate');
+        const clearSearchReception = document.getElementById('clearSearchReception');
+        const applySearchBtn = document.getElementById('applySearchBtn');
+        const resetSearchBtn = document.getElementById('resetSearchBtn');
+        const completedFilter = document.getElementById('completedFilter');
+
+        if (completedFilter) {
+            completedFilter.addEventListener('change', (e) => {
+                this.currentSearchFilter.completed = e.target.value;
+                this.filterAndRenderLogs();
+            });
+        }
+
+        if (openSearchModalBtn && listSearchModal) {
+            openSearchModalBtn.addEventListener('click', () => {
+                if (searchDateFromInput) searchDateFromInput.value = this.currentSearchFilter.dateFrom;
+                if (searchDateToInput) searchDateToInput.value = this.currentSearchFilter.dateTo;
+                if (searchNameInput) searchNameInput.value = this.currentSearchFilter.name;
+                if (searchReceptionFromInput) searchReceptionFromInput.value = this.currentSearchFilter.receptionFrom;
+                if (searchReceptionToInput) searchReceptionToInput.value = this.currentSearchFilter.receptionTo;
+                listSearchModal.classList.remove('hidden');
+                if (searchNameInput) searchNameInput.focus();
+            });
+        }
+
+        if (closeSearchModal) {
+            closeSearchModal.addEventListener('click', () => listSearchModal.classList.add('hidden'));
+        }
+        listSearchModal?.querySelector('.modal-overlay')?.addEventListener('click', () => {
+            listSearchModal.classList.add('hidden');
+        });
+
+        if (clearSearchDate) {
+            clearSearchDate.addEventListener('click', () => {
+                if (searchDateFromInput) searchDateFromInput.value = '';
+                if (searchDateToInput) searchDateToInput.value = '';
+            });
+        }
+
+        if (clearSearchReception) {
+            clearSearchReception.addEventListener('click', () => {
+                if (searchReceptionFromInput) searchReceptionFromInput.value = '';
+                if (searchReceptionToInput) searchReceptionToInput.value = '';
+            });
+        }
+
+        if (applySearchBtn) {
+            applySearchBtn.addEventListener('click', () => {
+                this.currentSearchFilter.dateFrom = searchDateFromInput ? searchDateFromInput.value : '';
+                this.currentSearchFilter.dateTo = searchDateToInput ? searchDateToInput.value : '';
+                this.currentSearchFilter.name = searchNameInput ? searchNameInput.value.toLowerCase() : '';
+                this.currentSearchFilter.receptionFrom = searchReceptionFromInput ? searchReceptionFromInput.value : '';
+                this.currentSearchFilter.receptionTo = searchReceptionToInput ? searchReceptionToInput.value : '';
+                this.filterAndRenderLogs();
+                listSearchModal.classList.add('hidden');
+            });
+        }
+
+        if (resetSearchBtn) {
+            resetSearchBtn.addEventListener('click', () => {
+                if (searchDateFromInput) searchDateFromInput.value = '';
+                if (searchDateToInput) searchDateToInput.value = '';
+                if (searchNameInput) searchNameInput.value = '';
+                if (searchReceptionFromInput) searchReceptionFromInput.value = '';
+                if (searchReceptionToInput) searchReceptionToInput.value = '';
+                if (completedFilter) completedFilter.value = '';
+                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: '' };
+                this.filterAndRenderLogs();
+                this.updateSearchButtonState();
+                listSearchModal.classList.add('hidden');
+            });
+        }
+
+        // Enter 키로 검색
+        [searchNameInput, searchReceptionFromInput, searchReceptionToInput].forEach(input => {
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && applySearchBtn) applySearchBtn.click();
+                });
+            }
+        });
+    }
+
+    // ========================================
+    // 엑셀 내보내기
+    // ========================================
+    exportToExcel() {
+        const showToast = window.showToast;
+
+        if (this.sampleLogs.length === 0) {
+            showToast('내보낼 데이터가 없습니다.', 'error');
+            return;
+        }
+
+        const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.dataset.id);
+        const logsToExport = selectedIds.length > 0
+            ? this.sampleLogs.filter(log => selectedIds.includes(String(log.id)))
+            : this.sampleLogs;
+
+        if (selectedIds.length > 0) {
+            showToast(`선택한 ${logsToExport.length}건을 내보냅니다.`, 'info');
+        }
+
+        const exportData = logsToExport.map(log => {
+            const isAllItems = log.analysisItems && log.analysisItems.length === this.ANALYSIS_ITEMS.length;
+            const analysisDisplay = !log.analysisItems || log.analysisItems.length === 0
+                ? '-'
+                : isAllItems ? '전체 항목' : log.analysisItems.join(', ');
+
+            const addressParts = parseAddressParts(log.addressRoad || log.address || '');
+            const fullAddress = [log.addressRoad, log.addressDetail].filter(Boolean).join(' ') || '-';
+
+            const applicantType = log.applicantType || '개인';
+            const birthOrCorp = applicantType === '법인' ? (log.corpNumber || '-') : (log.birthDate || '-');
+
+            return {
+                '접수번호': log.receptionNumber || '-',
+                '접수일자': log.date || '-',
+                '성명': log.name || '-',
+                '법인여부': applicantType,
+                '생년월일/법인번호': birthOrCorp,
+                '연락처': log.phoneNumber || '-',
+                '우편번호': log.addressPostcode || '-',
+                '시도': addressParts.sido || '-',
+                '시군구': addressParts.sigungu || '-',
+                '읍면동': addressParts.eupmyeondong || '-',
+                '나머지주소': (addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-',
+                '전체주소': fullAddress,
+                '시료채취장소': log.samplingLocation || '-',
+                '재배작물': log.cropName || '-',
+                '과수년생': log.treeAge || '-',
+                '채취일': log.samplingDate || '-',
+                '시료수': log.sampleCount || '-',
+                '분석항목': analysisDisplay,
+                '목적': log.purpose || '-',
+                '수령방법': log.receptionMethod || '-',
+                '비고': log.note || '-',
+                '완료여부': log.isComplete ? '완료' : '미완료',
+                '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+
+        ws['!cols'] = [
+            { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 15 },
+            { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+            { wch: 25 }, { wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+            { wch: 8 }, { wch: 40 }, { wch: 15 }, { wch: 10 }, { wch: 20 },
+            { wch: 8 }, { wch: 20 }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, '토양중금속접수');
+
+        const fileName = `토양중금속_접수대장_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showToast('엑셀 파일이 다운로드되었습니다.', 'success');
+    }
+
+    // ========================================
+    // 엑셀 가져오기 (ExcelImportManager)
+    // ========================================
+    setupExcelImport() {
+        const ANALYSIS_ITEMS = this.ANALYSIS_ITEMS;
+
+        const parseAnalysisItems = (val) => {
+            if (!val) return ANALYSIS_ITEMS.slice();
+            const str = String(val).trim();
+            if (str === '전항목' || str === '전체' || str === 'all') return ANALYSIS_ITEMS.slice();
+            return str.split(/[,\s]+/).filter(item => ANALYSIS_ITEMS.includes(item.trim())).map(item => item.trim());
+        };
+
+        const excelImporter = new ExcelImportManager({
+            appFields: [
+                { key: 'receptionNumber', label: '접수번호' },
+                { key: 'date', label: '접수일자' },
+                { key: 'name', label: '성명' },
+                { key: 'phoneNumber', label: '전화번호' },
+                { key: 'address', label: '주소' },
+                { key: 'samplingLocation', label: '채취지(주소)' },
+                { key: 'cropName', label: '작물명' },
+                { key: 'samplingDate', label: '채취일' },
+                { key: 'analysisItems', label: '분석항목' },
+                { key: 'purpose', label: '목적(용도)' },
+                { key: 'receptionMethod', label: '수령방법' },
+                { key: 'note', label: '비고' }
+            ],
+            autoMapRules: {
+                '접수번호': 'receptionNumber', '번호': 'receptionNumber', 'no': 'receptionNumber',
+                '접수일자': 'date', '날짜': 'date', '일자': 'date',
+                '성명': 'name', '이름': 'name', '의뢰인': 'name',
+                '전화번호': 'phoneNumber', '연락처': 'phoneNumber', '전화': 'phoneNumber',
+                '주소': 'address', '의뢰인주소': 'address',
+                '채취지': 'samplingLocation', '채취장소': 'samplingLocation', '소재지': 'samplingLocation', '필지': 'samplingLocation',
+                '작물': 'cropName', '작물명': 'cropName', '재배작물': 'cropName',
+                '채취일': 'samplingDate', '채취일자': 'samplingDate',
+                '분석항목': 'analysisItems', '검사항목': 'analysisItems',
+                '목적': 'purpose', '용도': 'purpose', '목적(용도)': 'purpose',
+                '수령방법': 'receptionMethod', '수령 방법': 'receptionMethod', '통보방법': 'receptionMethod',
+                '비고': 'note', '메모': 'note'
+            },
+            templateConfig: {
+                headers: ['접수번호', '채취지(주소)', '작물명', '채취일', '분석항목', '목적(용도)', '비고'],
+                sampleRow: ['1', '봉화군 봉화읍 내성리 224', '사과', '2026-03-15', '전항목', '일반재배', ''],
+                colWidths: [
+                    { wch: 10 }, { wch: 30 }, { wch: 12 }, { wch: 12 },
+                    { wch: 12 }, { wch: 12 }, { wch: 20 }
+                ],
+                sheetName: '중금속시료',
+                fileName: '중금속_가져오기_서식'
+            },
+            previewColumns: [
+                { key: 'receptionNumber', label: '접수번호' },
+                { key: 'date', label: '접수일자' },
+                { key: 'name', label: '성명' },
+                { key: 'samplingLocation', label: '채취지' },
+                { key: 'cropName', label: '작물명' },
+                { key: 'analysisItems', label: '분석항목' },
+                { key: 'purpose', label: '목적' },
+                { key: 'note', label: '비고' }
+            ],
+            renderPreviewCell: (record, key) => {
+                if (key === 'analysisItems') {
+                    const items = record.analysisItems;
+                    return escapeHTML(items.length === ANALYSIS_ITEMS.length ? '전항목' : items.join(', '));
+                }
+                return undefined;
+            },
+            getCommonData: () => ({
+                date: document.getElementById('importDate').value || new Date().toISOString().slice(0, 10),
+                name: document.getElementById('importName').value.trim(),
+                phone: document.getElementById('importPhone').value.trim(),
+                address: document.getElementById('importAddress').value.trim(),
+                method: document.getElementById('importMethod').value,
+                purpose: document.getElementById('importPurpose').value,
+                now: new Date().toISOString()
+            }),
+            buildRecord: (getVal, parseExcelDate, common) => {
+                const receptionNumber = getVal('receptionNumber') || '';
+                const dateVal = getVal('date');
+                const date = parseExcelDate(dateVal) || common.date;
+                const name = getVal('name') || common.name;
+                const phoneNumber = getVal('phoneNumber') || common.phone;
+                const address = getVal('address') || common.address;
+                const samplingLocation = getVal('samplingLocation') || '';
+                const cropName = getVal('cropName') || '';
+                const samplingDateVal = getVal('samplingDate');
+                const samplingDate = parseExcelDate(samplingDateVal) || common.date;
+                const analysisItemsStr = getVal('analysisItems');
+                const analysisItems = parseAnalysisItems(analysisItemsStr);
+                const purpose = getVal('purpose') || common.purpose;
+                const receptionMethod = getVal('receptionMethod') || common.method;
+                const note = getVal('note') || '';
+
+                return {
+                    receptionNumber, date, name, phoneNumber,
+                    applicantType: '개인', birthDate: '', corpNumber: '',
+                    addressPostcode: '', addressRoad: address, addressDetail: '', address,
+                    samplingLocation, cropName, treeAge: 0, samplingDate,
+                    sampleCount: 1, analysisItems, purpose, receptionMethod, note,
+                    isComplete: false, createdAt: common.now
+                };
+            },
+            skipRowCheck: (record, rowIdx) => {
+                if (!record.samplingLocation && !record.cropName && !record.name) {
+                    return `행 ${rowIdx + 2}: 채취지, 작물명, 성명이 모두 비어 있어 건너뜁니다.`;
+                }
+                return null;
+            },
+            getExistingLogs: () => this.sampleLogs,
+            onImportComplete: (records) => {
+                records.forEach(logEntry => {
+                    logEntry.id = SampleUtils.generateUUID();
+                    this.sampleLogs.push(logEntry);
+                });
+                this.sampleLogs.sort((a, b) => {
+                    const numA = parseInt(a.receptionNumber) || 0;
+                    const numB = parseInt(b.receptionNumber) || 0;
+                    if (numA !== numB) return numA - numB;
+                    return (a.receptionNumber || '').localeCompare(b.receptionNumber || '');
+                });
+                this.listViewStale = true;
+                this.saveLogs();
+                this.renderLogs(this.sampleLogs);
+            }
+        });
+        excelImporter.init();
+    }
+}
+
+// ========================================
+// 인스턴스 생성 및 초기화
+// ========================================
+const heavyMetalManager = new HeavyMetalSampleManager();
+window.heavyMetalManager = heavyMetalManager;
+
+document.addEventListener('DOMContentLoaded', () => {
+    heavyMetalManager.init();
 });

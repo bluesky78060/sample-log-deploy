@@ -20,6 +20,8 @@ class BaseSampleManager {
         this.moduleKey = config.moduleKey;
         this.moduleName = config.moduleName;
         this.storageKey = config.storageKey;
+        this.sampleType = config.sampleType || config.moduleName;
+        this.autoSaveFile = config.autoSaveFile || `${config.moduleKey}-autosave.json`;
         this.debug = config.debug || false;
 
         // 상태
@@ -31,6 +33,11 @@ class BaseSampleManager {
         this.totalPages = 1;
         this.isCloudSyncing = false;
         this.cloudSyncPromise = null;  // Promise-based lock
+        this._listDirty = true;  // PER-5: 목록 뷰 리렌더 필요 여부
+        this._firebaseCache = new Map();  // PER-9: 연도별 Firebase 데이터 캐시
+
+        // PaginationManager 인스턴스
+        this.pagination = null;
 
         // DOM 참조 (서브클래스에서 설정)
         this.form = null;
@@ -57,35 +64,41 @@ class BaseSampleManager {
      */
     async init() {
         try {
-            this.log(` 초기화 시작`);
+            this.log('초기화 시작');
 
             // FileAPI 초기화
             if (this.FileAPI) {
                 await this.FileAPI.init(this.getCurrentYear());
             }
 
-            // Firebase 초기화
-            await this.initFirebase();
+            // Firebase + AutoSave 병렬 초기화
+            await Promise.all([
+                this.initFirebase(),
+                this.initAutoSave()
+            ]);
 
-            // 자동 저장 초기화
-            await this.initAutoSave();
-
-            // UI 초기화를 먼저 수행 (DOM 요소 캐싱)
+            // UI 초기화 (DOM 요소 캐싱)
             this.initUI();
 
             // 데이터가 있는 연도 찾기
             this.selectedYear = this.findYearWithData();
-            this.log(` 선택된 연도:`, this.selectedYear);
+            this.syncYearSelects(this.selectedYear);
+            this.log('선택된 연도:', this.selectedYear);
 
             // 선택된 연도의 데이터 로드
-            this.log(` loadYearData 호출 전`);
             await this.loadYearData(this.selectedYear);
-            this.log(` loadYearData 완료, 데이터 개수:`, this.sampleLogs ? this.sampleLogs.length : 0);
 
             // 이벤트 리스너 설정
             this.setupEventListeners();
 
-            this.log('✅ 매니저 초기화 완료');
+            // 타입별 추가 이벤트 (서브클래스 hook)
+            this.setupTypeSpecificEvents();
+
+            // hash 기반 뷰 전환
+            this.handleHashChange();
+            window.addEventListener('hashchange', () => this.handleHashChange());
+
+            this.log('초기화 완료');
         } catch (error) {
             (window.logger?.error || console.error)('매니저 초기화 실패:', error);
         }
@@ -110,6 +123,16 @@ class BaseSampleManager {
                 this.log('Firestore 초기화 결과:', window.firestoreInitialized);
             } catch (err) {
                 (window.logger?.error || console.error)('Firestore 초기화 에러:', err);
+            }
+        }
+
+        // 암호화 매니저 초기화 (테스트 전용)
+        if (window.firestoreInitialized && window.encryptionManager?.init) {
+            try {
+                await window.encryptionManager.init();
+                this.log('암호화 매니저 초기화 완료');
+            } catch (err) {
+                (window.logger?.error || console.error)('암호화 매니저 초기화 에러:', err);
             }
         }
     }
@@ -179,6 +202,12 @@ class BaseSampleManager {
      * 데이터 저장
      */
     async saveLogs() {
+        this._listDirty = true;  // PER-5: 데이터 변경 시 목록 리렌더 필요
+        this._firebaseCache.delete(this.selectedYear);  // PER-9: 캐시 무효화
+        // 저장 전 hook (서브클래스에서 데이터 가공)
+        const processed = this.onBeforeSave(this.sampleLogs);
+        if (processed) this.sampleLogs = processed;
+
         const yearStorageKey = this.getStorageKey(this.selectedYear);
 
         // ID 생성 (없는 경우)
@@ -217,6 +246,9 @@ class BaseSampleManager {
 
         // 레코드 수 업데이트
         this.updateRecordCount();
+
+        // 저장 후 hook
+        this.onAfterSave(this.sampleLogs);
     }
 
     /**
@@ -224,6 +256,8 @@ class BaseSampleManager {
      * @param {string} id - 삭제할 샘플 ID
      */
     async deleteSample(id) {
+        this._listDirty = true;  // PER-5
+        this._firebaseCache.delete(this.selectedYear);  // PER-9: 캐시 무효화
         // Firebase가 활성화되어 있으면 Firebase에서 먼저 삭제
         if (window.firebaseConfig?.isEnabled()) {
             try {
@@ -262,6 +296,7 @@ class BaseSampleManager {
      * @param {string} year - 연도
      */
     async loadYearData(year) {
+        this._listDirty = true;  // PER-5
         this.log(`📅 ${year}년 데이터 로드 시작`);
 
         try {
@@ -271,12 +306,17 @@ class BaseSampleManager {
             // Firebase가 활성화되어 있으면 Firebase에서 먼저 데이터 로드
             if (window.firebaseConfig?.isEnabled()) {
                 try {
-                    this.log(` Firebase에서 데이터 로드 시작`);
-                    const firebaseLogs = await this.loadFromFirebase(year);
+                    // PER-9: 세션 내 Firebase 캐시 확인
+                    const cached = this._firebaseCache.get(year);
+                    this.log(cached ? ` Firebase 캐시 사용 (${year}년)` : ` Firebase에서 데이터 로드 시작`);
+                    const firebaseLogs = cached || await this.loadFromFirebase(year);
 
                     if (firebaseLogs && firebaseLogs.length > 0) {
                         this.log(` Firebase 데이터:`, firebaseLogs.length, '건');
                         this.sampleLogs = firebaseLogs;
+
+                        // PER-9: 세션 내 Firebase 캐시에 저장
+                        if (!cached) this._firebaseCache.set(year, firebaseLogs);
 
                         // Firebase 데이터를 localStorage에 저장 (캐싱)
                         localStorage.setItem(yearStorageKey, JSON.stringify(firebaseLogs));
@@ -331,6 +371,20 @@ class BaseSampleManager {
             }
 
             this.log(` 최종 sampleLogs 설정:`, this.sampleLogs.length, '건');
+
+            // 공통 마이그레이션 적용
+            this.sampleLogs = this.migrateCompletedField(this.sampleLogs);
+
+            // 추가 마이그레이션 (서브클래스 hook)
+            const migrations = this.getAdditionalMigrations();
+            for (const migrate of migrations) {
+                const result = migrate(this.sampleLogs);
+                if (result) this.sampleLogs = result;
+            }
+
+            // 후처리 hook (예: water의 smartMerge)
+            const processed = this.onAfterLoad(this.sampleLogs, year);
+            if (processed) this.sampleLogs = processed;
 
             // UI 업데이트
             this.renderLogs(this.sampleLogs);
@@ -440,10 +494,18 @@ class BaseSampleManager {
     }
 
     /**
-     * 데이터 변경 감지
+     * 데이터 변경 감지 (최적화: 배열의 경우 id/updatedAt만 비교)
      */
     hasChanges(data1, data2) {
-        return JSON.stringify(data1) !== JSON.stringify(data2);
+        if (!Array.isArray(data1) || !Array.isArray(data2)) {
+            return JSON.stringify(data1) !== JSON.stringify(data2);
+        }
+        if (data1.length !== data2.length) return true;
+        for (let i = 0; i < data1.length; i++) {
+            if (data1[i].id !== data2[i].id) return true;
+            if (data1[i].updatedAt !== data2[i].updatedAt) return true;
+        }
+        return false;
     }
 
     // ========================================
@@ -476,7 +538,14 @@ class BaseSampleManager {
         } else {
             // 폴백: 기본 자동 저장 처리
             try {
-                const savedData = await this.FileAPI.loadAutoSave();
+                let savedData = await this.FileAPI.loadAutoSave();
+                if (savedData && window.CryptoUtils?.decryptFromFile) {
+                    try {
+                        savedData = await window.CryptoUtils.decryptFromFile(savedData);
+                    } catch (e) {
+                        this.log('자동 저장 복호화 실패:', e);
+                    }
+                }
                 if (savedData) {
                     this.lastSavedDataHash = this.hashData(savedData);
                 }
@@ -510,12 +579,24 @@ class BaseSampleManager {
      */
     async performAutoSave() {
         try {
+            // 자동 저장 활성화 여부 확인
+            const enabledKey = `${this.moduleKey}AutoSaveEnabled`;
+            if (localStorage.getItem(enabledKey) !== 'true') return;
+
             const currentDataHash = this.hashData(this.sampleLogs);
 
             // 데이터가 변경된 경우만 저장
             if (currentDataHash !== this.lastSavedDataHash) {
-                const content = JSON.stringify(this.sampleLogs, null, 2);
-                const result = await this.FileAPI.saveAutoSave(content);
+                const saveObj = {
+                    version: '2.0',
+                    exportDate: new Date().toISOString(),
+                    totalRecords: this.sampleLogs.length,
+                    data: this.sampleLogs
+                };
+                const content = window.CryptoUtils?.encryptForFile
+                    ? await window.CryptoUtils.encryptForFile(saveObj)
+                    : JSON.stringify(saveObj, null, 2);
+                const result = await this.FileAPI.autoSave(content);
 
                 if (result) {
                     this.lastSavedDataHash = currentDataHash;
@@ -659,9 +740,10 @@ class BaseSampleManager {
         if (targetView) targetView.classList.add('active');
         if (targetNav) targetNav.classList.add('active');
 
-        // 목록 뷰로 전환 시 테이블 새로고침
-        if (viewName === 'list') {
+        // 목록 뷰로 전환 시 변경된 경우에만 테이블 새로고침 (PER-5)
+        if (viewName === 'list' && this._listDirty) {
             this.renderLogs(this.sampleLogs);
+            this._listDirty = false;
         }
     }
 
@@ -802,7 +884,10 @@ class BaseSampleManager {
      * 고유 ID 생성
      */
     generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return (typeof SampleUtils !== 'undefined' && SampleUtils.generateUUID) ? SampleUtils.generateUUID() : crypto.randomUUID();
     }
 
     /**
@@ -823,7 +908,21 @@ class BaseSampleManager {
      * @abstract
      */
     renderLogs(logs) {
-        throw new Error('renderLogs must be implemented by subclass');
+        // 서브클래스의 prepareDataForRender hook (soil/pesticide: flattenLogsForTable)
+        const preparedData = this.prepareDataForRender(logs);
+
+        if (this.pagination) {
+            this.pagination.setData(preparedData);
+        } else {
+            // PaginationManager 없이 직접 렌더링 (폴백)
+            if (this.tableBody) {
+                this.tableBody.innerHTML = '';
+                preparedData.forEach((item, index) => {
+                    const row = this.buildTableRow(item, index);
+                    if (row) this.tableBody.appendChild(row);
+                });
+            }
+        }
     }
 
     /**
@@ -850,6 +949,82 @@ class BaseSampleManager {
         throw new Error('resetForm must be implemented by subclass');
     }
 
+    /**
+     * 테이블 행 빌드 (PaginationManager에서 호출)
+     * @abstract
+     * @param {Object} item - 데이터 항목
+     * @param {number} index - 인덱스
+     * @returns {HTMLElement} tr 요소
+     */
+    buildTableRow(item, index) {
+        // 서브클래스에서 구현 필요
+        // PaginationManager 미사용 시에는 구현하지 않아도 됨
+        return null;
+    }
+
+    /**
+     * 렌더링 전 데이터 가공 (soil/pesticide: flattenLogsForTable)
+     * @param {Array} logs - 원본 데이터
+     * @returns {Array} 가공된 데이터
+     */
+    prepareDataForRender(logs) {
+        return logs;
+    }
+
+    /**
+     * 추가 마이그레이션 함수 목록 (pesticide: migrateProducerAddress 등)
+     * @returns {Array<Function>} 마이그레이션 함수 배열
+     */
+    getAdditionalMigrations() {
+        return [];
+    }
+
+    /**
+     * 공통 completed 필드 마이그레이션
+     * @param {Array} logs - 데이터
+     * @returns {Array} 마이그레이션된 데이터
+     */
+    migrateCompletedField(logs) {
+        if (!Array.isArray(logs)) return logs;
+        return logs.map(log => {
+            if (log.completed === undefined) {
+                return { ...log, completed: false };
+            }
+            return log;
+        });
+    }
+
+    /**
+     * hash 기반 뷰 전환
+     */
+    handleHashChange() {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+            this.switchView(hash);
+        }
+    }
+
+    /**
+     * 타입별 추가 이벤트 설정 (서브클래스에서 override)
+     */
+    setupTypeSpecificEvents() {
+        // 서브클래스에서 오버라이드
+    }
+
+    /**
+     * 페이지 변경 시 콜백 (서브클래스에서 override)
+     */
+    onPageChange(page, pageData) {
+        // 서브클래스에서 오버라이드 가능
+    }
+
+    /**
+     * 데이터 로드 후처리 hook
+     */
+    onAfterLoad(data, year) {
+        return data;
+    }
+
     // ========================================
     // Hook 메서드 (선택적 오버라이드)
     // ========================================
@@ -865,7 +1040,23 @@ class BaseSampleManager {
      * 페이지네이션 초기화
      */
     initPagination() {
-        // 서브클래스에서 오버라이드 가능
+        if (!window.PaginationManager) return;
+
+        this.pagination = new window.PaginationManager({
+            storageKey: `${this.moduleKey}ItemsPerPage`,
+            defaultItemsPerPage: 100,
+            onPageChange: (page, pageData) => {
+                this.onPageChange(page, pageData);
+            },
+            renderRow: (item, index) => {
+                return this.buildTableRow(item, index);
+            }
+        });
+
+        this.pagination.setTableElements(
+            this.tableBody,
+            this.emptyState
+        );
     }
 
     /**
@@ -932,9 +1123,5 @@ class BaseSampleManager {
     }
 }
 
-// 전역으로 내보내기
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = BaseSampleManager;
-} else {
-    window.BaseSampleManager = BaseSampleManager;
-}
+// 전역으로 내보내기 (Vite 번들 환경에서도 window에 노출)
+window.BaseSampleManager = BaseSampleManager;

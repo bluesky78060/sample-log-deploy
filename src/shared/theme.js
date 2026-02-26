@@ -17,9 +17,8 @@ const ThemeManager = {
         if (savedTheme) {
             this.setTheme(savedTheme);
         } else {
-            // 시스템 다크 모드 설정 확인
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            this.setTheme(prefersDark ? 'dark' : 'light');
+            // 저장된 설정 없으면 라이트 모드 기본값
+            this.setTheme('light');
         }
 
         // 시스템 테마 변경 감지
@@ -93,47 +92,47 @@ const ThemeManager = {
 
         if (body.classList.contains('soil-page')) {
             return {
-                bg: 'rgba(20, 83, 45, 0.95)',
-                text: '#86efac',
-                border: 'rgba(34, 197, 94, 0.4)',
-                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2386efac' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
+                bg: '#292524',
+                text: '#D6D3D1',
+                border: '#57534E',
+                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23D6D3D1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
             };
         } else if (body.classList.contains('compost-page')) {
             return {
-                bg: 'rgba(69, 26, 3, 0.95)',
-                text: '#fcd34d',
-                border: 'rgba(217, 119, 6, 0.4)',
-                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23fcd34d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
+                bg: '#292524',
+                text: '#D6D3D1',
+                border: '#57534E',
+                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23D6D3D1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
             };
         } else if (body.classList.contains('pesticide-page')) {
             return {
-                bg: 'rgba(59, 7, 100, 0.95)',
-                text: '#e9d5ff',
-                border: 'rgba(168, 85, 247, 0.4)',
-                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23e9d5ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
+                bg: '#292524',
+                text: '#D6D3D1',
+                border: '#57534E',
+                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23D6D3D1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
             };
         } else if (body.classList.contains('water-page')) {
             return {
-                bg: 'rgba(30, 41, 59, 0.95)',
-                text: '#93c5fd',
-                border: 'rgba(59, 130, 246, 0.4)',
-                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2393c5fd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
+                bg: '#292524',
+                text: '#D6D3D1',
+                border: '#57534E',
+                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23D6D3D1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
             };
         } else if (body.classList.contains('heavy-metal-page')) {
             return {
-                bg: 'rgba(30, 27, 46, 0.95)',
-                text: '#c4b5fd',
-                border: 'rgba(139, 92, 246, 0.4)',
-                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23c4b5fd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
+                bg: '#292524',
+                text: '#D6D3D1',
+                border: '#57534E',
+                arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23D6D3D1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
             };
         }
 
-        // 기본값 (다크 그레이)
+        // 기본값 (warm dark)
         return {
-            bg: '#2a2a2e',
-            text: '#e2e8f0',
-            border: '#4a4a50',
-            arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
+            bg: '#292524',
+            text: '#D6D3D1',
+            border: '#57534E',
+            arrow: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A8A29E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")"
         };
     },
 

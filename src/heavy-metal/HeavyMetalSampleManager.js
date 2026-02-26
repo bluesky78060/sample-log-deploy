@@ -142,8 +142,8 @@ class HeavyMetalSampleManager extends BaseSampleManager {
         addressModal.style.display = 'block';
 
         // Daum 우편번호 API 초기화
-        if (window.daum && window.daum.Postcode) {
-            new window.daum.Postcode({
+        if (window.kakao && window.kakao.Postcode) {
+            new window.kakao.Postcode({
                 oncomplete: (data) => {
                     document.getElementById('addressPostcode').value = data.zonecode;
                     document.getElementById('addressRoad').value = data.roadAddress;

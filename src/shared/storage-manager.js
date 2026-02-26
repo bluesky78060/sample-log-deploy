@@ -48,28 +48,100 @@ window.addEventListener('offline', () => {
 
 /**
  * 스토리지 매니저 초기화
+ * 저장된 모드가 있으면 우선 복원, 없으면 자동 감지
  * @returns {Promise<string>} 현재 스토리지 모드
  */
 async function initStorageManager() {
-    // Firebase 초기화 시도 (인증 파일에서 설정을 로드함)
+    // 1. 저장된 모드 복원 시도
+    const savedMode = localStorage.getItem('storageMode');
+    const validModes = Object.values(STORAGE_MODE);
+
+    // 2. Firebase 초기화 시도 (인증 파일에서 설정을 로드함)
+    let firebaseReady = false;
     if (window.firebaseConfig?.initialize) {
         try {
             const initialized = await window.firebaseConfig.initialize();
             if (initialized) {
                 await window.firestoreDb?.init();
-                currentMode = STORAGE_MODE.CLOUD_SYNC;
-                logStorage('클라우드 동기화 모드');
+                firebaseReady = true;
             }
         } catch (err) {
             (window.logger?.warn || console.warn)('[Storage] Firebase 초기화 실패:', err);
         }
     }
 
-    if (currentMode === STORAGE_MODE.LOCAL_ONLY) {
-        logStorage('로컬 전용 모드');
+    // 3. 모드 결정
+    if (savedMode && validModes.includes(savedMode)) {
+        // 저장된 모드가 cloud 계열인데 Firebase가 안 되면 local로 폴백
+        if ((savedMode === STORAGE_MODE.CLOUD_SYNC || savedMode === STORAGE_MODE.CLOUD_ONLY) && !firebaseReady) {
+            currentMode = STORAGE_MODE.LOCAL_ONLY;
+            logStorage('저장된 모드가 클라우드이지만 Firebase 미연결 → 로컬 폴백');
+        } else {
+            currentMode = savedMode;
+            logStorage(`저장된 모드 복원: ${savedMode}`);
+        }
+    } else {
+        // 저장된 모드 없음 → 자동 감지 (기존 로직)
+        currentMode = firebaseReady ? STORAGE_MODE.CLOUD_SYNC : STORAGE_MODE.LOCAL_ONLY;
+        logStorage(firebaseReady ? '클라우드 동기화 모드 (자동 감지)' : '로컬 전용 모드 (자동 감지)');
     }
 
     return currentMode;
+}
+
+/**
+ * 스토리지 모드 변경 + localStorage에 영구 저장
+ * @param {string} mode - STORAGE_MODE 값 ('local', 'cloud', 'cloudOnly')
+ * @returns {{success: boolean, message: string}}
+ */
+function setStorageMode(mode) {
+    const validModes = Object.values(STORAGE_MODE);
+    if (!validModes.includes(mode)) {
+        return { success: false, message: `유효하지 않은 모드: ${mode}` };
+    }
+
+    // cloud 계열 선택 시 Firebase 확인
+    if ((mode === STORAGE_MODE.CLOUD_SYNC || mode === STORAGE_MODE.CLOUD_ONLY) && !window.firestoreDb?.isEnabled()) {
+        return { success: false, message: 'Firebase가 연결되지 않아 클라우드 모드를 사용할 수 없습니다.' };
+    }
+
+    currentMode = mode;
+    localStorage.setItem('storageMode', mode);
+    logStorage(`모드 변경: ${mode}`);
+
+    // 모드 변경 이벤트 발생
+    window.dispatchEvent(new CustomEvent('storage-mode-changed', { detail: { mode } }));
+
+    return { success: true, message: `저장 모드가 변경되었습니다: ${mode}` };
+}
+
+/**
+ * 사용 가능한 모드 목록 반환 (UI에서 사용)
+ * @returns {Array<{value: string, label: string, description: string, available: boolean}>}
+ */
+function getAvailableModes() {
+    const firebaseConnected = window.firestoreDb?.isEnabled() || false;
+
+    return [
+        {
+            value: STORAGE_MODE.LOCAL_ONLY,
+            label: '로컬 저장소만',
+            description: '이 컴퓨터에만 저장됩니다. 오프라인에서 완전히 동작하며, 다른 기기와 데이터를 공유할 수 없습니다.',
+            available: true
+        },
+        {
+            value: STORAGE_MODE.CLOUD_SYNC,
+            label: '클라우드 동기화',
+            description: '로컬 + Firebase에 동시 저장합니다. 오프라인에서도 작동하며, 온라인 시 자동으로 동기화됩니다.',
+            available: firebaseConnected
+        },
+        {
+            value: STORAGE_MODE.CLOUD_ONLY,
+            label: '클라우드 전용',
+            description: 'Firebase에만 저장합니다. 인터넷 연결이 필수이며, 오프라인 시 데이터 접근이 제한됩니다.',
+            available: firebaseConnected
+        }
+    ];
 }
 
 /**
@@ -265,7 +337,13 @@ async function triggerSync() {
  * @returns {string} 고유 ID
  */
 function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+    if (typeof window !== 'undefined' && window.SampleUtils?.generateUUID) {
+        return window.SampleUtils.generateUUID();
+    }
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return Date.now().toString(36) + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(36)).join('').substring(0, 9);
 }
 
 /**
@@ -308,6 +386,8 @@ window.storageManager = {
     migrate: migrateToCloud,
     sync: triggerSync,
     getMode: getStorageMode,
+    setMode: setStorageMode,
+    getAvailableModes: getAvailableModes,
     getStatus: getSyncStatus,
     isCloudEnabled: isCloudSyncEnabled,
     generateId: generateId,

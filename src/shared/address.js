@@ -63,7 +63,7 @@ class AddressManager {
      * 주소 검색 모달 열기
      */
     openSearch() {
-        if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
+        if (typeof kakao === 'undefined' || typeof kakao.Postcode === 'undefined') {
             alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
             return;
         }
@@ -79,7 +79,7 @@ class AddressManager {
         }
 
         // Daum Postcode 임베드
-        new daum.Postcode({
+        new kakao.Postcode({
             oncomplete: (data) => this.onAddressSelected(data)
         }).embed(this.container);
     }

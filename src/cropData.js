@@ -275,3 +275,7 @@ const CROP_CATEGORIES = [
     '특용작물',
     '사료작물'
 ];
+
+// ESM 모듈 스코프에서도 다른 스크립트가 접근할 수 있도록 window에 등록
+window.CROP_DATA = CROP_DATA;
+window.CROP_CATEGORIES = CROP_CATEGORIES;

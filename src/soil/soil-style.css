@@ -13,18 +13,18 @@
 
 /* 네비게이션 바 토양 테마 */
 .soil-navbar {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border-bottom: 2px solid var(--soil-primary-light);
+    background: linear-gradient(135deg, #f0f7f1 0%, #FAF8F5 100%);
+    border-bottom: 1px solid #d5e0d8;
 }
 
 .soil-navbar .brand-icon {
-    font-size: 1.5rem;
+    font-size: 1.15rem;
 }
 
 .soil-navbar .brand-text {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: var(--soil-primary-dark);
+    color: #2D2D2D;
     margin-left: 0.25rem;
 }
 
@@ -33,34 +33,33 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
     background: white;
-    color: var(--soil-primary-dark);
+    color: #2D2D2D;
     text-decoration: none;
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 600;
-    margin-right: 0.5rem;
-    border: 1px solid var(--soil-primary-light);
+    margin-right: 0.35rem;
+    border: 1px solid #E8E4DF;
     transition: all 0.2s ease;
 }
 
 .back-btn:hover {
-    background: var(--soil-primary);
-    color: white;
-    border-color: var(--soil-primary);
+    background: #F5F3EF;
+    color: #7C9082;
 }
 
 /* 네비게이션 버튼 활성화 */
 .soil-navbar .nav-btn.active {
-    background: var(--soil-gradient);
+    background: #7C9082;
 }
 
 /* 폼 카드 헤더 토양 테마 */
 .soil-navbar ~ .main-content .form-card .card-header {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border-bottom: 1px solid var(--soil-primary-light);
+    background: linear-gradient(135deg, #f0f7f1 0%, #FAF8F5 100%);
+    border-bottom: 1px solid #d5e0d8;
 }
 
 .soil-navbar ~ .main-content .form-card .card-header h3 {
@@ -93,11 +92,11 @@
 
 /* 액션 버튼 토양 테마 */
 .soil-navbar .action-btn-icon.submit {
-    background: var(--soil-gradient);
+    background: #7C9082;
 }
 
 .soil-navbar .action-btn-icon.submit:hover {
-    background: linear-gradient(135deg, #16A34A, #15803D);
+    background: #6A7D70;
 }
 
 /* 검색 버튼 토양 테마 */
@@ -161,8 +160,8 @@
 .soil-navbar ~ .main-content input:focus,
 .soil-navbar ~ .main-content select:focus,
 .soil-navbar ~ .main-content textarea:focus {
-    border-color: var(--soil-primary);
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+    border-color: #7C9082;
+    box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12);
 }
 
 /* 테이블 행 구분선 */
@@ -246,20 +245,20 @@
 select#yearSelect.year-select,
 select#listYearSelect.list-year-select {
     background: white !important;
-    color: var(--soil-primary-dark) !important;
-    border: 2px solid var(--soil-primary) !important;
+    color: #2D2D2D !important;
+    border: 1px solid #E8E4DF !important;
     padding: 0.4rem 0.8rem !important;
-    border-radius: 6px !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
+    border-radius: 1.5rem !important;
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
     cursor: pointer !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2322C55E' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A8A8A' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 8px center !important;
-    background-size: 12px 12px !important;
+    background-position: right 10px center !important;
+    background-size: 10px 10px !important;
     padding-right: 1.8rem !important;
     transition: all 0.2s ease !important;
 }
@@ -271,20 +270,20 @@ select#listYearSelect.list-year-select {
 /* 목적(용도) 필터 드롭다운 - ID 선택자로 최우선 적용 */
 select#purposeFilter.purpose-filter {
     background: white !important;
-    color: var(--soil-primary-dark) !important;
-    border: 2px solid var(--soil-primary) !important;
+    color: #2D2D2D !important;
+    border: 1px solid #E8E4DF !important;
     padding: 0.4rem 0.8rem !important;
-    border-radius: 6px !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
+    border-radius: 1.5rem !important;
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
     cursor: pointer !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2322C55E' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A8A8A' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 8px center !important;
-    background-size: 12px 12px !important;
+    background-position: right 10px center !important;
+    background-size: 10px 10px !important;
     padding-right: 1.8rem !important;
     transition: all 0.2s ease !important;
     margin-left: 0.5rem !important;
@@ -296,48 +295,51 @@ select#purposeFilter.purpose-filter::-ms-expand {
 }
 
 select#purposeFilter.purpose-filter:hover {
-    background: var(--soil-primary-light) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+    border-color: #D5D0CA !important;
+    transform: none;
+    box-shadow: none;
 }
 
 select#purposeFilter.purpose-filter:focus {
     outline: none !important;
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+    border-color: #7C9082 !important;
+    box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12) !important;
 }
 
 select#purposeFilter.purpose-filter option {
     background: white !important;
-    color: var(--soil-primary-dark) !important;
+    color: #2D2D2D !important;
     font-weight: 500 !important;
 }
 
 select#purposeFilter.purpose-filter.has-filter {
-    background-color: var(--soil-primary) !important;
-    color: white !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-color: rgba(124, 144, 130, 0.08) !important;
+    color: #7C9082 !important;
+    border-color: #7C9082 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237C9082' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 8px center !important;
-    background-size: 12px 12px !important;
+    background-position: right 10px center !important;
+    background-size: 10px 10px !important;
 }
 
 select#yearSelect.year-select:hover,
 select#listYearSelect.list-year-select:hover {
-    background: var(--soil-primary-light) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+    border-color: #D5D0CA !important;
+    transform: none;
+    box-shadow: none;
 }
 
 select#yearSelect.year-select:focus,
 select#listYearSelect.list-year-select:focus {
     outline: none !important;
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+    border-color: #7C9082 !important;
+    box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12) !important;
 }
 
 select#yearSelect.year-select option,
 select#listYearSelect.list-year-select option {
     background: white !important;
-    color: var(--soil-primary-dark) !important;
+    color: #2D2D2D !important;
     font-weight: 500 !important;
 }
 
@@ -347,33 +349,33 @@ select#listYearSelect.list-year-select option {
 
 /* 다크 모드 네비게이션 바 */
 [data-theme="dark"] .soil-navbar {
-    background: linear-gradient(135deg, #14532d 0%, #052e16 100%);
-    border-bottom-color: rgba(34, 197, 94, 0.3);
+    background: rgba(41, 37, 36, 0.95);
+    border-bottom: 1px solid rgba(124, 144, 130, 0.2);
 }
 
 [data-theme="dark"] .soil-navbar .brand-text {
-    color: #86efac;
+    color: #D6D3D1;
 }
 
 [data-theme="dark"] .back-btn {
-    background: rgba(34, 197, 94, 0.15);
-    color: #86efac;
-    border-color: rgba(34, 197, 94, 0.3);
+    background: rgba(124, 144, 130, 0.1);
+    color: #D6D3D1;
+    border-color: rgba(124, 144, 130, 0.25);
 }
 
 [data-theme="dark"] .back-btn:hover {
-    background: var(--soil-primary);
-    color: white;
+    background: rgba(124, 144, 130, 0.2);
+    color: #7C9082;
 }
 
 /* 다크 모드 카드 헤더 */
 [data-theme="dark"] .soil-navbar ~ .main-content .form-card .card-header {
-    background: linear-gradient(135deg, rgba(20, 83, 45, 0.95) 0%, rgba(5, 46, 22, 0.95) 100%);
-    border-bottom-color: rgba(34, 197, 94, 0.2);
+    background: rgba(41, 37, 36, 0.8);
+    border-bottom-color: rgba(124, 144, 130, 0.2);
 }
 
 [data-theme="dark"] .soil-navbar ~ .main-content .form-card .card-header h3 {
-    color: #86efac;
+    color: #D6D3D1;
 }
 
 /* 다크 모드 년도 선택 - ID 선택자로 최우선 적용 */
@@ -382,30 +384,31 @@ select#listYearSelect.list-year-select option {
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
-    background-color: rgba(34, 197, 94, 0.15) !important;
-    color: #86efac !important;
-    border-color: rgba(34, 197, 94, 0.4) !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386efac' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-color: #2a2a30 !important;
+    color: #e5e7eb !important;
+    border-color: #4b5563 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A8A8A' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 8px center !important;
-    background-size: 12px 12px !important;
+    background-position: right 10px center !important;
+    background-size: 10px 10px !important;
 }
 
 [data-theme="dark"] select#yearSelect.year-select:hover,
 [data-theme="dark"] select#listYearSelect.list-year-select:hover {
-    background-color: rgba(34, 197, 94, 0.25) !important;
+    border-color: #7C9082 !important;
+    box-shadow: none !important;
 }
 
 [data-theme="dark"] select#yearSelect.year-select:focus,
 [data-theme="dark"] select#listYearSelect.list-year-select:focus {
-    border-color: #22c55e !important;
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+    border-color: #7C9082 !important;
+    box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.2) !important;
 }
 
 [data-theme="dark"] select#yearSelect.year-select option,
 [data-theme="dark"] select#listYearSelect.list-year-select option {
-    background-color: #14532d !important;
-    color: #86efac !important;
+    background-color: #2a2a30 !important;
+    color: #e5e7eb !important;
 }
 
 /* 다크 모드 목적 필터 - ID 선택자로 최우선 적용 */
@@ -413,36 +416,38 @@ select#listYearSelect.list-year-select option {
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
-    background-color: rgba(34, 197, 94, 0.15) !important;
-    color: #86efac !important;
-    border-color: rgba(34, 197, 94, 0.4) !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386efac' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-color: #2a2a30 !important;
+    color: #e5e7eb !important;
+    border-color: #4b5563 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A8A8A' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 8px center !important;
-    background-size: 12px 12px !important;
+    background-position: right 10px center !important;
+    background-size: 10px 10px !important;
 }
 
 [data-theme="dark"] select#purposeFilter.purpose-filter:hover {
-    background-color: rgba(34, 197, 94, 0.25) !important;
+    border-color: #7C9082 !important;
+    box-shadow: none !important;
 }
 
 [data-theme="dark"] select#purposeFilter.purpose-filter:focus {
-    border-color: #22c55e !important;
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+    border-color: #7C9082 !important;
+    box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.2) !important;
 }
 
 [data-theme="dark"] select#purposeFilter.purpose-filter option {
-    background-color: #14532d !important;
-    color: #86efac !important;
+    background-color: #2a2a30 !important;
+    color: #e5e7eb !important;
 }
 
 [data-theme="dark"] select#purposeFilter.purpose-filter.has-filter {
-    background-color: rgba(34, 197, 94, 0.6) !important;
-    color: white !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
+    background-color: rgba(124, 144, 130, 0.2) !important;
+    color: #a3b8a9 !important;
+    border-color: #7C9082 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a3b8a9' d='M6 8L2 4h8z'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 8px center !important;
-    background-size: 12px 12px !important;
+    background-position: right 10px center !important;
+    background-size: 10px 10px !important;
 }
 
 /* 다크 모드 select 공통 (subCategory, purpose 등) */
@@ -858,6 +863,310 @@ select#listYearSelect.list-year-select option {
     color: #86efac;
 }
 
+/* ========================================
+   엑셀 가져오기 모달 스타일
+   ======================================== */
+
+.modal-content.modal-xlarge {
+    max-width: 900px;
+    width: 95%;
+}
+
+.import-step-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--soil-primary-dark);
+    margin-bottom: 0.25rem;
+}
+
+.import-step-desc {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+}
+
+.import-common-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.import-field-row {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.import-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.import-field label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.import-field label .required {
+    color: #ef4444;
+}
+
+.import-field input,
+.import-field select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+.import-field input:focus,
+.import-field select:focus {
+    border-color: var(--soil-primary);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+    outline: none;
+}
+
+/* 서식 다운로드 */
+.import-template-area {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #f0fdf4;
+    border: 1px dashed var(--soil-primary);
+    border-radius: 8px;
+}
+
+.btn-template-download {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 1.5px solid var(--soil-primary);
+    border-radius: 6px;
+    color: var(--soil-primary-dark);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-template-download:hover {
+    background: var(--soil-primary);
+    color: white;
+}
+
+.template-hint {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+[data-theme="dark"] .import-template-area {
+    background: rgba(20, 83, 45, 0.2);
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+[data-theme="dark"] .btn-template-download {
+    background: rgba(20, 83, 45, 0.6);
+    border-color: rgba(34, 197, 94, 0.5);
+    color: #86efac;
+}
+
+[data-theme="dark"] .btn-template-download:hover {
+    background: var(--soil-primary);
+    color: white;
+}
+
+[data-theme="dark"] .template-hint {
+    color: #94a3b8;
+}
+
+/* 컬럼 매핑 */
+.column-mapping-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #f9fafb;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+}
+
+.mapping-row.mapped {
+    background: #f0fdf4;
+    border-color: var(--soil-primary-light);
+}
+
+.mapping-excel-col {
+    flex: 0 0 160px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #1f2937;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mapping-arrow {
+    flex: 0 0 24px;
+    text-align: center;
+    color: #9ca3af;
+}
+
+.mapping-select {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+}
+
+.mapping-select:focus {
+    border-color: var(--soil-primary);
+    outline: none;
+}
+
+.mapping-sample {
+    flex: 0 0 180px;
+    font-size: 0.75rem;
+    color: #6b7280;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 미리보기 테이블 */
+.preview-table-wrap {
+    max-height: 400px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.preview-table th {
+    position: sticky;
+    top: 0;
+    background: #f0fdf4;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--soil-primary-dark);
+    border-bottom: 2px solid var(--soil-primary-light);
+    white-space: nowrap;
+}
+
+.preview-table td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-table tbody tr:hover {
+    background: rgba(34, 197, 94, 0.05);
+}
+
+.import-warnings {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    color: #92400e;
+}
+
+.modal-footer-spacer {
+    flex: 1;
+}
+
+/* 다크 모드 엑셀 가져오기 */
+[data-theme="dark"] .import-step-title {
+    color: #86efac;
+}
+
+[data-theme="dark"] .import-step-desc {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .import-field label {
+    color: #d1d5db;
+}
+
+[data-theme="dark"] .import-field input,
+[data-theme="dark"] .import-field select {
+    background-color: rgba(20, 83, 45, 0.9);
+    color: #e2e8f0;
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+[data-theme="dark"] .mapping-row {
+    background: rgba(20, 83, 45, 0.2);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .mapping-row.mapped {
+    background: rgba(20, 83, 45, 0.4);
+}
+
+[data-theme="dark"] .mapping-excel-col {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .mapping-select {
+    background-color: rgba(20, 83, 45, 0.9);
+    color: #e2e8f0;
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+[data-theme="dark"] .mapping-sample {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .preview-table-wrap {
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .preview-table th {
+    background: rgba(20, 83, 45, 0.6);
+    color: #86efac;
+    border-bottom-color: rgba(34, 197, 94, 0.4);
+}
+
+[data-theme="dark"] .preview-table td {
+    border-bottom-color: rgba(34, 197, 94, 0.15);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .preview-table tbody tr:hover {
+    background: rgba(34, 197, 94, 0.1);
+}
+
+[data-theme="dark"] .import-warnings {
+    background: rgba(146, 64, 14, 0.2);
+    border-color: rgba(252, 211, 77, 0.3);
+    color: #fcd34d;
+}
+
 /* 주소 컬럼 스타일 - 고정 너비 두 줄 표시 */
 .soil-navbar ~ .main-content .col-address {
     width: 250px;
@@ -871,4 +1180,70 @@ select#listYearSelect.list-year-select option {
     white-space: normal;
     word-break: keep-all;
     line-height: 1.4;
+}
+
+/* 농가별 구분선 */
+tr.farm-separator {
+    height: 6px;
+    background: linear-gradient(to right, transparent, var(--soil-primary-light), transparent);
+    pointer-events: none;
+}
+
+tr.farm-separator td {
+    padding: 0 !important;
+    border: none !important;
+    background: linear-gradient(to right, transparent 5%, var(--soil-primary) 20%, var(--soil-primary) 80%, transparent 95%);
+    height: 2px;
+    line-height: 0;
+    font-size: 0;
+}
+
+tr.farm-separator:hover {
+    background: linear-gradient(to right, transparent, var(--soil-primary-light), transparent);
+}
+
+[data-theme="dark"] tr.farm-separator {
+    background: linear-gradient(to right, transparent, rgba(139, 92, 246, 0.15), transparent);
+}
+
+[data-theme="dark"] tr.farm-separator td {
+    background: linear-gradient(to right, transparent 5%, rgba(139, 92, 246, 0.5) 20%, rgba(139, 92, 246, 0.5) 80%, transparent 95%);
+}
+
+[data-theme="dark"] tr.farm-separator:hover {
+    background: linear-gradient(to right, transparent, rgba(139, 92, 246, 0.2), transparent);
+}
+
+/* 성명 셀 - 일괄 선택 클릭 */
+.col-name {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
+}
+.col-name:hover {
+    background-color: rgba(107, 74, 34, 0.08);
+    text-decoration: underline;
+}
+[data-theme="dark"] .col-name:hover {
+    background-color: rgba(139, 92, 246, 0.15);
+}
+
+/* 선택 카운트 배지 */
+.selected-count-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: #4a90d9;
+    color: white;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    animation: fadeIn 0.2s ease;
+}
+[data-theme="dark"] .selected-count-badge {
+    background: #7c5ce7;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
 }

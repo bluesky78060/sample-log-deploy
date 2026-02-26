@@ -98,3 +98,4 @@ firebase-auth.json
 
 # 네트워크 접근 제어 설정 (내부 IP 정보)
 **/network-config.js
+auto-save-*.json

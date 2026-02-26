@@ -7,16 +7,6 @@
 // 정규식 상수 - 모듈 레벨 호이스팅 (js-hoist-regexp)
 // ========================================
 const REGEX_NON_DIGIT = /[^\d]/g;
-const REGEX_HTML_ESCAPE = /[&<>"']/g;
-
-// HTML 이스케이프 매핑
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-};
 
 // ========================================
 // 전역 에러 핸들러
@@ -462,7 +452,13 @@ async function loadFromAutoSaveFile(FileAPI, log = console.log) {
     try {
         const content = await FileAPI.loadAutoSave();
         if (content) {
-            const parsed = JSON.parse(content);
+            let parsed;
+            if (window.CryptoUtils?.decryptFromFile) {
+                parsed = await window.CryptoUtils.decryptFromFile(content);
+            } else {
+                parsed = JSON.parse(content);
+            }
+            if (!parsed) return null;
             const loadedData = parsed.data || parsed;
             if (Array.isArray(loadedData) && loadedData.length > 0) {
                 log('📂 자동 저장 파일에서 데이터 로드:', loadedData.length, '건');
@@ -491,12 +487,15 @@ async function performAutoSave(options) {
 
     if (localStorage.getItem(enabledKey) !== 'true') return false;
 
-    const saveData = JSON.stringify({
+    const saveObj = {
         version: '2.0',
         exportDate: new Date().toISOString(),
         totalRecords: data.length,
         data: data
-    }, null, 2);
+    };
+    const saveData = window.CryptoUtils?.encryptForFile
+        ? await window.CryptoUtils.encryptForFile(saveObj)
+        : JSON.stringify(saveObj, null, 2);
 
     try {
         updateAutoSaveStatus('saving');
@@ -723,17 +722,6 @@ function createLogger(debug) {
 }
 
 /**
- * HTML 이스케이프 (XSS 방지)
- * 성능 최적화: 단일 정규식과 매핑 객체 사용 (js-hoist-regexp)
- * @param {string} str - 이스케이프할 문자열
- * @returns {string} 이스케이프된 문자열
- */
-function escapeHTML(str) {
-    if (str === null || str === undefined) return '';
-    return String(str).replace(REGEX_HTML_ESCAPE, char => HTML_ESCAPE_MAP[char]);
-}
-
-/**
  * 날짜 포맷팅 (YYYY-MM-DD)
  * @param {Date|string} date - 날짜
  * @returns {string} 포맷된 날짜
@@ -764,8 +752,12 @@ function setTodayDate(dateInput) {
  * @returns {string} UUID
  */
 function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // 폴백: crypto.getRandomValues 기반
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
+        const r = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
@@ -981,7 +973,6 @@ window.SampleUtils = {
 
     // 유틸리티
     createLogger,
-    escapeHTML,
     setTodayDate,
     generateUUID
 };

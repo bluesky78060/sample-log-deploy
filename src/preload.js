@@ -87,6 +87,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 인증 파일 선택 다이얼로그 (Electron 네이티브)
     selectAuthFile: () => ipcRenderer.invoke('select-auth-file'),
 
+    // ========================================
+    // 암호화 키 파일/솔트 관련
+    // ========================================
+
+    // 키 파일 존재 여부 확인
+    keyFileExists: () => ipcRenderer.invoke('key-file-exists'),
+
+    // 키 파일 읽기
+    readKeyFile: () => ipcRenderer.invoke('read-key-file'),
+
+    // 키 파일 저장
+    saveKeyFile: (content) => ipcRenderer.invoke('save-key-file', content),
+
+    // 키 파일 내보내기 (다이얼로그 + 저장)
+    exportKeyFile: (content) => ipcRenderer.invoke('export-key-file', content),
+
+    // 키 파일 가져오기 (다이얼로그 + 읽기)
+    importKeyFile: () => ipcRenderer.invoke('import-key-file'),
+
+    // Salt 저장
+    saveSalt: (saltBase64) => ipcRenderer.invoke('save-salt', saltBase64),
+
+    // Salt 로드
+    loadSalt: () => ipcRenderer.invoke('load-salt'),
+
+    // 복구 블롭 저장
+    saveRecoveryBlob: (blobJson) => ipcRenderer.invoke('save-recovery-blob', blobJson),
+
+    // 복구 블롭 로드
+    loadRecoveryBlob: () => ipcRenderer.invoke('load-recovery-blob'),
+
+    // ========================================
+    // 세션 비밀번호 (메인 프로세스 메모리)
+    // ========================================
+
+    // 세션 비밀번호 저장
+    storeSessionPassword: (password) => ipcRenderer.invoke('store-session-password', password),
+
+    // 세션 비밀번호 조회
+    getSessionPassword: () => ipcRenderer.invoke('get-session-password'),
+
+    // 세션 비밀번호 삭제
+    clearSessionPassword: () => ipcRenderer.invoke('clear-session-password'),
+
     // Electron 환경 여부
     isElectron: true
 });

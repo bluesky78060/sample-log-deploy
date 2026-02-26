@@ -187,7 +187,7 @@
       }, 300);
 
     } catch (error) {
-      window.logger.error('파일 처리 오류:', error);
+      (window.logger?.error || console.error)('파일 처리 오류:', error);
       document.getElementById('labelUploadProgress').classList.add('hidden');
       alert('파일 처리 중 오류가 발생했습니다: ' + error.message);
 
@@ -809,7 +809,7 @@
         }
       }
     } catch (error) {
-      window.logger.error('전달된 데이터 로드 오류:', error);
+      (window.logger?.error || console.error)('전달된 데이터 로드 오류:', error);
     }
   }
 })();
