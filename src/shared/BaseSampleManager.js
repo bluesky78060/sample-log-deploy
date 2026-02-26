@@ -516,7 +516,7 @@ class BaseSampleManager {
      * 자동 저장 초기화
      */
     async initAutoSave() {
-        if (!this.FileAPI || !window.isElectron) {
+        if (!this.FileAPI) {
             return;
         }
 
@@ -559,7 +559,7 @@ class BaseSampleManager {
      * 자동 저장 트리거
      */
     triggerAutoSave() {
-        if (!this.FileAPI || !window.isElectron) {
+        if (!this.FileAPI) {
             return;
         }
 

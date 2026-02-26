@@ -431,11 +431,58 @@ async function initAutoSave(options) {
             log(`📁 ${moduleName} 자동 저장 경로:`, FileAPI.autoSavePath, '활성화:', autoSaveEnabled);
         }
     } else {
-        // Web 환경 - 자동저장 상태 복원
-        const autoSaveEnabled = localStorage.getItem(enabledKey) === 'true';
-        if (autoSaveToggle && autoSaveEnabled) {
-            autoSaveToggle.checked = true;
-            updateAutoSaveStatus('pending');
+        // Web 환경 - File System Access API로 폴더 선택 자동저장
+        const hasSelectedFolder = localStorage.getItem(folderSelectedKey) === 'true';
+        const supportsDirectoryPicker = 'showDirectoryPicker' in window;
+
+        if (!hasSelectedFolder && supportsDirectoryPicker) {
+            // 최초 방문: 폴더 선택 안내
+            setTimeout(async () => {
+                const confirmSelect = confirm(
+                    `${moduleName} 자동 저장 기능을 사용하시겠습니까?\n\n` +
+                    '저장할 폴더를 선택하면 데이터가 파일로 자동 백업됩니다.\n' +
+                    '(브라우저 데이터 삭제 시에도 파일은 안전합니다)'
+                );
+                if (confirmSelect && window.selectWebAutoSaveFolder) {
+                    try {
+                        const result = await window.selectWebAutoSaveFolder();
+                        if (result.success) {
+                            localStorage.setItem(folderSelectedKey, 'true');
+                            localStorage.setItem(enabledKey, 'true');
+                            if (autoSaveToggle) {
+                                autoSaveToggle.checked = true;
+                                autoSaveToggle.dispatchEvent(new Event('change'));
+                            }
+                            updateAutoSaveStatus('active');
+                            log(`📁 ${moduleName} 자동 저장 폴더 설정됨: ${result.folderName}`);
+                            if (showToast) showToast(`자동 저장 폴더가 설정되었습니다: ${result.folderName}`, 'success');
+                        }
+                    } catch (error) {
+                        (window.logger?.error || console.error)('폴더 선택 오류:', error);
+                    }
+                }
+            }, 500);
+        } else if (hasSelectedFolder && supportsDirectoryPicker) {
+            // 이전에 폴더를 선택했으나 웹은 새로고침하면 핸들이 사라짐 → 재선택 필요
+            const autoSaveEnabled = localStorage.getItem(enabledKey) !== 'false';
+            if (autoSaveToggle) {
+                autoSaveToggle.checked = autoSaveEnabled;
+            }
+
+            if (autoSaveEnabled && !window.hasWebAutoSaveFolder?.()) {
+                // 폴더 핸들이 없으면 재선택 안내 (사용자 제스처 필요)
+                updateAutoSaveStatus('pending');
+                log(`📁 ${moduleName} 자동 저장: 폴더 재선택 필요 (브라우저 새로고침 후)`);
+            } else {
+                updateAutoSaveStatus(autoSaveEnabled ? 'active' : 'inactive');
+            }
+        } else {
+            // showDirectoryPicker 미지원 (Firefox 등)
+            const autoSaveEnabled = localStorage.getItem(enabledKey) === 'true';
+            if (autoSaveToggle && autoSaveEnabled) {
+                autoSaveToggle.checked = true;
+                updateAutoSaveStatus('pending');
+            }
         }
     }
 }
@@ -447,7 +494,10 @@ async function initAutoSave(options) {
  * @returns {Promise<Array|null>} 로드된 데이터 또는 null
  */
 async function loadFromAutoSaveFile(FileAPI, log = console.log) {
-    if (!window.isElectron || !FileAPI.autoSavePath) return null;
+    // Electron: autoSavePath 필요, Web: 폴더 핸들 필요
+    const canLoad = (window.isElectron && FileAPI.autoSavePath) ||
+                    (!window.isElectron && window.hasWebAutoSaveFolder?.());
+    if (!canLoad) return null;
 
     try {
         const content = await FileAPI.loadAutoSave();
@@ -683,29 +733,38 @@ function setupAutoSaveFolderButton(options) {
             }
         })();
     } else {
-        // Web 환경
-        selectAutoSaveFolderBtn.title = '자동저장 파일 선택';
+        // Web 환경 - 폴더 선택 (showDirectoryPicker)
+        const folderSelectedKey = `${moduleKey}AutoSaveFolderSelected`;
+
+        if (window.hasWebAutoSaveFolder?.()) {
+            const handle = window.getWebDirHandle?.();
+            selectAutoSaveFolderBtn.title = `저장 폴더: ${handle?.name || '선택됨'}`;
+        } else {
+            selectAutoSaveFolderBtn.title = '자동저장 폴더 선택';
+        }
+
         selectAutoSaveFolderBtn.addEventListener('click', async () => {
             try {
-                if ('showSaveFilePicker' in window) {
-                    const handle = await window.showSaveFilePicker({
-                        suggestedName: 'sample-logs-autosave.json',
-                        types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
-                    });
-                    if (setWebFileHandle) setWebFileHandle(handle);
-                    if (showToast) showToast('자동저장 파일이 설정되었습니다.', 'success');
-                    if (autoSaveToggle) {
-                        autoSaveToggle.checked = true;
+                if ('showDirectoryPicker' in window && window.selectWebAutoSaveFolder) {
+                    const result = await window.selectWebAutoSaveFolder();
+                    if (result.success) {
+                        localStorage.setItem(folderSelectedKey, 'true');
                         localStorage.setItem(enabledKey, 'true');
+                        if (autoSaveToggle) {
+                            autoSaveToggle.checked = true;
+                        }
+                        updateAutoSaveStatus('active');
+                        selectAutoSaveFolderBtn.title = `저장 폴더: ${result.folderName}`;
+                        if (showToast) showToast(`자동저장 폴더가 설정되었습니다: ${result.folderName}`, 'success');
+                        if (autoSaveCallback) await autoSaveCallback();
                     }
-                    if (autoSaveCallback) await autoSaveCallback();
                 } else {
-                    if (showToast) showToast('이 브라우저에서는 파일 선택을 지원하지 않습니다.', 'error');
+                    if (showToast) showToast('이 브라우저에서는 폴더 선택을 지원하지 않습니다.', 'error');
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
-                    (window.logger?.error || console.error)('파일 선택 오류:', error);
-                    if (showToast) showToast('파일 선택 중 오류가 발생했습니다.', 'error');
+                    (window.logger?.error || console.error)('폴더 선택 오류:', error);
+                    if (showToast) showToast('폴더 선택 중 오류가 발생했습니다.', 'error');
                 }
             }
         });
