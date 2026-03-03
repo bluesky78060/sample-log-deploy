@@ -42,7 +42,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
             name: '',
             receptionFrom: '',
             receptionTo: '',
-            completed: ''
+            completed: 'incomplete'
         };
         this.isFullView = false;
         this.autoSaveFileHandle = null;
@@ -350,7 +350,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
         if (targetNav) targetNav.classList.add('active');
 
         if (viewName === 'list' && this.listViewStale) {
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.listViewStale = false;
         }
     }
@@ -370,18 +370,10 @@ class PesticideSampleManager extends window.BaseSampleManager {
     // ========================================
 
     onYearChange(newYear) {
-        this.listViewStale = true;
         this.updateListViewTitle();
     }
 
-    // ========================================
-    // Override: 저장 전 hook
-    // ========================================
-
-    onBeforeSave(data) {
-        this.listViewStale = true;
-        return data;
-    }
+    // onBeforeSave: BaseSampleManager.saveLogs에서 listViewStale 설정하므로 별도 오버라이드 불필요
 
     // ========================================
     // Override: 저장 후 hook (자동 저장)
@@ -831,7 +823,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
 
             this.sampleLogs[logIndex] = updatedLog;
             this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.cancelEditMode();
             this.showToast('수정이 완료되었습니다.', 'success');
             this.switchView('list');
@@ -883,7 +875,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
         });
 
         this.saveLogs();
-        this.renderLogs(this.sampleLogs);
+        this.filterAndRenderLogs();
         this.form.reset();
         this.dateInput.valueAsDate = new Date();
 
@@ -1557,7 +1549,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
 
         const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
             this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo ||
-            this.currentSearchFilter.completed;
+            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
         if (hasFilter) {
             openSearchModalBtn.classList.add('has-filter');
             openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
@@ -2310,7 +2302,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
                     }
                     log.updatedAt = new Date().toISOString();
                     this.saveLogs();
-                    this.renderLogs(this.sampleLogs);
+                    this.filterAndRenderLogs();
                 }
             }
 
@@ -2321,7 +2313,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
                 if (confirm('정말 삭제하시겠습니까?')) {
                     this.sampleLogs = this.sampleLogs.filter(item => item.id !== id);
                     this.saveLogs();
-                    this.renderLogs(this.sampleLogs);
+                    this.filterAndRenderLogs();
 
                     if (window.firestoreDb?.isEnabled()) {
                         window.firestoreDb.delete('pesticide', parseInt(this.selectedYear), id)
@@ -2357,6 +2349,13 @@ class PesticideSampleManager extends window.BaseSampleManager {
             });
         }
 
+        this.tableBody.addEventListener('change', (e) => {
+            if (e.target.classList.contains('row-checkbox')) {
+                this.updateSelectAllState();
+                this.updateSelectedCount();
+            }
+        });
+
         // 성명 클릭 시 같은 이름 일괄 선택
         if (this.tableBody) {
             this.tableBody.addEventListener('click', (e) => {
@@ -2383,13 +2382,6 @@ class PesticideSampleManager extends window.BaseSampleManager {
                 }
             });
         }
-
-        this.tableBody.addEventListener('change', (e) => {
-            if (e.target.classList.contains('row-checkbox')) {
-                this.updateSelectAllState();
-                this.updateSelectedCount();
-            }
-        });
 
         window.getSelectedIds = () => this.getSelectedIds();
 
@@ -2476,8 +2468,8 @@ class PesticideSampleManager extends window.BaseSampleManager {
                 searchNameInput.value = '';
                 searchReceptionFromInput.value = '';
                 searchReceptionToInput.value = '';
-                if (completedFilter) completedFilter.value = '';
-                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: '' };
+                if (completedFilter) completedFilter.value = 'incomplete';
+                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: 'incomplete' };
                 this.filterAndRenderLogs();
                 closeSearchModal();
             });
@@ -2539,7 +2531,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
 
                 this.sampleLogs = this.sampleLogs.filter(log => !selectedIds.includes(String(log.id)));
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
 
                 if (window.firestoreDb?.isEnabled()) {
                     Promise.all(selectedIds.map(id =>
@@ -2595,7 +2587,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
                 });
 
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
 
                 if (this.selectAllCheckbox) {
                     this.selectAllCheckbox.checked = false;
@@ -2671,7 +2663,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
             getData: () => this.sampleLogs,
             setData: (data) => { this.sampleLogs = data; },
             saveData: () => this.saveLogs(),
-            renderData: () => this.renderLogs(this.sampleLogs),
+            renderData: () => this.filterAndRenderLogs(),
             showToast: window.showToast,
             deduplicateById: true
         });
@@ -2959,7 +2951,7 @@ class PesticideSampleManager extends window.BaseSampleManager {
                     return (a.receptionNumber || '').localeCompare(b.receptionNumber || '');
                 });
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
             }
         });
         excelImporter.init();

@@ -885,9 +885,9 @@ checkAuthFileStatus();
                 await window.firestoreDb.init();
             }
         }
-        // 암호화는 Firebase 없이도 초기화 (로컬 모드 지원)
-        if (window.encryptionManager?.init) {
-            await window.encryptionManager.init();
+        // 암호화는 세션 비밀번호로만 초기화 (모달 표시 안 함, 설정 비밀번호 프롬프트에서 인증)
+        if (window.encryptionManager?.initSilent) {
+            await window.encryptionManager.initSilent();
         }
     } catch (err) {
         console.warn('[Settings] Firebase/Encryption init error:', err);

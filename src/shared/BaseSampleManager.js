@@ -33,8 +33,9 @@ class BaseSampleManager {
         this.totalPages = 1;
         this.isCloudSyncing = false;
         this.cloudSyncPromise = null;  // Promise-based lock
-        this._listDirty = true;  // PER-5: 목록 뷰 리렌더 필요 여부
-        this._firebaseCache = new Map();  // PER-9: 연도별 Firebase 데이터 캐시
+        this.listViewStale = true;  // PER-5: 목록 뷰 리렌더 필요 여부
+        this._firebaseCache = new Map();  // PER-9: 연도별 Firebase 데이터 캐시 { data, timestamp }
+        this._firebaseCacheTTL = 30000;   // PER-9: 캐시 유효 시간 (30초)
 
         // PaginationManager 인스턴스
         this.pagination = null;
@@ -125,16 +126,6 @@ class BaseSampleManager {
                 (window.logger?.error || console.error)('Firestore 초기화 에러:', err);
             }
         }
-
-        // 암호화 매니저 초기화 (Firebase 없이도 로컬 암호화 지원)
-        if (window.encryptionManager?.init) {
-            try {
-                await window.encryptionManager.init();
-                this.log('암호화 매니저 초기화 완료');
-            } catch (err) {
-                (window.logger?.error || console.error)('암호화 매니저 초기화 에러:', err);
-            }
-        }
     }
 
     // ========================================
@@ -202,7 +193,7 @@ class BaseSampleManager {
      * 데이터 저장
      */
     async saveLogs() {
-        this._listDirty = true;  // PER-5: 데이터 변경 시 목록 리렌더 필요
+        this.listViewStale = true;  // PER-5: 데이터 변경 시 목록 리렌더 필요
         this._firebaseCache.delete(this.selectedYear);  // PER-9: 캐시 무효화
         // 저장 전 hook (서브클래스에서 데이터 가공)
         const processed = this.onBeforeSave(this.sampleLogs);
@@ -256,7 +247,7 @@ class BaseSampleManager {
      * @param {string} id - 삭제할 샘플 ID
      */
     async deleteSample(id) {
-        this._listDirty = true;  // PER-5
+        this.listViewStale = true;  // PER-5
         this._firebaseCache.delete(this.selectedYear);  // PER-9: 캐시 무효화
         // Firebase가 활성화되어 있으면 Firebase에서 먼저 삭제
         if (window.firebaseConfig?.isEnabled()) {
@@ -272,8 +263,8 @@ class BaseSampleManager {
                 const yearStorageKey = this.getStorageKey(this.selectedYear);
                 localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
 
-                // UI 업데이트
-                this.renderLogs(this.sampleLogs);
+                // UI 업데이트 (기본 필터 적용)
+                this.filterAndRenderLogs();
                 this.updateRecordCount();
 
                 this.showToast('삭제되었습니다.', 'success');
@@ -286,7 +277,7 @@ class BaseSampleManager {
             this.log(` Firebase 비활성화, 로컬에서만 삭제`);
             this.sampleLogs = this.sampleLogs.filter(l => String(l.id) !== id);
             await this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.showToast('삭제되었습니다.', 'success');
         }
     }
@@ -296,7 +287,7 @@ class BaseSampleManager {
      * @param {string} year - 연도
      */
     async loadYearData(year) {
-        this._listDirty = true;  // PER-5
+        this.listViewStale = true;  // PER-5
         this.log(`📅 ${year}년 데이터 로드 시작`);
 
         try {
@@ -306,17 +297,18 @@ class BaseSampleManager {
             // Firebase가 활성화되어 있으면 Firebase에서 먼저 데이터 로드
             if (window.firebaseConfig?.isEnabled()) {
                 try {
-                    // PER-9: 세션 내 Firebase 캐시 확인
-                    const cached = this._firebaseCache.get(year);
-                    this.log(cached ? ` Firebase 캐시 사용 (${year}년)` : ` Firebase에서 데이터 로드 시작`);
-                    const firebaseLogs = cached || await this.loadFromFirebase(year);
+                    // PER-9: TTL 기반 Firebase 캐시 확인
+                    const cacheEntry = this._firebaseCache.get(year);
+                    const cacheValid = cacheEntry && (Date.now() - cacheEntry.timestamp < this._firebaseCacheTTL);
+                    this.log(cacheValid ? ` Firebase 캐시 사용 (${year}년)` : ` Firebase에서 데이터 로드 시작`);
+                    const firebaseLogs = cacheValid ? cacheEntry.data : await this.loadFromFirebase(year);
 
                     if (firebaseLogs && firebaseLogs.length > 0) {
                         this.log(` Firebase 데이터:`, firebaseLogs.length, '건');
                         this.sampleLogs = firebaseLogs;
 
-                        // PER-9: 세션 내 Firebase 캐시에 저장
-                        if (!cached) this._firebaseCache.set(year, firebaseLogs);
+                        // PER-9: TTL 포함 캐시 저장
+                        if (!cacheValid) this._firebaseCache.set(year, { data: firebaseLogs, timestamp: Date.now() });
 
                         // Firebase 데이터를 localStorage에 저장 (캐싱)
                         localStorage.setItem(yearStorageKey, JSON.stringify(firebaseLogs));
@@ -371,7 +363,6 @@ class BaseSampleManager {
             }
 
             this.log(` 최종 sampleLogs 설정:`, this.sampleLogs.length, '건');
-
             // 공통 마이그레이션 적용
             this.sampleLogs = this.migrateCompletedField(this.sampleLogs);
 
@@ -386,8 +377,8 @@ class BaseSampleManager {
             const processed = this.onAfterLoad(this.sampleLogs, year);
             if (processed) this.sampleLogs = processed;
 
-            // UI 업데이트
-            this.renderLogs(this.sampleLogs);
+            // UI 업데이트 (기본 필터 적용)
+            this.filterAndRenderLogs();
             this.updateRecordCount();
 
             // 다음 접수번호 설정 (서브클래스에서 구현된 경우)
@@ -486,8 +477,8 @@ class BaseSampleManager {
      * 스마트 병합 - utils.js의 함수 사용
      */
     smartMerge(localData, firebaseData) {
-        if (window.smartMerge) {
-            return window.smartMerge(localData, firebaseData);
+        if (window.SyncUtils?.smartMerge) {
+            return window.SyncUtils.smartMerge(localData, firebaseData);
         }
         // 폴백: Firebase 데이터 우선
         return firebaseData;
@@ -516,7 +507,7 @@ class BaseSampleManager {
      * 자동 저장 초기화
      */
     async initAutoSave() {
-        if (!this.FileAPI) {
+        if (!this.FileAPI || !window.isElectron) {
             return;
         }
 
@@ -538,14 +529,7 @@ class BaseSampleManager {
         } else {
             // 폴백: 기본 자동 저장 처리
             try {
-                let savedData = await this.FileAPI.loadAutoSave();
-                if (savedData && window.CryptoUtils?.decryptFromFile) {
-                    try {
-                        savedData = await window.CryptoUtils.decryptFromFile(savedData);
-                    } catch (e) {
-                        this.log('자동 저장 복호화 실패:', e);
-                    }
-                }
+                const savedData = await this.FileAPI.loadAutoSave();
                 if (savedData) {
                     this.lastSavedDataHash = this.hashData(savedData);
                 }
@@ -559,7 +543,7 @@ class BaseSampleManager {
      * 자동 저장 트리거
      */
     triggerAutoSave() {
-        if (!this.FileAPI) {
+        if (!this.FileAPI || !window.isElectron) {
             return;
         }
 
@@ -587,15 +571,12 @@ class BaseSampleManager {
 
             // 데이터가 변경된 경우만 저장
             if (currentDataHash !== this.lastSavedDataHash) {
-                const saveObj = {
+                const content = JSON.stringify({
                     version: '2.0',
                     exportDate: new Date().toISOString(),
                     totalRecords: this.sampleLogs.length,
                     data: this.sampleLogs
-                };
-                const content = window.CryptoUtils?.encryptForFile
-                    ? await window.CryptoUtils.encryptForFile(saveObj)
-                    : JSON.stringify(saveObj, null, 2);
+                }, null, 2);
                 const result = await this.FileAPI.autoSave(content);
 
                 if (result) {
@@ -741,9 +722,9 @@ class BaseSampleManager {
         if (targetNav) targetNav.classList.add('active');
 
         // 목록 뷰로 전환 시 변경된 경우에만 테이블 새로고침 (PER-5)
-        if (viewName === 'list' && this._listDirty) {
-            this.renderLogs(this.sampleLogs);
-            this._listDirty = false;
+        if (viewName === 'list' && this.listViewStale) {
+            this.filterAndRenderLogs();
+            this.listViewStale = false;
         }
     }
 
@@ -902,6 +883,14 @@ class BaseSampleManager {
     // ========================================
     // 추상 메서드 (서브클래스에서 구현 필요)
     // ========================================
+
+    /**
+     * 필터를 적용한 렌더링 (서브클래스에서 override)
+     * 기본 구현은 renderLogs를 직접 호출 (필터 없음)
+     */
+    filterAndRenderLogs() {
+        this.renderLogs(this.sampleLogs);
+    }
 
     /**
      * 로그 렌더링 (테이블 그리기)

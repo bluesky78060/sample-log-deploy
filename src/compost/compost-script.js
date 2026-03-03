@@ -14,7 +14,7 @@ const DEFAULT_SAMPLE_TYPE = '가축분퇴비';
 const SAMPLE_TYPE = 'compost';
 
 /** @type {string} */
-const STORAGE_KEY = 'compostSampleLogs';
+const STORAGE_KEY = 'test_compostSampleLogs';
 
 /** @type {string} */
 const AUTO_SAVE_FILE = 'compost-autosave.json';
@@ -43,7 +43,7 @@ class CompostSampleManager extends window.BaseSampleManager {
             name: '',
             receptionFrom: '',
             receptionTo: '',
-            completed: ''
+            completed: 'incomplete'
         };
         this.isFullView = false;
         this.autoSaveFileHandle = null;
@@ -218,7 +218,7 @@ class CompostSampleManager extends window.BaseSampleManager {
         if (targetNav) targetNav.classList.add('active');
 
         if (viewName === 'list' && this.listViewStale) {
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.listViewStale = false;
         }
     }
@@ -238,18 +238,10 @@ class CompostSampleManager extends window.BaseSampleManager {
     // ========================================
 
     onYearChange(newYear) {
-        this.listViewStale = true;
         this.updateListViewTitle();
     }
 
-    // ========================================
-    // Override: 저장 전 hook (listViewStale 설정)
-    // ========================================
-
-    onBeforeSave(data) {
-        this.listViewStale = true;
-        return data;
-    }
+    // onBeforeSave: BaseSampleManager.saveLogs에서 listViewStale 설정하므로 별도 오버라이드 불필요
 
     // ========================================
     // Override: 저장 후 hook (자동 저장)
@@ -1106,7 +1098,7 @@ class CompostSampleManager extends window.BaseSampleManager {
             log.isComplete = !log.isComplete;
             log.updatedAt = new Date().toISOString();
             this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
         }
     }
 
@@ -1126,7 +1118,7 @@ class CompostSampleManager extends window.BaseSampleManager {
             }
             log.updatedAt = new Date().toISOString();
             this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
         }
     }
 
@@ -1216,7 +1208,6 @@ class CompostSampleManager extends window.BaseSampleManager {
                     const allChecked = targetCheckboxes.every(cb => cb.checked);
                     targetCheckboxes.forEach(cb => { cb.checked = !allChecked; });
 
-                    // selectAll 상태 업데이트
                     if (this.selectAllCheckbox) {
                         const allBoxes = tableBody.querySelectorAll('.row-checkbox');
                         const checkedBoxes = tableBody.querySelectorAll('.row-checkbox:checked');
@@ -1241,7 +1232,7 @@ class CompostSampleManager extends window.BaseSampleManager {
 
         const btnBulkDelete = document.getElementById('deleteSelectedBtn');
         if (btnBulkDelete) {
-            btnBulkDelete.addEventListener('click', () => {
+            btnBulkDelete.addEventListener('click', async () => {
                 const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.dataset.id);
 
                 if (selectedIds.length === 0) {
@@ -1252,16 +1243,19 @@ class CompostSampleManager extends window.BaseSampleManager {
                 if (confirm(`선택한 ${selectedIds.length}건을 삭제하시겠습니까?`)) {
                     this.sampleLogs = this.sampleLogs.filter(log => !selectedIds.includes(String(log.id)));
                     this.saveLogs();
-                    this.renderLogs(this.sampleLogs);
+                    this.filterAndRenderLogs();
                     this.selectAllCheckbox.checked = false;
 
-                    // Firebase에서도 삭제
+                    // Firebase에서도 삭제 (await로 완료 보장)
                     if (window.firestoreDb?.isEnabled()) {
-                        Promise.all(selectedIds.map(id =>
-                            window.firestoreDb.delete('compost', parseInt(this.selectedYear), id)
-                        ))
-                            .then(() => this.log('Firebase 일괄 삭제 완료:', selectedIds.length, '건'))
-                            .catch(err => (window.logger?.error || console.error)('Firebase 일괄 삭제 실패:', err));
+                        try {
+                            await Promise.all(selectedIds.map(id =>
+                                window.firestoreDb.delete('compost', parseInt(this.selectedYear), id)
+                            ));
+                            this.log('Firebase 일괄 삭제 완료:', selectedIds.length, '건');
+                        } catch (err) {
+                            (window.logger?.error || console.error)('Firebase 일괄 삭제 실패:', err);
+                        }
                     }
 
                     this.showToast(`${selectedIds.length}건이 삭제되었습니다.`, 'success');
@@ -1375,7 +1369,7 @@ class CompostSampleManager extends window.BaseSampleManager {
                 });
 
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
                 this.selectAllCheckbox.checked = false;
 
                 closeModalFn();
@@ -1696,8 +1690,8 @@ class CompostSampleManager extends window.BaseSampleManager {
                 if (searchNameInput) searchNameInput.value = '';
                 if (searchReceptionFromInput) searchReceptionFromInput.value = '';
                 if (searchReceptionToInput) searchReceptionToInput.value = '';
-                if (completedFilter) completedFilter.value = '';
-                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: '' };
+                if (completedFilter) completedFilter.value = 'incomplete';
+                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: 'incomplete' };
                 this.filterAndRenderLogs();
                 this.updateSearchButtonState();
                 listSearchModal.classList.add('hidden');
@@ -1773,7 +1767,7 @@ class CompostSampleManager extends window.BaseSampleManager {
         const openSearchModalBtn = document.getElementById('openSearchModalBtn');
         const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
             this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo ||
-            this.currentSearchFilter.completed;
+            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
         if (openSearchModalBtn) {
             if (hasFilter) {
                 openSearchModalBtn.classList.add('has-filter');
@@ -1890,7 +1884,7 @@ class CompostSampleManager extends window.BaseSampleManager {
             getData: () => this.sampleLogs,
             setData: (data) => { this.sampleLogs = data; },
             saveData: () => this.saveLogs(),
-            renderData: () => this.renderLogs(this.sampleLogs),
+            renderData: () => this.filterAndRenderLogs(),
             showToast: window.showToast
         };
 
@@ -2225,7 +2219,7 @@ class CompostSampleManager extends window.BaseSampleManager {
                     return (a.receptionNumber || '').localeCompare(b.receptionNumber || '');
                 });
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
             }
         });
         excelImporter.init();
@@ -2238,13 +2232,20 @@ class CompostSampleManager extends window.BaseSampleManager {
     async loadAutoSaveOnInit() {
         this.log('자동 저장 로드 체크:', { isElectron: window.isElectron, autoSavePath: this.FileAPI?.autoSavePath });
         if (window.isElectron && this.FileAPI?.autoSavePath) {
+            // Firebase/localStorage에서 이미 데이터가 로드된 경우 autoSave를 무시
+            // (autoSave는 오프라인 백업용이므로 이미 최신 데이터가 있으면 불필요)
+            if (this.sampleLogs && this.sampleLogs.length > 0) {
+                this.log('이미 데이터가 로드됨 (' + this.sampleLogs.length + '건), autoSave 스킵');
+                return;
+            }
+
             const autoSaveData = await window.loadFromAutoSaveFile();
             this.log('로드된 데이터:', autoSaveData);
             if (autoSaveData && autoSaveData.length > 0) {
                 this.sampleLogs = autoSaveData;
                 localStorage.setItem(this.getStorageKey(this.selectedYear), JSON.stringify(this.sampleLogs));
                 this.log('퇴액비 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
             }
         } else {
             this.log('자동 저장 로드 스킵됨:', { isElectron: window.isElectron, autoSavePath: this.FileAPI?.autoSavePath });

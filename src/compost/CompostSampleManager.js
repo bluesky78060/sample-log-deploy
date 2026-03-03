@@ -605,7 +605,7 @@ class CompostSampleManager extends BaseSampleManager {
             log.isComplete = !log.isComplete;
             log.updatedAt = new Date().toISOString();
             this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
         }
     }
 
@@ -624,7 +624,7 @@ class CompostSampleManager extends BaseSampleManager {
             }
             log.updatedAt = new Date().toISOString();
             this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
         }
     }
 }

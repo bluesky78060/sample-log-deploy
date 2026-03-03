@@ -5,9 +5,9 @@ const path = require('path');
 module.exports = {
   packagerConfig: {
     asar: true,
-    name: 'sample-log',
-    executableName: 'sample-log',
-    appBundleId: 'com.samplelog.app',
+    name: 'sample-log-test',
+    executableName: 'sample-log-test',
+    appBundleId: 'com.samplelog.test',
     extraResource: ['./app-update.yml'],
     icon: path.resolve(__dirname, 'assets', 'icon'),
   },
@@ -17,7 +17,7 @@ module.exports = {
       const fs = require('fs');
       const iconPath = path.resolve(__dirname, 'assets', 'icon.icns');
       for (const outputPath of packageResult.outputPaths) {
-        const resourcesPath = path.join(outputPath, 'sample-log.app', 'Contents', 'Resources', 'electron.icns');
+        const resourcesPath = path.join(outputPath, 'sample-log-test.app', 'Contents', 'Resources', 'electron.icns');
         if (fs.existsSync(resourcesPath)) {
           fs.copyFileSync(iconPath, resourcesPath);
           console.log('Icon copied to:', resourcesPath);
@@ -41,12 +41,12 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        name: 'sample-log',
-        setupExe: 'sample-log-setup.exe',
+        name: 'sample-log-test',
+        setupExe: 'sample-log-test-setup.exe',
         setupIcon: path.resolve(__dirname, 'assets', 'icon.ico'),
         iconUrl: 'https://raw.githubusercontent.com/bluesky78060/sample-log-electron/main/assets/icon.ico',
-        title: '시료접수대장',
-        shortcutName: '시료접수대장',
+        title: '시료접수대장(테스트)',
+        shortcutName: '시료접수대장(테스트)',
         authors: '봉화군 농업기술센터',
         description: '시료 접수 관리 프로그램'
       },

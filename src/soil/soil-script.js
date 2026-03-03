@@ -44,7 +44,7 @@ class SoilSampleManager extends window.BaseSampleManager {
             receptionTo: '',
             lot: '',
             purpose: '',
-            completed: ''
+            completed: 'incomplete'
         };
         this.isFullView = false;
         this.autoSaveFileHandle = null;
@@ -286,7 +286,7 @@ class SoilSampleManager extends window.BaseSampleManager {
 
         // 목록 뷰로 전환 시 데이터 변경이 있을 때만 새로고침
         if (viewName === 'list' && this.listViewStale) {
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.listViewStale = false;
         }
     }
@@ -382,91 +382,30 @@ class SoilSampleManager extends window.BaseSampleManager {
         const yearSelect = document.getElementById('yearSelect');
         const listYearSelect = document.getElementById('listYearSelect');
 
-        if (yearSelect) {
-            yearSelect.addEventListener('change', async (e) => {
-                this.syncYearSelects(e.target.value);
-                await this.loadYearData(e.target.value);
-                if (window.isElectron && this.FileAPI) {
-                    await this.FileAPI.updateAutoSavePath(e.target.value);
-                    await this.loadAutoSaveForSelectedYear();
-                }
-                this.showToast(`${e.target.value}년 데이터를 불러왔습니다.`, 'success');
-            });
-        }
-
-        if (listYearSelect) {
-            listYearSelect.addEventListener('change', async (e) => {
-                this.syncYearSelects(e.target.value);
-                await this.loadYearData(e.target.value);
-                if (window.isElectron && this.FileAPI) {
-                    await this.FileAPI.updateAutoSavePath(e.target.value);
-                    await this.loadAutoSaveForSelectedYear();
-                }
-                this.showToast(`${e.target.value}년 데이터를 불러왔습니다.`, 'success');
-            });
-        }
-    }
-
-    // ========================================
-    // Override: loadYearData (soil-specific: Firebase skipOrder, listViewStale)
-    // ========================================
-
-    async loadYearData(year) {
-        const yearStorageKey = this.getStorageKey(year);
-        this.listViewStale = true;
-
-        // 1. Firebase에서 먼저 로드 시도
-        if (window.firestoreDb?.isEnabled()) {
-            try {
-                this.log('Firebase에서 데이터 로드 중...');
-                const cloudData = await window.firestoreDb.getAll('soil', parseInt(year), { skipOrder: true });
-
-                if (cloudData && cloudData.length > 0) {
-                    this.sampleLogs = cloudData;
-                    this.sampleLogs = this.migrateCompletedField(this.sampleLogs);
-                    this.log('Firebase 데이터 로드 완료:', this.sampleLogs.length, '건');
-
-                    localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
-
-                    this.renderLogs(this.sampleLogs);
-                    if (this.receptionNumberInput) {
-                        this.receptionNumberInput.value = this.generateNextReceptionNumber();
-                    }
-                    this.updateListViewTitle();
-                    this.updateRecordCount();
-                    this.triggerAutoSave();
-
-                    if (this.FileAPI) {
-                        await this.FileAPI.updateAutoSavePath(year);
-                    }
-                    return;
-                } else {
-                    this.log('Firebase에 데이터 없음, localStorage 확인');
-                }
-            } catch (error) {
-                (window.logger?.error || console.error)('Firebase 로드 실패, 로컬 데이터 사용:', error);
+        const handleYearChange = async (e) => {
+            this.syncYearSelects(e.target.value);
+            await this.loadYearData(e.target.value);
+            // BaseSampleManager.loadYearData가 FileAPI.updateAutoSavePath 호출하므로 중복 제거
+            if (window.isElectron && this.FileAPI) {
+                await this.loadAutoSaveForSelectedYear();
             }
-        }
+            this.showToast(`${e.target.value}년 데이터를 불러왔습니다.`, 'success');
+        };
 
-        // 2. Firebase 사용 불가 또는 데이터 없음 -> 로컬에서 로드
-        this.sampleLogs = SampleUtils.safeParseJSON(yearStorageKey, []);
-        this.sampleLogs = this.migrateCompletedField(this.sampleLogs);
-        this.renderLogs(this.sampleLogs);
-
-        if (this.receptionNumberInput) {
-            this.receptionNumberInput.value = this.generateNextReceptionNumber();
-        }
-        this.updateListViewTitle();
-        this.updateRecordCount();
-        this.triggerAutoSave();
-
-        if (this.FileAPI) {
-            await this.FileAPI.updateAutoSavePath(year);
-        }
+        if (yearSelect) yearSelect.addEventListener('change', handleYearChange);
+        if (listYearSelect) listYearSelect.addEventListener('change', handleYearChange);
     }
 
     // ========================================
-    // Override: saveLogs (soil-specific: listViewStale, sessionStorage)
+    // Override: 연도 변경 hook
+    // ========================================
+
+    onYearChange(newYear) {
+        this.updateListViewTitle();
+    }
+
+    // ========================================
+    // Override: saveLogs (soil-specific: sessionStorage)
     // ========================================
 
     async saveLogs() {
@@ -520,7 +459,7 @@ class SoilSampleManager extends window.BaseSampleManager {
     async deleteSample(id) {
         this.sampleLogs = this.sampleLogs.filter(log => log.id !== id);
         await this.saveLogs();
-        this.renderLogs(this.sampleLogs);
+        this.filterAndRenderLogs();
 
         // Firebase에서도 삭제
         if (window.firestoreDb?.isEnabled()) {
@@ -1709,7 +1648,7 @@ class SoilSampleManager extends window.BaseSampleManager {
 
             this.sampleLogs[logIndex] = updatedLog;
             this.saveLogs();
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.cancelEditMode();
             this.showToast('수정이 완료되었습니다.', 'success');
             this.switchView('list');
@@ -1740,7 +1679,7 @@ class SoilSampleManager extends window.BaseSampleManager {
 
         if (duplicateNumbers.length > 0) {
             this.sampleLogs = latestLogs;
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             const nextAvailable = isFillNumber
                 ? this.generateNextFillReceptionNumber()
                 : this.generateNextReceptionNumber();
@@ -1797,7 +1736,7 @@ class SoilSampleManager extends window.BaseSampleManager {
 
         newLogs.forEach(log => this.sampleLogs.push(log));
         this.saveLogs();
-        this.renderLogs(this.sampleLogs);
+        this.filterAndRenderLogs();
         this.form.reset();
         if (this.dateInput) this.dateInput.valueAsDate = new Date();
 
@@ -2090,7 +2029,7 @@ class SoilSampleManager extends window.BaseSampleManager {
         const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
             this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom ||
             this.currentSearchFilter.receptionTo || this.currentSearchFilter.lot || this.currentSearchFilter.purpose ||
-            this.currentSearchFilter.completed;
+            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
 
         if (openSearchModalBtn) {
             if (hasFilter) {
@@ -2342,7 +2281,6 @@ class SoilSampleManager extends window.BaseSampleManager {
         const checkedBoxes = this.tableBody.querySelectorAll('.row-checkbox:checked');
         const count = checkedBoxes.length;
 
-        // 선택 카운트 배지 표시
         let badge = document.getElementById('selectedCountBadge');
         if (count > 0) {
             if (!badge) {
@@ -2381,7 +2319,6 @@ class SoilSampleManager extends window.BaseSampleManager {
 
         if (targetCheckboxes.length === 0) return;
 
-        // 모두 체크됨 → 모두 해제, 아니면 → 모두 체크
         const allChecked = targetCheckboxes.every(cb => cb.checked);
         targetCheckboxes.forEach(cb => { cb.checked = !allChecked; });
 
@@ -2902,7 +2839,7 @@ class SoilSampleManager extends window.BaseSampleManager {
         if (autoSaveData && autoSaveData.length > 0) {
             this.sampleLogs = autoSaveData;
             localStorage.setItem(this.getStorageKey(this.selectedYear), JSON.stringify(this.sampleLogs));
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             if (this.receptionNumberInput) {
                 this.receptionNumberInput.value = this.generateNextReceptionNumber();
             }
@@ -3300,8 +3237,8 @@ class SoilSampleManager extends window.BaseSampleManager {
                 if (searchReceptionToInput) searchReceptionToInput.value = '';
                 if (searchLotInput) searchLotInput.value = '';
                 if (purposeFilter) purposeFilter.value = '';
-                if (completedFilter) completedFilter.value = '';
-                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', lot: '', purpose: '', completed: '' };
+                if (completedFilter) completedFilter.value = 'incomplete';
+                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', lot: '', purpose: '', completed: 'incomplete' };
                 this.filterAndRenderLogs();
                 closeSearchModal();
             });
@@ -3354,7 +3291,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                 if (!confirm(`선택한 ${selectedIds.length}건을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return;
                 this.sampleLogs = this.sampleLogs.filter(log => !selectedIds.includes(String(log.id)));
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
                 if (window.firestoreDb?.isEnabled()) {
                     Promise.all(selectedIds.map(id => window.firestoreDb.delete('soil', parseInt(this.selectedYear), id)))
                         .then(() => this.log('Firebase 일괄 삭제 완료:', selectedIds.length, '건'))
@@ -3399,7 +3336,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                     return log;
                 });
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
                 if (this.selectAllCheckbox) { this.selectAllCheckbox.checked = false; this.selectAllCheckbox.indeterminate = false; }
                 closeMailDateModalFn();
                 this.showToast(`${updatedCount}건의 발송일자가 입력되었습니다.`, 'success');
@@ -3487,7 +3424,7 @@ class SoilSampleManager extends window.BaseSampleManager {
             getData: () => this.sampleLogs,
             setData: (data) => { this.sampleLogs = data; },
             saveData: () => this.saveLogs(),
-            renderData: () => this.renderLogs(this.sampleLogs),
+            renderData: () => this.filterAndRenderLogs(),
             showToast: (msg, type) => this.showToast(msg, type),
             deduplicateById: true
         });
@@ -3525,7 +3462,6 @@ class SoilSampleManager extends window.BaseSampleManager {
             });
         }
 
-        // 클라우드 마이그레이션
         // 등록 결과 모달 이벤트
         const closeRegistrationModal = document.getElementById('closeRegistrationModal');
         const closeResultBtn = document.getElementById('closeResultBtn');
@@ -3573,7 +3509,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                 this.itemsPerPage = parseInt(e.target.value, 10);
                 localStorage.setItem('soilItemsPerPage', this.itemsPerPage);
                 this.currentPage = 1;
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
             });
         }
     }
@@ -3809,7 +3745,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                     return (a.receptionNumber || '').localeCompare(b.receptionNumber || '');
                 });
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
                 this.log('엑셀 가져오기 완료:', records.length, '건');
             }
         });
@@ -3834,7 +3770,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                     this.sampleLogs = autoSaveData;
                     localStorage.setItem(this.getStorageKey(this.selectedYear), JSON.stringify(this.sampleLogs));
                     this.log('토양 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
-                    this.renderLogs(this.sampleLogs);
+                    this.filterAndRenderLogs();
                     if (this.receptionNumberInput) {
                         this.receptionNumberInput.value = this.generateNextReceptionNumber();
                     }

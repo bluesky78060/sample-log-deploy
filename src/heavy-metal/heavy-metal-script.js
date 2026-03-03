@@ -20,7 +20,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
         this.listViewStale = true;
         this.currentSearchFilter = {
             dateFrom: '', dateTo: '', name: '',
-            receptionFrom: '', receptionTo: '', completed: ''
+            receptionFrom: '', receptionTo: '', completed: 'incomplete'
         };
         this.currentRegistrationData = null;
         this.pendingMailDateIndices = [];
@@ -89,7 +89,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
         if (targetNav) targetNav.classList.add('active');
 
         if (viewName === 'list' && this.listViewStale) {
-            this.renderLogs(this.sampleLogs);
+            this.filterAndRenderLogs();
             this.listViewStale = false;
         }
     }
@@ -339,7 +339,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
         this.listViewStale = true;
         this.saveLogs();
         this.resetForm();
-        this.renderLogs(this.sampleLogs);
+        this.filterAndRenderLogs();
     }
 
     // ========================================
@@ -552,7 +552,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
         log.updatedAt = new Date().toISOString();
         this.listViewStale = true;
         this.saveLogs();
-        this.renderLogs(this.sampleLogs);
+        this.filterAndRenderLogs();
     }
 
     // ========================================
@@ -571,7 +571,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
         log.updatedAt = new Date().toISOString();
         this.listViewStale = true;
         this.saveLogs();
-        this.renderLogs(this.sampleLogs);
+        this.filterAndRenderLogs();
     }
 
     // ========================================
@@ -901,7 +901,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
     updateSearchButtonState() {
         const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
             this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo ||
-            this.currentSearchFilter.completed;
+            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
         const openSearchModalBtn = document.getElementById('openSearchModalBtn');
         if (openSearchModalBtn) {
             if (hasFilter) {
@@ -1158,7 +1158,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
                     this.sampleLogs = this.sampleLogs.filter(l => !selectedIds.includes(String(l.id)));
                     this.listViewStale = true;
                     this.saveLogs();
-                    this.renderLogs(this.sampleLogs);
+                    this.filterAndRenderLogs();
                     showToast(`${checked.length}건이 삭제되었습니다.`, 'success');
 
                     // Firebase에서도 삭제
@@ -1208,7 +1208,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
 
                 this.listViewStale = true;
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
 
                 if (selectAllCheckbox) {
                     selectAllCheckbox.checked = false;
@@ -1381,7 +1381,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
             getData: () => this.sampleLogs,
             setData: (data) => { this.sampleLogs = data; },
             saveData: () => this.saveLogs(),
-            renderData: () => this.renderLogs(this.sampleLogs),
+            renderData: () => this.filterAndRenderLogs(),
             showToast: showToast
         });
 
@@ -1689,8 +1689,8 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
                 if (searchNameInput) searchNameInput.value = '';
                 if (searchReceptionFromInput) searchReceptionFromInput.value = '';
                 if (searchReceptionToInput) searchReceptionToInput.value = '';
-                if (completedFilter) completedFilter.value = '';
-                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: '' };
+                if (completedFilter) completedFilter.value = 'incomplete';
+                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: 'incomplete' };
                 this.filterAndRenderLogs();
                 this.updateSearchButtonState();
                 listSearchModal.classList.add('hidden');
@@ -1908,7 +1908,7 @@ class HeavyMetalSampleManager extends window.BaseSampleManager {
                 });
                 this.listViewStale = true;
                 this.saveLogs();
-                this.renderLogs(this.sampleLogs);
+                this.filterAndRenderLogs();
             }
         });
         excelImporter.init();

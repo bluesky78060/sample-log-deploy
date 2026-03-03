@@ -29,6 +29,9 @@ const EncryptionManager = (function() {
     /** @type {boolean} 초기화 진행 중 여부 (재진입 방지) */
     let _initInProgress = false;
 
+    /** @type {Promise<boolean>|null} 현재 진행 중인 초기화 Promise (동시 호출 대기용) */
+    let _initPromise = null;
+
     /** @type {string|null} 키 소스 (firebase, local, generated) */
     let _keySource = null;
 
@@ -335,7 +338,7 @@ const EncryptionManager = (function() {
             }
         }
 
-        // 2. Electron 로컬 키 파일 폴백
+        // 2. Electron 로컬 키 파일 폴백 (Electron 전용)
         if (window.electronAPI?.isElectron) {
             try {
                 const keyContent = await window.electronAPI.readKeyFile?.();
@@ -347,9 +350,11 @@ const EncryptionManager = (function() {
             } catch (localErr) {
                 console.warn('[Encryption] Local key file not found:', localErr.message);
             }
+            // Electron은 localStorage 폴백을 사용하지 않음 (웹 키와 분리)
+            return null;
         }
 
-        // 3. 웹 localStorage 폴백 (Firebase/Electron 모두 없을 때)
+        // 3. 웹 localStorage 폴백 (웹 전용, Electron에서는 도달하지 않음)
         try {
             const lsKey = localStorage.getItem(LS_KEY_ENCRYPTION_KEY);
             if (lsKey) {
@@ -377,6 +382,12 @@ const EncryptionManager = (function() {
 
         const systemCollection = getSystemCollection();
         try {
+            // Firebase에 이미 키가 있으면 덮어쓰지 않음 (다른 환경에서 생성한 키 보호)
+            const existing = await db.collection(systemCollection).doc('encryptionKey').get();
+            if (existing.exists && existing.data()?.keyFileContent) {
+                console.log(`[Encryption] Firebase already has key in ${systemCollection} - skip sync`);
+                return;
+            }
             await db.collection(systemCollection).doc('encryptionKey').set({
                 keyFileContent: keyContent,
                 createdAt: new Date().toISOString(),
@@ -423,31 +434,33 @@ const EncryptionManager = (function() {
             }
         }
 
-        // Firebase 실패 시 로컬 파일에 저장
+        // Firebase 실패 시 환경별 로컬 저장소에 저장 (서로 분리)
         const isElectron = window.electronAPI?.isElectron === true;
-        if (isElectron && window.electronAPI?.saveKeyFile) {
-            try {
-                const result = await window.electronAPI.saveKeyFile(keyFileContent);
-                if (result?.success) {
-                    console.log('[Encryption] Key stored in local file (safeStorage protected)');
-                    _keySource = 'local';
-                    // 키 파일 백업 안내
-                    _promptKeyFileBackup(keyFileContent);
-                    return keyFileContent;
+        if (isElectron) {
+            // Electron: 앱 데이터 폴더 파일에만 저장 (localStorage 사용 안 함)
+            if (window.electronAPI?.saveKeyFile) {
+                try {
+                    const result = await window.electronAPI.saveKeyFile(keyFileContent);
+                    if (result?.success) {
+                        console.log('[Encryption] Key stored in local file (safeStorage protected)');
+                        _keySource = 'local';
+                        _promptKeyFileBackup(keyFileContent);
+                        return keyFileContent;
+                    }
+                } catch (localErr) {
+                    console.error('[Encryption] Failed to store key locally:', localErr.message);
                 }
-            } catch (localErr) {
-                console.error('[Encryption] Failed to store key locally:', localErr.message);
             }
-        }
-
-        // 웹 localStorage 폴백 (Firebase/Electron 모두 없을 때)
-        try {
-            localStorage.setItem(LS_KEY_ENCRYPTION_KEY, keyFileContent);
-            console.log('[Encryption] Key stored in localStorage');
-            _keySource = 'local';
-            return keyFileContent;
-        } catch (lsErr) {
-            console.warn('[Encryption] localStorage key save failed:', lsErr.message);
+        } else {
+            // 웹: localStorage에만 저장 (Electron 로컬 파일 사용 안 함)
+            try {
+                localStorage.setItem(LS_KEY_ENCRYPTION_KEY, keyFileContent);
+                console.log('[Encryption] Key stored in localStorage');
+                _keySource = 'local';
+                return keyFileContent;
+            } catch (lsErr) {
+                console.warn('[Encryption] localStorage key save failed:', lsErr.message);
+            }
         }
 
         // 모든 저장 실패 시 키 자체는 반환 (세션 중에만 사용)
@@ -2025,8 +2038,13 @@ const EncryptionManager = (function() {
      */
     async function initEncryption() {
         if (_initialized) return !!_cryptoKey;
-        if (_initInProgress) return false;
+        if (_initInProgress) return _initPromise || false;
         _initInProgress = true;
+        _initPromise = _doInitEncryption().finally(() => { _initPromise = null; });
+        return _initPromise;
+    }
+
+    async function _doInitEncryption() {
 
         if (!window.CryptoUtils) {
             console.warn('[Encryption] CryptoUtils not loaded');
@@ -2041,6 +2059,14 @@ const EncryptionManager = (function() {
 
             // ── Step 1b: 키 파일 없으면 최초 설정 ──
             if (!_keyFileContent) {
+                // Firebase 초기화 지연 대비: Firebase가 이제 준비되었을 수 있으므로 재시도
+                if (window.firebaseConfig?.isEnabled()) {
+                    console.log('[Encryption] Retrying Firebase key load...');
+                    _keyFileContent = await loadKeyFileContent();
+                }
+            }
+
+            if (!_keyFileContent) {
                 console.log('[Encryption] No existing key found - starting first-time setup');
                 _isFirstTimeSetup = true;
 
@@ -2053,7 +2079,7 @@ const EncryptionManager = (function() {
 
             console.debug(`[Encryption] Key ready (source: ${_keySource})`);
 
-            // ── Step 1c: 로컬 키가 Firebase에 없으면 동기화 ──
+            // ── Step 1c: 로컬 키가 Firebase에 없으면 동기화 (기존 키 보호) ──
             if (_keySource === 'local') {
                 console.log('[Encryption] Key loaded from local - syncing to Firebase...');
                 await syncKeyToFirebase(_keyFileContent);
@@ -3082,6 +3108,7 @@ const EncryptionManager = (function() {
         _salt = null;
         _initialized = false;
         _initInProgress = false;
+        _initPromise = null;
         _keySource = null;
         _isFirstTimeSetup = false;
 
@@ -3105,7 +3132,7 @@ const EncryptionManager = (function() {
      */
     async function initSilent() {
         if (_initialized) return !!_cryptoKey;
-        if (_initInProgress) return false;
+        if (_initInProgress) return _initPromise || false;
         _initInProgress = true;
 
         if (!window.CryptoUtils) {
