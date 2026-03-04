@@ -568,7 +568,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
                 if (result?.success) {
                     console.log('[Encryption] Key stored in local file (safeStorage protected)');
                     _keySource = 'local';
-                    _promptKeyFileBackup(keyFileContent);
+                    // 백업 안내는 비밀번호 설정 완료 후에 표시됨
                     return keyFileContent;
                 }
             } catch (localErr) {
@@ -1886,14 +1886,22 @@ function showFirstTimePasswordPrompt(): Promise<string | null> {
                     </div>
                     <div>
                         <label style="font-size: 13px; font-weight: 500; color: #374151; display: block; margin-bottom: 8px;">비밀번호 확인</label>
-                        <input type="password" id="enc-password-confirm" placeholder="비밀번호 다시 입력" maxlength="64"
-                            style="
-                                width: 100%; padding: 12px 14px; font-size: 14px;
-                                border: 1px solid #D1D5DB; border-radius: 10px;
-                                box-sizing: border-box; outline: none; background: #F9FAFB;
-                                transition: border-color 0.2s, box-shadow 0.2s;
-                            "
-                        />
+                        <div style="position: relative;">
+                            <input type="password" id="enc-password-confirm" placeholder="비밀번호 다시 입력" maxlength="64"
+                                style="
+                                    width: 100%; padding: 12px 44px 12px 14px; font-size: 14px;
+                                    border: 1px solid #D1D5DB; border-radius: 10px;
+                                    box-sizing: border-box; outline: none; background: #F9FAFB;
+                                    transition: border-color 0.2s, box-shadow 0.2s;
+                                "
+                            />
+                            <button type="button" id="enc-toggle-pw-confirm" style="
+                                position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+                                background: none; border: none; cursor: pointer; padding: 4px; color: #9CA3AF;
+                            " title="비밀번호 표시/숨기기">
+                                ${EYE_OFF_SVG}
+                            </button>
+                        </div>
                     </div>
                     <div id="enc-password-error" style="
                         color: #DC2626; font-size: 12px; margin-top: 6px; display: none;
@@ -1935,6 +1943,15 @@ function showFirstTimePasswordPrompt(): Promise<string | null> {
                 const isPassword = input.type === 'password';
                 input.type = isPassword ? 'text' : 'password';
                 toggleBtn.innerHTML = isPassword ? EYE_ON_SVG : EYE_OFF_SVG;
+            });
+        }
+
+        const toggleConfirmBtn = document.getElementById('enc-toggle-pw-confirm');
+        if (toggleConfirmBtn) {
+            toggleConfirmBtn.addEventListener('click', () => {
+                const isPassword = confirmInput.type === 'password';
+                confirmInput.type = isPassword ? 'text' : 'password';
+                toggleConfirmBtn.innerHTML = isPassword ? EYE_ON_SVG : EYE_OFF_SVG;
             });
         }
 
@@ -2032,6 +2049,11 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
         }
     } catch (recErr) {
         console.warn('[Encryption] Recovery key generation failed:', (recErr as Error).message);
+    }
+
+    // 비밀번호 설정 완료 후 키 파일 백업 안내 표시
+    if (_keyFileContent) {
+        _promptKeyFileBackup(_keyFileContent);
     }
 
     console.log('[Encryption] First-time setup SUCCESS (verification skipped - no existing encrypted data)');
