@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 마이그레이션 도구</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #718096;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .status-card {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .status-card.needs-migration {
+            background: #fffbeb;
+            border-color: #f59e0b;
+        }
+
+        .status-card.migrated {
+            background: #f0fdf4;
+            border-color: #22c55e;
+        }
+
+        .status-card h3 {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .count-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .count-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .count-label {
+            color: #475569;
+        }
+
+        .count-value {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-warning:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-danger:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+        }
+
+        .progress-container {
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-bar-bg {
+            background: #e2e8f0;
+            border-radius: 999px;
+            height: 24px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .log-container {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 2rem;
+        }
+
+        .log-line {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .log-line.success {
+            color: #86efac;
+        }
+
+        .log-line.error {
+            color: #fca5a5;
+        }
+
+        .log-line.info {
+            color: #93c5fd;
+        }
+
+        .log-line.warning {
+            color: #fcd34d;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .warning-box h4 {
+            color: #92400e;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .warning-box p {
+            color: #78350f;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Firebase 마이그레이션 도구</h1>
+        <p class="subtitle">원본 컬렉션 → test_ 컬렉션으로 데이터 복사</p>
+
+        <div class="warning-box">
+            <h4>⚠️ 주의사항</h4>
+            <p>
+                이 도구는 <strong>soilSamples_2026</strong> 같은 원본 컬렉션의 데이터를
+                <strong>test_soilSamples_2026</strong>로 복사합니다.<br>
+                실제 마이그레이션 전에 반드시 "상태 확인 (DRY RUN)"을 먼저 실행하세요.
+            </p>
+        </div>
+
+        <div id="statusGrid" class="status-grid">
+            <!-- 상태 카드가 여기에 동적으로 추가됩니다 -->
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-primary" id="btnCheck">
+                📊 상태 확인 (DRY RUN)
+            </button>
+            <button class="btn btn-warning" id="btnMigrate" disabled>
+                🚀 실제 마이그레이션 실행
+            </button>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-label" id="progressLabel">진행 중...</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBar">0%</div>
+            </div>
+        </div>
+
+        <div class="log-container" id="logContainer">
+            <div class="log-line info">> 마이그레이션 도구가 준비되었습니다.</div>
+            <div class="log-line info">> "상태 확인" 버튼을 눌러 시작하세요.</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import './shared/firebase-config.js';
+        import './shared/firebase-migration-tool.js';
+
+        let migrationTool = null;
+        let currentStatus = null;
+
+        const statusGrid = document.getElementById('statusGrid');
+        const btnCheck = document.getElementById('btnCheck');
+        const btnMigrate = document.getElementById('btnMigrate');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressLabel = document.getElementById('progressLabel');
+        const progressBar = document.getElementById('progressBar');
+        const logContainer = document.getElementById('logContainer');
+
+        function addLog(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = `> ${message}`;
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+        }
+
+        function updateProgress(current, total) {
+            const percentage = Math.round((current / total) * 100);
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${percentage}%`;
+            progressLabel.textContent = `진행 중: ${current}/${total}건`;
+        }
+
+        function showProgress() {
+            progressContainer.classList.add('active');
+        }
+
+        function hideProgress() {
+            progressContainer.classList.remove('active');
+            progressBar.style.width = '0%';
+        }
+
+        function renderStatus(status) {
+            statusGrid.innerHTML = '';
+
+            for (const [type, info] of Object.entries(status)) {
+                const card = document.createElement('div');
+                card.className = `status-card ${info.needsMigration ? 'needs-migration' : 'migrated'}`;
+
+                const typeName = {
+                    soil: '토양',
+                    water: '수질분석',
+                    compost: '퇴·액비',
+                    heavyMetal: '토양 중금속',
+                    pesticide: '잔류농약'
+                }[type] || type;
+
+                card.innerHTML = `
+                    <h3>${typeName}</h3>
+                    <div class="count-row">
+                        <span class="count-label">원본:</span>
+                        <span class="count-value">${info.original.count}건</span>
+                    </div>
+                    <div class="count-row">
+                        <span class="count-label">test_:</span>
+                        <span class="count-value">${info.test.count}건</span>
+                    </div>
+                    <span class="badge ${info.needsMigration ? 'warning' : 'success'}">
+                        ${info.needsMigration ? '⚠️ 마이그레이션 필요' : '✅ 완료'}
+                    </span>
+                `;
+
+                statusGrid.appendChild(card);
+            }
+        }
+
+        btnCheck.addEventListener('click', async () => {
+            try {
+                btnCheck.disabled = true;
+                btnCheck.innerHTML = '<span class="loading"></span> 확인 중...';
+                clearLog();
+                addLog('Firebase 연결 확인 중...', 'info');
+
+                migrationTool = new window.FirebaseMigrationTool();
+                await migrationTool.init();
+                addLog('✅ Firebase 연결 성공', 'success');
+
+                addLog('컬렉션 상태 확인 중...', 'info');
+                currentStatus = await migrationTool.checkStatus();
+
+                renderStatus(currentStatus);
+
+                let needsMigration = false;
+                for (const [type, info] of Object.entries(currentStatus)) {
+                    const typeName = {
+                        soil: '토양',
+                        water: '수질분석',
+                        compost: '퇴·액비',
+                        heavyMetal: '토양 중금속',
+                        pesticide: '잔류농약'
+                    }[type] || type;
+
+                    addLog(`${typeName}: ${info.original.name} (${info.original.count}건) → ${info.test.name} (${info.test.count}건)`, 'info');
+
+                    if (info.needsMigration) {
+                        needsMigration = true;
+                        addLog(`⚠️  ${typeName}은 마이그레이션이 필요합니다.`, 'warning');
+                    }
+                }
+
+                if (needsMigration) {
+                    btnMigrate.disabled = false;
+                    addLog('마이그레이션이 필요한 컬렉션이 있습니다. "실제 마이그레이션 실행" 버튼을 눌러주세요.', 'warning');
+                } else {
+                    addLog('모든 컬렉션이 이미 마이그레이션되었습니다.', 'success');
+                }
+
+            } catch (error) {
+                addLog(`❌ 오류: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                btnCheck.disabled = false;
+                btnCheck.innerHTML = '📊 상태 확인 (DRY RUN)';
+            }
+        });
+
+        btnMigrate.addEventListener('click', async () => {
+            if (!confirm('실제 마이그레이션을 실행하시겠습니까?\n\n원본 데이터를 test_ 컬렉션으로 복사합니다.')) {
+                return;
+            }
+
+            try {
+                btnMigrate.disabled = true;
+                btnMigrate.innerHTML = '<span class="loading"></span> 마이그레이션 중...';
+                showProgress();
+                clearLog();
+
+                addLog('마이그레이션 시작...', 'info');
+
+                const result = await migrationTool.migrateAll({
+                    dryRun: false,
+                    onProgress: (progress) => {
+                        updateProgress(progress.current, progress.total);
+                    }
+                });
+
+                addLog('', 'info');
+                addLog('=== 마이그레이션 결과 ===', 'info');
+                for (const r of result.results) {
+                    const typeName = {
+                        soil: '토양',
+                        water: '수질분석',
+                        compost: '퇴·액비',
+                        heavyMetal: '토양 중금속',
+                        pesticide: '잔류농약'
+                    }[r.type] || r.type;
+
+                    if (r.success) {
+                        addLog(`✅ ${typeName}: ${r.message}`, 'success');
+                    } else {
+                        addLog(`❌ ${typeName}: ${r.message || r.error}`, 'error');
+                    }
+                }
+
+                addLog('', 'info');
+                addLog(`총 ${result.summary.total}개 중 ${result.summary.success}개 성공, ${result.summary.failed}개 실패`, 'info');
+
+                if (result.summary.success > 0) {
+                    addLog('', 'success');
+                    addLog('🎉 마이그레이션이 완료되었습니다!', 'success');
+                    addLog('앱을 새로고침하면 test_ 컬렉션의 데이터를 볼 수 있습니다.', 'success');
+
+                    // 상태 다시 확인
+                    setTimeout(async () => {
+                        currentStatus = await migrationTool.checkStatus();
+                        renderStatus(currentStatus);
+                    }, 2000);
+                }
+
+            } catch (error) {
+                addLog(`❌ 오류: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                hideProgress();
+                btnMigrate.disabled = false;
+                btnMigrate.innerHTML = '🚀 실제 마이그레이션 실행';
+            }
+        });
+
+        // 초기 로그
+        addLog('Firebase 설정 확인 중...', 'info');
+        if (window.firebaseConfig?.isEnabled()) {
+            addLog('✅ Firebase가 활성화되어 있습니다.', 'success');
+        } else {
+            addLog('❌ Firebase가 비활성화되어 있습니다.', 'error');
+            addLog('설정 페이지에서 Firebase를 먼저 활성화하세요.', 'error');
+            btnCheck.disabled = true;
+        }
+    </script>
+</body>
+</html>

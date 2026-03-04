@@ -1236,7 +1236,7 @@ class CompostSampleManager extends window.BaseSampleManager {
                 const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.dataset.id);
 
                 if (selectedIds.length === 0) {
-                    alert('삭제할 항목을 선택해주세요.');
+                    showToast('삭제할 항목을 선택해주세요.', 'warning');
                     return;
                 }
 
@@ -1277,7 +1277,7 @@ class CompostSampleManager extends window.BaseSampleManager {
 
             if (selectedIds.length === 0) {
                 if (this.sampleLogs.length === 0) {
-                    alert('인쇄할 데이터가 없습니다.');
+                    showToast('인쇄할 데이터가 없습니다.', 'warning');
                     return;
                 }
 
@@ -1789,7 +1789,7 @@ class CompostSampleManager extends window.BaseSampleManager {
 
         exportBtn.addEventListener('click', () => {
             if (this.sampleLogs.length === 0) {
-                alert('내보낼 데이터가 없습니다.');
+                showToast('내보낼 데이터가 없습니다.', 'warning');
                 return;
             }
 
@@ -1998,7 +1998,7 @@ class CompostSampleManager extends window.BaseSampleManager {
             }
 
             if (value.length > 0 && typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin'], true);
+                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin', 'pohang_buk', 'pohang_nam'], true);
 
                 if (suggestions.length > 0) {
                     autocompleteList.innerHTML = sanitizeHTML(suggestions.map(item => `
@@ -2230,25 +2230,30 @@ class CompostSampleManager extends window.BaseSampleManager {
     // ========================================
 
     async loadAutoSaveOnInit() {
-        this.log('자동 저장 로드 체크:', { isElectron: window.isElectron, autoSavePath: this.FileAPI?.autoSavePath });
-        if (window.isElectron && this.FileAPI?.autoSavePath) {
-            // Firebase/localStorage에서 이미 데이터가 로드된 경우 autoSave를 무시
-            // (autoSave는 오프라인 백업용이므로 이미 최신 데이터가 있으면 불필요)
-            if (this.sampleLogs && this.sampleLogs.length > 0) {
-                this.log('이미 데이터가 로드됨 (' + this.sampleLogs.length + '건), autoSave 스킵');
-                return;
-            }
+        // 로컬 모드에서만 auto-save 로드 (Firebase 모드에서는 로드 안함)
+        if (window.firebaseConfig?.isEnabled()) {
+            this.log('Firebase 모드: 자동 저장 로드 비활성화됨');
+            return;
+        }
 
+        // 로컬 모드: auto-save 파일에서 로드
+        if (!window.isElectron || !this.FileAPI?.autoSavePath || this.sampleLogs.length > 0) {
+            return;
+        }
+
+        try {
             const autoSaveData = await window.loadFromAutoSaveFile();
-            this.log('로드된 데이터:', autoSaveData);
             if (autoSaveData && autoSaveData.length > 0) {
                 this.sampleLogs = autoSaveData;
                 localStorage.setItem(this.getStorageKey(this.selectedYear), JSON.stringify(this.sampleLogs));
-                this.log('퇴액비 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
                 this.filterAndRenderLogs();
+                if (this.receptionNumberInput) {
+                    this.receptionNumberInput.value = this.generateNextReceptionNumber();
+                }
+                this.log('로컬 모드: 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
             }
-        } else {
-            this.log('자동 저장 로드 스킵됨:', { isElectron: window.isElectron, autoSavePath: this.FileAPI?.autoSavePath });
+        } catch (error) {
+            this.log('자동 저장 파일 로드 오류:', error);
         }
     }
 

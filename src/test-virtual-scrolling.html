@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Scrolling 테스트</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            padding: 20px;
+            background: var(--gray-100);
+        }
+
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-family: 'Fraunces', serif;
+            color: var(--gray-800);
+            margin-bottom: 1.5rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: white;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .controls button {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .controls button:hover {
+            background: var(--primary-hover);
+        }
+
+        #stats {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: white;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        #stats strong {
+            color: var(--primary);
+        }
+
+        #container {
+            max-height: 600px;
+            overflow: auto;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius-md);
+            background: white;
+            box-shadow: var(--shadow-md);
+        }
+
+        #viewport {
+            position: relative;
+        }
+
+        .item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-200);
+            background: white;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .item:hover {
+            background: var(--gray-50);
+        }
+
+        .item strong {
+            color: var(--primary);
+            min-width: 60px;
+        }
+
+        .item-name {
+            flex: 1;
+            color: var(--gray-800);
+        }
+
+        .item-date {
+            color: var(--gray-500);
+            font-size: 13px;
+        }
+
+        .performance-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--success-light);
+            color: var(--success);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Virtual Scrolling 성능 테스트</h1>
+
+        <div class="controls">
+            <button onclick="generateData(100)">100개 생성</button>
+            <button onclick="generateData(1000)">1,000개 생성</button>
+            <button onclick="generateData(5000)">5,000개 생성</button>
+            <button onclick="generateData(10000)">10,000개 생성</button>
+            <button onclick="scrollToIndex(0)" style="background: var(--gray-600)">맨 위로</button>
+            <button onclick="scrollToIndex(5000)" style="background: var(--gray-600)">중간으로</button>
+            <button onclick="scrollToIndex(9999)" style="background: var(--gray-600)">맨 아래로</button>
+        </div>
+
+        <div id="stats"></div>
+
+        <div id="container">
+            <div id="viewport"></div>
+        </div>
+    </div>
+
+    <script src="shared/VirtualListManager.js"></script>
+    <script>
+        let virtualList;
+
+        function init() {
+            virtualList = new VirtualListManager({
+                container: document.getElementById('container'),
+                viewport: document.getElementById('viewport'),
+                itemHeight: 48,
+                buffer: 5,
+                renderItem: (item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.innerHTML = `
+                        <strong>#${index + 1}</strong>
+                        <span class="item-name">${item.name}</span>
+                        <span class="item-date">${item.date}</span>
+                    `;
+                    return div;
+                },
+                getItemKey: (item) => item.id
+            });
+
+            generateData(1000);
+        }
+
+        function generateData(count) {
+            const start = performance.now();
+
+            const data = Array.from({ length: count }, (_, i) => ({
+                id: `item-${i}`,
+                name: `Sample ${i + 1}`,
+                date: new Date(2024, 0, (i % 365) + 1).toISOString().split('T')[0]
+            }));
+
+            virtualList.setData(data);
+
+            const end = performance.now();
+            updateStats(count, end - start);
+        }
+
+        function scrollToIndex(index) {
+            virtualList.scrollToIndex(index);
+        }
+
+        function updateStats(count, renderTime) {
+            const stats = virtualList.getStats();
+            const fps = renderTime < 16.67 ? '60fps' : Math.round(1000 / renderTime) + 'fps';
+            const performanceBadge = renderTime < 16.67
+                ? '<span class="performance-badge">✓ 60fps 달성</span>'
+                : '';
+
+            document.getElementById('stats').innerHTML = `
+                <strong>성능 통계:</strong><br>
+                전체 아이템: ${count.toLocaleString()}개<br>
+                렌더링된 아이템: ${stats.renderedItems}개 <small>(화면에 보이는 항목만)</small><br>
+                메모리 효율: ${stats.memoryEfficiency} <small>(메모리 절약 비율)</small><br>
+                렌더링 시간: ${renderTime.toFixed(2)}ms (${fps}) ${performanceBadge}
+            `;
+        }
+
+        // 초기화
+        init();
+    </script>
+</body>
+</html>

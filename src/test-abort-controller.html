@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AbortController Test</title>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-start {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .btn-cancel {
+            background-color: #f44336;
+            color: white;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+        .progress {
+            margin-top: 10px;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>AbortController 취소 기능 테스트</h1>
+
+    <div class="test-section">
+        <h2>1. Firebase 동기화 취소 테스트</h2>
+        <button class="btn-start" onclick="testFirebaseSync()">Firebase 동기화 시작</button>
+        <button class="btn-cancel" onclick="cancelFirebaseSync()">취소</button>
+        <div class="status" id="firebaseStatus">대기 중...</div>
+        <div class="progress">
+            <div class="progress-bar" id="firebaseProgress" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 대용량 파일 저장 취소 테스트</h2>
+        <button class="btn-start" onclick="testLargeFileSave()">대용량 파일 저장</button>
+        <button class="btn-cancel" onclick="cancelLargeFileSave()">취소</button>
+        <div class="status" id="fileStatus">대기 중...</div>
+        <div class="progress">
+            <div class="progress-bar" id="fileProgress" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 콘솔 테스트 코드</h2>
+        <pre><code>// Firebase 동기화 취소 테스트
+const testData = Array.from({ length: 2000 }, (_, i) => ({
+    id: `test-${i}`,
+    name: `Sample ${i}`,
+    date: new Date().toISOString()
+}));
+
+const controller = new AbortController();
+
+// 동기화 시작
+window.firestoreDb.batchSave('soil', 2024, testData, { signal: controller.signal });
+
+// 3초 후 취소
+setTimeout(() => controller.abort(), 3000);
+</code></pre>
+    </div>
+
+    <!-- 공통 스크립트 로드 -->
+    <script type="module" src="./shared/loading-manager.js"></script>
+    <script type="module" src="./shared/toast.js"></script>
+    <script type="module" src="./shared/logger.js"></script>
+    <script type="module" src="./shared/error-handler.js"></script>
+    <script type="module" src="./shared/file-api.js"></script>
+    <script type="module" src="./shared/firebase-config.js"></script>
+    <script type="module" src="./shared/firestore-db.js"></script>
+
+    <script>
+        let firebaseController = null;
+        let fileController = null;
+
+        // Firebase 동기화 테스트
+        async function testFirebaseSync() {
+            const statusEl = document.getElementById('firebaseStatus');
+            const progressEl = document.getElementById('firebaseProgress');
+
+            try {
+                // 테스트 데이터 생성 (2000건)
+                const testData = Array.from({ length: 2000 }, (_, i) => ({
+                    id: `test-${i}`,
+                    name: `Sample ${i}`,
+                    date: new Date().toISOString(),
+                    completed: false
+                }));
+
+                // AbortController 생성
+                firebaseController = new AbortController();
+
+                statusEl.textContent = '동기화 중...';
+                progressEl.style.width = '0%';
+
+                // 진행률 시뮬레이션
+                const progressInterval = setInterval(() => {
+                    const currentWidth = parseFloat(progressEl.style.width);
+                    if (currentWidth < 90) {
+                        progressEl.style.width = (currentWidth + 5) + '%';
+                    }
+                }, 200);
+
+                // Firebase 동기화 실행 (window.firestoreDb가 로드되어 있어야 함)
+                if (window.firestoreDb) {
+                    const result = await window.firestoreDb.batchSave(
+                        'soil',
+                        2024,
+                        testData,
+                        { signal: firebaseController.signal }
+                    );
+
+                    clearInterval(progressInterval);
+
+                    if (result) {
+                        statusEl.textContent = '동기화 완료!';
+                        progressEl.style.width = '100%';
+                    } else {
+                        statusEl.textContent = '동기화 실패 또는 취소됨';
+                        progressEl.style.width = '0%';
+                    }
+                } else {
+                    clearInterval(progressInterval);
+                    statusEl.textContent = 'Firebase가 초기화되지 않았습니다.';
+                }
+            } catch (error) {
+                statusEl.textContent = error.name === 'AbortError'
+                    ? '사용자가 취소했습니다.'
+                    : `오류: ${error.message}`;
+                progressEl.style.width = '0%';
+            }
+        }
+
+        function cancelFirebaseSync() {
+            if (firebaseController) {
+                firebaseController.abort();
+                document.getElementById('firebaseStatus').textContent = '취소 요청됨...';
+            }
+        }
+
+        // 대용량 파일 저장 테스트
+        async function testLargeFileSave() {
+            const statusEl = document.getElementById('fileStatus');
+            const progressEl = document.getElementById('fileProgress');
+
+            try {
+                // 대용량 JSON 데이터 생성 (5MB 정도)
+                const largeData = Array.from({ length: 10000 }, (_, i) => ({
+                    id: `record-${i}`,
+                    name: `Record ${i}`,
+                    description: 'A'.repeat(500), // 500자
+                    timestamp: new Date().toISOString()
+                }));
+
+                const content = JSON.stringify(largeData, null, 2);
+
+                // AbortController 생성
+                fileController = new AbortController();
+
+                statusEl.textContent = '파일 저장 중...';
+                progressEl.style.width = '0%';
+
+                // saveLargeFile 함수 사용 (window.saveLargeFile이 로드되어 있어야 함)
+                if (window.saveLargeFile) {
+                    const result = await window.saveLargeFile(
+                        content,
+                        'test-large-file.json',
+                        { signal: fileController.signal }
+                    );
+
+                    if (result) {
+                        statusEl.textContent = '파일 저장 완료!';
+                        progressEl.style.width = '100%';
+                    } else {
+                        statusEl.textContent = '파일 저장 실패 또는 취소됨';
+                        progressEl.style.width = '0%';
+                    }
+                } else {
+                    statusEl.textContent = 'saveLargeFile 함수가 로드되지 않았습니다.';
+                }
+            } catch (error) {
+                statusEl.textContent = error.name === 'AbortError'
+                    ? '사용자가 취소했습니다.'
+                    : `오류: ${error.message}`;
+                progressEl.style.width = '0%';
+            }
+        }
+
+        function cancelLargeFileSave() {
+            if (fileController) {
+                fileController.abort();
+                document.getElementById('fileStatus').textContent = '취소 요청됨...';
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('[Test Page] AbortController 테스트 페이지 로드됨');
+
+            // Firebase 초기화 확인
+            if (window.firebaseConfig) {
+                window.firebaseConfig.initialize().then(() => {
+                    console.log('[Test Page] Firebase 초기화 완료');
+                }).catch(err => {
+                    console.warn('[Test Page] Firebase 초기화 실패:', err);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

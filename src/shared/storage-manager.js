@@ -28,7 +28,7 @@ const DEBUG_STORAGE = false;
 const logStorage = (...args) => DEBUG_STORAGE && console.log('[Storage]', ...args);
 
 // 동기화 상태
-let syncStatus = {
+const syncStatus = {
     lastSyncTime: null,
     pendingChanges: 0,
     isOnline: navigator.onLine

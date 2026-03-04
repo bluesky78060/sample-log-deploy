@@ -153,7 +153,7 @@ class PaginationManager {
         // 표시할 페이지 번호 계산
         const maxButtons = 5; // 최대 표시할 버튼 수
         let startPage = Math.max(1, this.currentPage - Math.floor(maxButtons / 2));
-        let endPage = Math.min(this.totalPages, startPage + maxButtons - 1);
+        const endPage = Math.min(this.totalPages, startPage + maxButtons - 1);
 
         // startPage 조정 (endPage에서 역산)
         if (endPage - startPage + 1 < maxButtons) {

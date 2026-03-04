@@ -1,3 +1,5 @@
+// @ts-nocheck
+// Note: TypeScript checking disabled due to dynamic class extension from window.BaseSampleManager
 // ========================================
 // Soil Sample Manager
 // 토양 시료 관리 클래스
@@ -6,6 +8,7 @@
 /**
  * 토양 시료 관리 매니저
  * BaseSampleManager를 확장하여 토양 특화 기능 구현
+ * @extends {BaseSampleManager}
  */
 class SoilSampleManager extends BaseSampleManager {
     constructor() {

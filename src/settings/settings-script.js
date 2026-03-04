@@ -89,7 +89,7 @@ async function saveAuthFile(content) {
         // JSON 파싱 검증
         const config = JSON.parse(content);
         if (!config.apiKey || !config.projectId) {
-            alert('유효하지 않은 인증 파일입니다.\nAPI Key와 Project ID가 필요합니다.');
+            showToast('유효하지 않은 인증 파일입니다.\nAPI Key와 Project ID가 필요합니다.', 'error');
             return false;
         }
 
@@ -103,12 +103,12 @@ async function saveAuthFile(content) {
             if (window.firebaseConfig?.reinitialize) {
                 const initResult = await window.firebaseConfig.reinitialize();
                 if (initResult) {
-                    alert('인증 파일이 적용되고 Firebase가 연결되었습니다.\n프로젝트: ' + config.projectId);
+                    showToast('인증 파일이 적용되고 Firebase가 연결되었습니다.\n프로젝트: ' + config.projectId);
                 } else {
-                    alert('인증 파일이 저장되었지만 Firebase 연결에 실패했습니다.\n페이지를 새로고침해주세요.');
+                    showToast('인증 파일이 저장되었지만 Firebase 연결에 실패했습니다.\n페이지를 새로고침해주세요.');
                 }
             } else {
-                alert('인증 파일이 저장되었습니다.\n페이지를 새로고침하면 적용됩니다.');
+                showToast('인증 파일이 저장되었습니다.\n페이지를 새로고침하면 적용됩니다.');
             }
             await checkAuthFileStatus();
             updateConnectionStatus();
@@ -122,22 +122,22 @@ async function saveAuthFile(content) {
             if (window.firebaseConfig?.reinitialize) {
                 const initResult = await window.firebaseConfig.reinitialize();
                 if (initResult) {
-                    alert('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + config.projectId);
+                    showToast('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + config.projectId);
                 } else {
-                    alert('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
+                    showToast('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
                 }
             } else {
-                alert('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.');
+                showToast('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.');
             }
             await checkAuthFileStatus();
             updateConnectionStatus();
             return true;
         } else {
-            alert('인증 파일 저장 실패: ' + (result.error || '알 수 없는 오류'));
+            showToast('인증 파일 저장 실패: ' + (result.error || '알 수 없는 오류'));
             return false;
         }
     } catch (error) {
-        alert('인증 파일 형식이 올바르지 않습니다.\nJSON 형식의 파일이 필요합니다.');
+        showToast('인증 파일 형식이 올바르지 않습니다.\nJSON 형식의 파일이 필요합니다.');
         return false;
     }
 }
@@ -153,7 +153,7 @@ async function deleteAuthFile() {
         if (window.firebaseConfig?.resetConfig) {
             window.firebaseConfig.resetConfig();
         }
-        alert('Firebase 설정이 삭제되었습니다.');
+        showToast('Firebase 설정이 삭제되었습니다.');
         await checkAuthFileStatus();
         updateConnectionStatus();
         return;
@@ -166,14 +166,14 @@ async function deleteAuthFile() {
             if (window.firebaseConfig?.resetConfig) {
                 window.firebaseConfig.resetConfig();
             }
-            alert('인증 파일이 삭제되었습니다.');
+            showToast('인증 파일이 삭제되었습니다.');
             await checkAuthFileStatus();
             updateConnectionStatus();
         } else {
-            alert('인증 파일 삭제 실패: ' + (result.error || '알 수 없는 오류'));
+            showToast('인증 파일 삭제 실패: ' + (result.error || '알 수 없는 오류'));
         }
     } catch (error) {
-        alert('인증 파일 삭제 중 오류 발생: ' + error.message);
+        showToast('인증 파일 삭제 중 오류 발생: ' + error.message);
     }
 }
 
@@ -191,20 +191,20 @@ document.getElementById('selectAuthFileBtn')?.addEventListener('click', async ()
                 if (window.firebaseConfig?.reinitialize) {
                     const initResult = await window.firebaseConfig.reinitialize();
                     if (initResult) {
-                        alert('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + result.projectId);
+                        showToast('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + result.projectId);
                     } else {
-                        alert('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
+                        showToast('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
                     }
                 } else {
-                    alert('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.\n프로젝트: ' + result.projectId);
+                    showToast('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.\n프로젝트: ' + result.projectId);
                 }
                 await checkAuthFileStatus();
                 updateConnectionStatus();
             } else {
-                alert('인증 파일 등록 실패: ' + (result.error || '알 수 없는 오류'));
+                showToast('인증 파일 등록 실패: ' + (result.error || '알 수 없는 오류'));
             }
         } catch (error) {
-            alert('파일 선택 중 오류 발생: ' + error.message);
+            showToast('파일 선택 중 오류 발생: ' + error.message);
         }
     } else {
         // 웹 환경 폴백
@@ -318,7 +318,7 @@ document.getElementById('firebaseForm').addEventListener('submit', async (e) => 
     statusEl.style.color = '#0369a1';
     statusEl.textContent = '● 저장됨';
 
-    alert('설정이 저장되었습니다. "연결 테스트" 버튼을 눌러 연결을 확인하세요.');
+    showToast('설정이 저장되었습니다. "연결 테스트" 버튼을 눌러 연결을 확인하세요.');
 });
 
 // 연결 상태 업데이트
@@ -361,7 +361,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
 
             document.getElementById('migrateAllBtn').disabled = false;
             renderMigrationList();
-            alert('Firebase 연결 성공!');
+            showToast('Firebase 연결 성공!');
         } else {
             statusEl.className = 'status-badge disconnected';
             statusEl.style.background = '#fef3c7';
@@ -369,9 +369,9 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
             statusEl.textContent = '● 미연결';
 
             if (isElectron) {
-                alert('Firebase 연결 실패.\n인증 파일이 등록되어 있는지 확인하세요.');
+                showToast('Firebase 연결 실패.\n인증 파일이 등록되어 있는지 확인하세요.');
             } else {
-                alert('Firebase 연결 실패.\n수동 설정값을 확인해주세요.');
+                showToast('Firebase 연결 실패.\n수동 설정값을 확인해주세요.');
             }
         }
     } catch (error) {
@@ -380,7 +380,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
         statusEl.style.color = '#dc2626';
         statusEl.textContent = '● 연결 실패';
         console.error('연결 테스트 실패:', error);
-        alert('연결 실패: ' + error.message);
+        showToast('연결 실패: ' + error.message);
     }
 });
 
@@ -451,14 +451,14 @@ function renderMigrationList() {
 // 개별 타입의 모든 연도 마이그레이션
 async function migrateTypeAllYears(sampleType, storagePrefix) {
     if (!window.storageManager?.isCloudEnabled()) {
-        alert('Firebase가 연결되지 않았습니다.');
+        showToast('Firebase가 연결되지 않았습니다.');
         return;
     }
 
     const currentYear = new Date().getFullYear();
     const MIN_YEAR = 2020;
     let totalCount = 0;
-    let successYears = [];
+    const successYears = [];
 
     try {
         for (let year = MIN_YEAR; year <= currentYear; year++) {
@@ -477,10 +477,10 @@ async function migrateTypeAllYears(sampleType, storagePrefix) {
             alert(`마이그레이션 완료!\n\n총 ${totalCount}건\n${successYears.join('\n')}`);
             renderMigrationList();
         } else {
-            alert('마이그레이션할 데이터가 없습니다.');
+            showToast('마이그레이션할 데이터가 없습니다.');
         }
     } catch (error) {
-        alert('마이그레이션 중 오류 발생: ' + error.message);
+        showToast('마이그레이션 중 오류 발생: ' + error.message);
     }
 }
 
@@ -493,7 +493,7 @@ document.getElementById('migrateAllBtn').addEventListener('click', async () => {
     const currentYear = new Date().getFullYear();
     const MIN_YEAR = 2020;
     let totalCount = 0;
-    let details = [];
+    const details = [];
 
     for (const type of SAMPLE_TYPES) {
         let typeCount = 0;
@@ -722,7 +722,7 @@ function loadOrgName() {
 document.getElementById('saveOrgNameBtn').addEventListener('click', () => {
     const value = document.getElementById('orgName').value.trim();
     if (!value) {
-        alert('기관명을 입력해주세요.');
+        showToast('기관명을 입력해주세요.');
         return;
     }
     localStorage.setItem(ORG_NAME_KEY, value);
@@ -1200,7 +1200,7 @@ document.getElementById('encExportKeyBtn')?.addEventListener('click', async () =
     if (window.encryptionManager?.exportKeyFile) {
         const result = await window.encryptionManager.exportKeyFile();
         if (!result.success && result.error !== '취소됨') {
-            alert('키 파일 내보내기 실패: ' + result.error);
+            showToast('키 파일 내보내기 실패: ' + result.error);
         }
     }
 });
@@ -1210,9 +1210,9 @@ document.getElementById('encImportKeyBtn')?.addEventListener('click', async () =
         const result = await window.encryptionManager.importKeyFile();
         if (result.success) {
             updateEncryptionStatusUI();
-            alert('키 파일을 가져왔습니다.\n비밀번호를 입력하여 암호화를 활성화하세요.');
+            showToast('키 파일을 가져왔습니다.\n비밀번호를 입력하여 암호화를 활성화하세요.');
         } else if (result.error !== '취소됨') {
-            alert('키 파일 가져오기 실패: ' + result.error);
+            showToast('키 파일 가져오기 실패: ' + result.error);
         }
     }
 });
@@ -1222,9 +1222,9 @@ document.getElementById('encImportKeyBtnInactive')?.addEventListener('click', as
         const result = await window.encryptionManager.importKeyFile();
         if (result.success) {
             updateEncryptionStatusUI();
-            alert('키 파일을 가져왔습니다.\n비밀번호를 입력하여 암호화를 활성화하세요.');
+            showToast('키 파일을 가져왔습니다.\n비밀번호를 입력하여 암호화를 활성화하세요.');
         } else if (result.error !== '취소됨') {
-            alert('키 파일 가져오기 실패: ' + result.error);
+            showToast('키 파일 가져오기 실패: ' + result.error);
         }
     }
 });
@@ -1241,7 +1241,7 @@ let encMigrationScanResults = [];
  */
 async function scanPlaintextData() {
     if (!window.encryptionManager?.isReady()) {
-        alert('암호화가 활성화되어야 합니다. (비밀번호 입력 필요)');
+        showToast('암호화가 활성화되어야 합니다. (비밀번호 입력 필요)');
         return;
     }
 
@@ -1727,7 +1727,7 @@ async function encryptAutoSaveFile(filePath, typeName, year) {
 async function encryptWebAutoSaveFile(fileName, typeName, year) {
     const dirHandle = window.getWebDirHandle ? window.getWebDirHandle() : null;
     if (!dirHandle) {
-        alert('자동저장 폴더가 선택되지 않았습니다.');
+        showToast('자동저장 폴더가 선택되지 않았습니다.');
         return;
     }
 
@@ -1863,7 +1863,7 @@ async function encryptLocalStorageData(storageKey, typeName, year) {
 async function encryptAllPlaintext() {
     const plaintextResults = encMigrationScanResults.filter(r => r.plaintextCount > 0);
     if (plaintextResults.length === 0) {
-        alert('암호화할 평문 데이터가 없습니다.');
+        showToast('암호화할 평문 데이터가 없습니다.');
         return;
     }
 
@@ -1939,7 +1939,7 @@ let decMigrationScanResults = [];
  */
 async function scanEncryptedData() {
     if (!window.encryptionManager?.isReady()) {
-        alert('암호화가 활성화되어야 합니다. (비밀번호 입력 필요)');
+        showToast('암호화가 활성화되어야 합니다. (비밀번호 입력 필요)');
         return;
     }
 
@@ -2560,7 +2560,7 @@ async function decryptAutoSaveFile(filePath, typeName, year) {
 async function decryptWebAutoSaveFile(fileName, typeName, year) {
     const dirHandle = window.getWebDirHandle ? window.getWebDirHandle() : null;
     if (!dirHandle) {
-        alert('자동저장 폴더가 선택되지 않았습니다.');
+        showToast('자동저장 폴더가 선택되지 않았습니다.');
         return;
     }
 
@@ -2698,7 +2698,7 @@ async function decryptLocalStorageData(storageKey, typeName, year) {
  */
 async function decryptAllEncrypted() {
     if (decMigrationScanResults.length === 0) {
-        alert('복호화할 암호화 데이터가 없습니다.');
+        showToast('복호화할 암호화 데이터가 없습니다.');
         return;
     }
 
@@ -2759,3 +2759,66 @@ async function decryptAllEncrypted() {
 // 평문 마이그레이션 이벤트 리스너 등록
 document.getElementById('scanEncryptedBtn')?.addEventListener('click', scanEncryptedData);
 document.getElementById('decryptAllBtn')?.addEventListener('click', decryptAllEncrypted);
+
+// ========================================
+// Firebase 진단 도구
+// ========================================
+
+/**
+ * Firebase 연결 진단 실행
+ */
+async function runFirebaseDiagnostics() {
+    console.log('🔍 Firebase 연결 진단 시작...');
+
+    const result = await window.firebaseDiagnostics.diagnose();
+
+    console.group('📊 진단 결과');
+    console.log('전체 상태:', result.overallStatus);
+    console.table(Object.entries(result.checks).map(([name, check]) => ({
+        검사항목: name,
+        통과: check.passed ? '✅' : '❌',
+        메시지: check.message
+    })));
+
+    if (result.recommendations.length > 0) {
+        console.group('💡 권장 사항');
+        result.recommendations.forEach((rec, i) => {
+            console.log(`${i + 1}. [${rec.priority}] ${rec.message}`);
+        });
+        console.groupEnd();
+    }
+
+    console.groupEnd();
+
+    return result;
+}
+
+/**
+ * Firebase 재연결 시도
+ */
+async function reconnectFirebase() {
+    console.log('🔄 Firebase 재연결 시도...');
+
+    const result = await window.firebaseDiagnostics.attemptAutoRecovery();
+
+    if (result.success) {
+        console.log('✅', result.message);
+        if (window.showToast) {
+            showToast(result.message, 'success');
+        }
+    } else {
+        console.error('❌', result.message);
+        if (window.showToast) {
+            showToast(result.message, 'error', {
+                actionLabel: '진단',
+                action: () => runFirebaseDiagnostics()
+            });
+        }
+    }
+
+    return result;
+}
+
+// 콘솔에서 사용 가능한 전역 함수로 등록
+window.runFirebaseDiagnostics = runFirebaseDiagnostics;
+window.reconnectFirebase = reconnectFirebase;

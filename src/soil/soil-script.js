@@ -3,6 +3,10 @@
  * SoilSampleManager - BaseSampleManager 상속
  */
 
+// @ts-nocheck
+// Note: This file has complex inheritance from window.BaseSampleManager
+// TypeScript checking is disabled due to dynamic class extension pattern
+
 // ========================================
 // 상수 및 설정
 // ========================================
@@ -20,6 +24,10 @@ const AUTO_SAVE_FILE = 'soil-autosave.json';
 // SoilSampleManager 클래스
 // ========================================
 
+/**
+ * SoilSampleManager - Manages soil sample registration and lookup
+ * @extends {BaseSampleManager}
+ */
 class SoilSampleManager extends window.BaseSampleManager {
     constructor() {
         super({
@@ -385,8 +393,8 @@ class SoilSampleManager extends window.BaseSampleManager {
         const handleYearChange = async (e) => {
             this.syncYearSelects(e.target.value);
             await this.loadYearData(e.target.value);
-            // BaseSampleManager.loadYearData가 FileAPI.updateAutoSavePath 호출하므로 중복 제거
-            if (window.isElectron && this.FileAPI) {
+            // 로컬 모드에서만 auto-save 로드 (Firebase 모드에서는 로드 안함)
+            if (window.isElectron && this.FileAPI && !window.firebaseConfig?.isEnabled()) {
                 await this.loadAutoSaveForSelectedYear();
             }
             this.showToast(`${e.target.value}년 데이터를 불러왔습니다.`, 'success');
@@ -617,7 +625,7 @@ class SoilSampleManager extends window.BaseSampleManager {
             this.updateParcelNumbers();
             this.updateParcelsData();
         } else {
-            alert('최소 1개의 필지가 필요합니다.');
+            showToast('최소 1개의 필지가 필요합니다.');
         }
     }
 
@@ -932,7 +940,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                 return;
             }
             if (value.length > 0 && typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin'], true);
+                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin', 'pohang_buk', 'pohang_nam'], true);
                 if (suggestions.length > 0) {
                     autocompleteList.innerHTML = sanitizeHTML(suggestions.map(item => `
                         <li data-village="${item.village}" data-district="${item.district}" data-region-key="${item.regionKey}" data-region="${item.region || ''}" data-is-mountain="${item.isMountain}">
@@ -1023,7 +1031,7 @@ class SoilSampleManager extends window.BaseSampleManager {
                 return;
             }
             if (value.length > 0 && typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin'], true);
+                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin', 'pohang_buk', 'pohang_nam'], true);
                 if (suggestions.length > 0) {
                     autocompleteList.innerHTML = sanitizeHTML(suggestions.map(item => `
                         <li data-village="${item.village}" data-district="${item.district}" data-region-key="${item.regionKey}" data-region="${item.region || ''}" data-is-mountain="${item.isMountain}">
@@ -2773,7 +2781,7 @@ class SoilSampleManager extends window.BaseSampleManager {
         if (this.totalPages <= 1) { this.pageNumbersContainer.innerHTML = ''; return; }
         const maxVisiblePages = 5;
         let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
+        const endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
         if (endPage - startPage + 1 < maxVisiblePages) {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
@@ -3272,7 +3280,7 @@ class SoilSampleManager extends window.BaseSampleManager {
             btnLabelPrint.addEventListener('click', () => {
                 const selectedIds = this.getSelectedIds();
                 if (selectedIds.length === 0) {
-                    if (this.sampleLogs.length === 0) { alert('인쇄할 데이터가 없습니다.'); return; }
+                    if (this.sampleLogs.length === 0) { showToast('인쇄할 데이터가 없습니다.'); return; }
                     if (!confirm(`선택된 항목이 없습니다.\n전체 ${this.sampleLogs.length}건을 라벨 인쇄하시겠습니까?`)) return;
                     this.openLabelPrintWithData(this.sampleLogs);
                 } else {
@@ -3287,7 +3295,7 @@ class SoilSampleManager extends window.BaseSampleManager {
         if (btnBulkDelete) {
             btnBulkDelete.addEventListener('click', () => {
                 const selectedIds = this.getSelectedIds();
-                if (selectedIds.length === 0) { alert('삭제할 항목을 선택해주세요.'); return; }
+                if (selectedIds.length === 0) { showToast('삭제할 항목을 선택해주세요.'); return; }
                 if (!confirm(`선택한 ${selectedIds.length}건을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return;
                 this.sampleLogs = this.sampleLogs.filter(log => !selectedIds.includes(String(log.id)));
                 this.saveLogs();
@@ -3458,7 +3466,7 @@ class SoilSampleManager extends window.BaseSampleManager {
         if (openViewerBtn) {
             openViewerBtn.addEventListener('click', () => {
                 const viewerWindow = window.open('viewer.html', 'DataViewer', 'width=1400,height=800,scrollbars=yes,resizable=yes');
-                if (!viewerWindow) alert('팝업이 차단되었습니다.\n브라우저 설정에서 팝업을 허용해주세요.');
+                if (!viewerWindow) showToast('팝업이 차단되었습니다.\n브라우저 설정에서 팝업을 허용해주세요.');
             });
         }
 
@@ -3519,7 +3527,7 @@ class SoilSampleManager extends window.BaseSampleManager {
     // ========================================
 
     exportToExcel() {
-        if (this.sampleLogs.length === 0) { alert('내보낼 데이터가 없습니다.'); return; }
+        if (this.sampleLogs.length === 0) { showToast('내보낼 데이터가 없습니다.'); return; }
         const selectedIds = this.getSelectedIds();
         const logsToExport = selectedIds.length > 0
             ? this.sampleLogs.filter(log => selectedIds.includes(log.id)) : this.sampleLogs;
@@ -3762,18 +3770,16 @@ class SoilSampleManager extends window.BaseSampleManager {
             this.receptionNumberInput.value = this.generateNextReceptionNumber();
         }
 
-        // Electron 환경: 자동 저장 파일에서 데이터 로드
-        if (window.isElectron && this.FileAPI?.autoSavePath) {
+        // 로컬 모드에서만 auto-save 로드 (Firebase 모드에서는 로드 안함)
+        if (window.isElectron && this.FileAPI?.autoSavePath && !window.firebaseConfig?.isEnabled()) {
             const autoSaveData = await window.loadFromAutoSaveFile();
-            if (autoSaveData && autoSaveData.length > 0) {
-                if (this.sampleLogs.length === 0) {
-                    this.sampleLogs = autoSaveData;
-                    localStorage.setItem(this.getStorageKey(this.selectedYear), JSON.stringify(this.sampleLogs));
-                    this.log('토양 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
-                    this.filterAndRenderLogs();
-                    if (this.receptionNumberInput) {
-                        this.receptionNumberInput.value = this.generateNextReceptionNumber();
-                    }
+            if (autoSaveData && autoSaveData.length > 0 && this.sampleLogs.length === 0) {
+                this.sampleLogs = autoSaveData;
+                localStorage.setItem(this.getStorageKey(this.selectedYear), JSON.stringify(this.sampleLogs));
+                this.log('로컬 모드: 자동 저장 파일에서 데이터 로드됨:', autoSaveData.length, '건');
+                this.filterAndRenderLogs();
+                if (this.receptionNumberInput) {
+                    this.receptionNumberInput.value = this.generateNextReceptionNumber();
                 }
             }
         }

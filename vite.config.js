@@ -8,6 +8,9 @@ export default defineConfig({
     port: 3001,
     open: true
   },
+  resolve: {
+    extensions: ['.ts', '.js', '.mjs', '.json']
+  },
   build: {
     outDir: '../docs',
     emptyOutDir: true,

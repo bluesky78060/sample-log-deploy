@@ -4276,7 +4276,8 @@ input[type="number"] {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
     animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    min-width: 280px;
+    min-width: 300px;
+    max-width: 600px;  /* 액션 버튼이 있을 때 더 넓게 */
     border: 1px solid var(--gray-700);
 }
 
@@ -4313,6 +4314,47 @@ input[type="number"] {
     flex: 1;
     font-size: 0.875rem;
     font-weight: 500;
+}
+
+/* Toast 액션 버튼 */
+.toast-action {
+    margin-left: 12px;
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    color: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.toast-action:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.toast-action:active {
+    transform: scale(0.95);
+}
+
+/* Toast 닫기 버튼 */
+.toast-close {
+    margin-left: auto;
+    padding: 0 8px;
+    background: transparent;
+    color: inherit;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+    opacity: 1;
 }
 
 /* =============================================
@@ -6320,4 +6362,154 @@ select {
         --primary-hover: #8FAF96;
         --primary-dark: #A3C0AA;
     }
+}
+
+/* ========================================
+   로딩 오버레이
+   ======================================== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.loading-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.loading-content {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    min-width: 300px;
+    max-width: 500px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    border: 4px solid #E8E4DF;
+    border-top-color: #7C9082;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-message {
+    margin: 0 0 16px;
+    font-size: 16px;
+    color: #333;
+    font-weight: 500;
+}
+
+.loading-progress-container {
+    margin: 16px 0;
+}
+
+.loading-progress-container.hidden {
+    display: none;
+}
+
+.loading-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #E8E4DF;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.loading-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7C9082, #A0B3A0);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.loading-progress-text {
+    font-size: 14px;
+    color: #666;
+}
+
+.loading-cancel {
+    margin-top: 16px;
+    padding: 8px 24px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.loading-cancel:hover {
+    background: #c82333;
+}
+
+.loading-cancel.hidden {
+    display: none;
+}
+
+/* =============================================
+   Virtual Scrolling
+   ============================================= */
+
+/* Virtual Scrolling 컨테이너 */
+.table-wrapper {
+    position: relative;
+    overflow: auto;
+    max-height: calc(100vh - 200px);
+}
+
+.table-wrapper.virtual-scrolling {
+    /* Virtual Scrolling 활성화 시 */
+    will-change: transform;  /* GPU 가속 */
+}
+
+/* Virtual Scrolling 아이템 */
+.virtual-item {
+    box-sizing: border-box;
+    border-bottom: 1px solid #E8E4DF;
+}
+
+/* 성능 개선을 위한 최적화 */
+.virtual-item * {
+    pointer-events: auto;
+}
+
+/* 스크롤 성능 */
+.table-wrapper::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }

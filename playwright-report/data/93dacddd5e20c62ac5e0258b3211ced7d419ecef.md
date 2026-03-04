@@ -1,0 +1,205 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "arrow_back" [ref=e3] [cursor=pointer]:
+      - /url: ../index.html
+      - generic [ref=e4]: arrow_back
+    - generic [ref=e6] [cursor=pointer]:
+      - generic [ref=e7]: 🌱
+      - generic [ref=e8]: 토양
+      - generic [ref=e9]: ▼
+    - generic [ref=e10]:
+      - button "edit_note 접수" [ref=e11] [cursor=pointer]:
+        - generic [ref=e12]: edit_note
+        - generic: 접수
+      - button "table_rows 목록" [ref=e13] [cursor=pointer]:
+        - generic [ref=e14]: table_rows
+        - generic: 목록
+    - generic [ref=e16]:
+      - button "refresh 초기화" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]: refresh
+        - generic: 초기화
+      - button "check_circle 등록" [ref=e19] [cursor=pointer]:
+        - generic [ref=e20]: check_circle
+        - generic: 등록
+    - generic [ref=e21]:
+      - button "download 내보내기" [ref=e22] [cursor=pointer]:
+        - generic [ref=e23]: download
+        - generic: 내보내기
+      - button "save 저장" [ref=e24] [cursor=pointer]:
+        - generic [ref=e25]: save
+        - generic: 저장
+      - generic "JSON 불러오기" [ref=e26] [cursor=pointer]:
+        - generic [ref=e27]: folder_open
+        - generic: 불러오기
+      - button "file_download 서식" [ref=e28] [cursor=pointer]:
+        - generic [ref=e29]: file_download
+        - generic: 서식
+      - generic "엑셀 가져오기" [ref=e30] [cursor=pointer]:
+        - generic [ref=e31]: upload
+        - generic: 가져오기
+    - generic [ref=e33]:
+      - generic "자동저장" [ref=e34] [cursor=pointer]:
+        - checkbox
+      - button "folder" [ref=e36] [cursor=pointer]:
+        - generic [ref=e37]: folder
+    - generic [ref=e41]:
+      - generic [ref=e43]: light_mode
+      - button "다크 모드로 전환" [ref=e44] [cursor=pointer]
+      - generic [ref=e46]: dark_mode
+  - main [ref=e47]:
+    - generic [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - generic [ref=e54]: 👤
+            - heading "기본 정보" [level=3] [ref=e55]
+            - combobox [ref=e57] [cursor=pointer]:
+              - option "2025년"
+              - option "2026년" [selected]
+              - option "2027년"
+              - option "2028년"
+              - option "2029년"
+              - option "2030년"
+            - generic [ref=e58]:
+              - button "📮" [ref=e59] [cursor=pointer]:
+                - generic [ref=e60]: 📮
+              - button "📧" [ref=e61] [cursor=pointer]:
+                - generic [ref=e62]: 📧
+              - button "📠" [ref=e63] [cursor=pointer]:
+                - generic [ref=e64]: 📠
+              - button "🚶" [ref=e65] [cursor=pointer]:
+                - generic [ref=e66]: 🚶
+          - generic [ref=e67]:
+            - generic [ref=e68]:
+              - generic [ref=e69]:
+                - generic [ref=e70]: 접수번호
+                - textbox "접수번호" [ref=e71]:
+                  - /placeholder: 자동 생성
+                  - text: "1"
+              - generic [ref=e72]:
+                - generic [ref=e73]: 접수일자
+                - textbox "접수일자" [ref=e74]: 2026-03-04
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - generic [ref=e77]: 성명 *
+                - textbox "성명 *" [ref=e78]:
+                  - /placeholder: 민원인 성명
+              - generic [ref=e79]:
+                - generic [ref=e80]: 전화번호 *
+                - textbox "전화번호 *" [ref=e81]:
+                  - /placeholder: 010-0000-0000
+            - generic [ref=e83]:
+              - generic [ref=e84]: 주소
+              - generic [ref=e85]:
+                - generic [ref=e86]:
+                  - textbox "주소" [ref=e87]:
+                    - /placeholder: 우편번호
+                  - button "🔍 주소 검색" [ref=e88] [cursor=pointer]
+                - textbox "도로명 주소" [ref=e89]
+                - textbox "상세 주소 입력" [ref=e90]
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - generic [ref=e93]: 🌱
+            - heading "토양 시료 정보" [level=3] [ref=e94]
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 구분
+                - combobox "구분" [ref=e99]:
+                  - option "선택하세요" [selected]
+                  - option "🌾 논"
+                  - option "🥬 밭"
+                  - option "🍎 과수"
+                  - option "🏠 시설"
+                  - option "🌲 임야"
+                  - option "🚜 성토"
+              - generic [ref=e100]:
+                - generic [ref=e101]: 목적 (용도) *
+                - combobox "목적 (용도) *" [ref=e102]:
+                  - option "선택하세요" [selected]
+                  - option "🌾 일반재배"
+                  - option "🍃 무농약"
+                  - option "♻️ 유기"
+                  - option "✅ GAP"
+                  - option "🌱 저탄소"
+            - generic [ref=e104]:
+              - generic [ref=e105]: 비고
+              - textbox "비고" [ref=e106]:
+                - /placeholder: 추가 메모 사항을 입력하세요
+      - generic [ref=e108]:
+        - generic [ref=e109]:
+          - generic [ref=e110]: 🗺️
+          - heading "필지 정보" [level=3] [ref=e111]
+          - button "+ 필지 추가" [ref=e112] [cursor=pointer]
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - generic [ref=e115]: 💡
+            - generic [ref=e116]: 같은 필지에 여러 시료 접수 가능 (비고로 구분)
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - heading "📍 필지 1" [level=4] [ref=e120]
+              - generic [ref=e121]:
+                - combobox [ref=e122] [cursor=pointer]:
+                  - option "구분" [selected]
+                  - option "논"
+                  - option "밭"
+                  - option "과수"
+                  - option "시설"
+                  - option "임야"
+                  - option "성토"
+                - combobox [ref=e123] [cursor=pointer]:
+                  - option "용도" [selected]
+                  - option "일반재배"
+                  - option "무농약"
+                  - option "유기"
+                  - option "GAP"
+                  - option "저탄소"
+              - button "삭제" [ref=e124] [cursor=pointer]
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - generic [ref=e127]:
+                  - generic [ref=e128]: 필지 주소 (주 지번) * 리+지번 입력 후 Enter
+                  - textbox "필지 주소 (주 지번) * 리+지번 입력 후 Enter" [ref=e131]:
+                    - /placeholder: "예: 문단리 224, 문단리 산 423"
+                - generic [ref=e132]:
+                  - generic [ref=e133]:
+                    - generic [ref=e134]: 작물명
+                    - textbox "작물명" [ref=e136]:
+                      - /placeholder: "예: 고추"
+                  - generic [ref=e137]:
+                    - generic [ref=e138]: 면적
+                    - generic [ref=e139]:
+                      - spinbutton "면적" [ref=e140]
+                      - generic [ref=e141]:
+                        - button "㎡" [ref=e142] [cursor=pointer]
+                        - button "평" [ref=e143] [cursor=pointer]
+                - button "+ 추가 작물" [ref=e144] [cursor=pointer]:
+                  - generic [ref=e145]: +
+                  - text: 추가 작물
+              - generic [ref=e147]:
+                - generic [ref=e148]: 하위 필지
+                - generic [ref=e149]:
+                  - textbox "하위 필지" [ref=e151]:
+                    - /placeholder: "예: 문단리 224, 문단리 산 423"
+                  - button "+" [ref=e152] [cursor=pointer]
+              - generic [ref=e154]:
+                - generic [ref=e155]: 비고
+                - textbox "비고" [ref=e156]:
+                  - /placeholder: 필지 관련 메모
+              - generic [ref=e157]:
+                - generic [ref=e158]:
+                  - generic [ref=e159]: "하위 필지:"
+                  - generic [ref=e160]: 0개
+                - generic [ref=e161]:
+                  - generic [ref=e162]: "작물 수:"
+                  - generic [ref=e163]: 0개
+                - generic [ref=e164]:
+                  - generic [ref=e165]: "총 면적:"
+                  - generic [ref=e166]: "0"
+  - generic:
+    - generic:
+      - paragraph: 처리 중...
+```
