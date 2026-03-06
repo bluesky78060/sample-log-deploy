@@ -596,9 +596,35 @@
                 </div>
             </div>
 
-            <!-- v1.7.56 -->
+            <!-- v1.7.63 -->
             <div class="version-entry">
                 <div class="version-dot latest"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.63</span>
+                                <span class="version-date">2026-03-06</span>
+                            </div>
+                            <div class="version-title">토양 그룹 수정 및 데이터 안정성 개선</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-latest">★ 최신</span>
+                            <span class="badge badge-feature">기능</span>
+                            <span class="badge badge-fix">수정</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>토양 그룹 수정 기능</strong> — 여러 필지를 한번에 접수한 시료를 접수 시와 동일하게 그룹 단위로 수정 가능</li>
+                        <li><strong>자동 저장 폴더 선택 중복 방지</strong> — 이미 설정된 폴더가 있으면 매 페이지 진입 시 문답이 반복되지 않음</li>
+                        <li><strong>데이터 로딩 안정성 개선</strong> — autoSave 덮어쓰기 방지, smartMerge 참조 수정, 일괄삭제 await 추가, Firestore orderBy 제외 방지</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.7.56 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
                 <div class="version-card">
                     <div class="version-card-header">
                         <div>
@@ -609,7 +635,6 @@
                             <div class="version-title">성명 클릭 일괄 선택 및 체크박스 개선</div>
                         </div>
                         <div class="badge-row">
-                            <span class="badge badge-latest">★ 최신</span>
                             <span class="badge badge-feature">기능</span>
                             <span class="badge badge-fix">수정</span>
                         </div>

@@ -325,7 +325,7 @@ const createWindow = (): void => {
   // 1. VITE_DEV_SERVER_URL 환경변수가 있으면 Vite dev server 사용
   // 2. 없으면 Vite dev server(localhost:3000)에 연결 시도
   // 3. 둘 다 안 되면 빌드된 docs/index.html 로드
-  const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3001';
+  const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3005';
   const docsPath = path.join(__dirname, '..', 'docs', 'index.html');
 
   async function loadApp(): Promise<void> {

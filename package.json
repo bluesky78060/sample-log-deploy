@@ -26,7 +26,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "sync-version": "node -e \"const p=require('./package.json');const fs=require('fs');const f='src/shared/constants.js';let c=fs.readFileSync(f,'utf8');c=c.replace(/APP_VERSION\\s*[:=]\\s*'[^']*'/,\\\"APP_VERSION = '\\\"+p.version+\\\"'\\\");fs.writeFileSync(f,c);console.log('Version synced to '+p.version);\"",
+    "sync-version": "node -e \"const p=require('./package.json');const fs=require('fs');const f='src/shared/constants.ts';let c=fs.readFileSync(f,'utf8');c=c.replace(/APP_VERSION:\\s*string\\s*=\\s*'[^']*'/,\\\"APP_VERSION: string = '\\\"+p.version+\\\"'\\\");fs.writeFileSync(f,c);console.log('Version synced to '+p.version);\"",
     "build:css": "tailwindcss -i src/styles/input.css -o src/shared/tailwind-output.css --minify",
     "watch:css": "tailwindcss -i src/styles/input.css -o src/shared/tailwind-output.css --watch",
     "sync": "npm run build",

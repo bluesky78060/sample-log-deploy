@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase 상태 진단</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .status { margin: 10px 0; padding: 10px; border: 1px solid #444; border-radius: 4px; }
+        .ok { background: #1e4620; border-color: #4ec9b0; }
+        .error { background: #4b1818; border-color: #f48771; }
+        .warning { background: #4b3d1a; border-color: #dcdcaa; }
+        h2 { color: #569cd6; margin-top: 20px; }
+        code { background: #2d2d30; padding: 2px 6px; border-radius: 3px; }
+        button { margin: 10px 5px; padding: 8px 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Firebase 연결 상태 진단 도구</h1>
+
+    <button onclick="runDiagnostics()">진단 실행</button>
+    <button onclick="testUpdateStatus()">updateConnectionStatus() 테스트</button>
+    <button onclick="location.reload()">새로고침</button>
+
+    <div id="results"></div>
+
+    <script type="module">
+        window.runDiagnostics = async function() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>진단 결과</h2>';
+
+            const checks = [];
+
+            // 1. Window 전역 객체 확인
+            checks.push({
+                name: 'window.firebaseConfig 존재 여부',
+                result: !!window.firebaseConfig,
+                value: typeof window.firebaseConfig
+            });
+
+            checks.push({
+                name: 'window.firebaseConfig.isEnabled 함수 존재',
+                result: typeof window.firebaseConfig?.isEnabled === 'function',
+                value: typeof window.firebaseConfig?.isEnabled
+            });
+
+            // 2. Firebase 상태 확인
+            let isEnabled = false;
+            try {
+                isEnabled = window.firebaseConfig?.isEnabled?.() || false;
+                checks.push({
+                    name: 'firebaseConfig.isEnabled() 반환값',
+                    result: isEnabled,
+                    value: String(isEnabled)
+                });
+            } catch (err) {
+                checks.push({
+                    name: 'firebaseConfig.isEnabled() 호출',
+                    result: false,
+                    value: 'Error: ' + err.message
+                });
+            }
+
+            // 3. Storage Manager 확인
+            checks.push({
+                name: 'window.storageManager 존재 여부',
+                result: !!window.storageManager,
+                value: typeof window.storageManager
+            });
+
+            checks.push({
+                name: 'window.storageManager.getMode 함수 존재',
+                result: typeof window.storageManager?.getMode === 'function',
+                value: typeof window.storageManager?.getMode
+            });
+
+            let storageMode = 'unknown';
+            try {
+                storageMode = window.storageManager?.getMode?.() || 'not available';
+                checks.push({
+                    name: 'storageManager.getMode() 반환값',
+                    result: true,
+                    value: storageMode
+                });
+            } catch (err) {
+                checks.push({
+                    name: 'storageManager.getMode() 호출',
+                    result: false,
+                    value: 'Error: ' + err.message
+                });
+            }
+
+            // 4. DOM 요소 확인
+            const statusEl = document.getElementById('connectionStatus');
+            checks.push({
+                name: 'connectionStatus DOM 요소 존재',
+                result: !!statusEl,
+                value: statusEl ? statusEl.textContent : 'not found'
+            });
+
+            // 5. Electron API 확인
+            checks.push({
+                name: 'window.electronAPI 존재 여부',
+                result: !!window.electronAPI,
+                value: typeof window.electronAPI
+            });
+
+            checks.push({
+                name: 'window.electronAPI.isElectron',
+                result: window.electronAPI?.isElectron === true,
+                value: String(window.electronAPI?.isElectron)
+            });
+
+            // 6. 인증 파일 확인 (Electron만)
+            if (window.electronAPI?.readAuthFile) {
+                try {
+                    const authResult = await window.electronAPI.readAuthFile();
+                    checks.push({
+                        name: '인증 파일 존재 여부',
+                        result: authResult.success && !!authResult.content,
+                        value: authResult.success ? 'exists' : 'not found'
+                    });
+
+                    if (authResult.success && authResult.content) {
+                        try {
+                            const config = JSON.parse(authResult.content);
+                            checks.push({
+                                name: '인증 파일 projectId',
+                                result: !!config.projectId,
+                                value: config.projectId || 'missing'
+                            });
+                        } catch (e) {
+                            checks.push({
+                                name: '인증 파일 파싱',
+                                result: false,
+                                value: 'Parse error'
+                            });
+                        }
+                    }
+                } catch (err) {
+                    checks.push({
+                        name: '인증 파일 읽기',
+                        result: false,
+                        value: 'Error: ' + err.message
+                    });
+                }
+            }
+
+            // 결과 출력
+            checks.forEach(check => {
+                const className = check.result ? 'ok' : 'error';
+                results.innerHTML += `
+                    <div class="status ${className}">
+                        <strong>${check.result ? '✅' : '❌'} ${check.name}</strong><br>
+                        값: <code>${check.value}</code>
+                    </div>
+                `;
+            });
+
+            // 요약
+            results.innerHTML += `
+                <h2>📊 요약</h2>
+                <div class="status ${isEnabled ? 'ok' : 'error'}">
+                    <strong>Firebase 연결 상태: ${isEnabled ? '연결됨' : '미연결'}</strong><br>
+                    저장 모드: <code>${storageMode}</code>
+                </div>
+            `;
+        };
+
+        window.testUpdateStatus = function() {
+            console.log('=== updateConnectionStatus 테스트 시작 ===');
+
+            const isFirebaseEnabled = window.firebaseConfig?.isEnabled?.() || false;
+            console.log('isFirebaseEnabled:', isFirebaseEnabled);
+            console.log('firebaseConfig exists:', !!window.firebaseConfig);
+            console.log('isEnabled function exists:', !!window.firebaseConfig?.isEnabled);
+
+            const statusEl = document.getElementById('connectionStatus');
+            console.log('connectionStatus element:', statusEl);
+
+            if (statusEl) {
+                console.log('Current text:', statusEl.textContent);
+                console.log('Current class:', statusEl.className);
+            }
+
+            alert('콘솔을 확인하세요 (F12)');
+        };
+
+        // 자동 실행
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(runDiagnostics, 500);
+            });
+        } else {
+            setTimeout(runDiagnostics, 500);
+        }
+    </script>
+</body>
+</html>

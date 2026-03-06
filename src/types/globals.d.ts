@@ -56,8 +56,11 @@ interface SelectFolderResult {
  */
 interface AuthFileResult {
   success: boolean;
+  exists?: boolean;
   content?: string;
   error?: string;
+  canceled?: boolean;
+  projectId?: string;
 }
 
 /**
@@ -117,6 +120,9 @@ interface ElectronAPI {
   storeSessionPassword(password: string): Promise<void>;
   getSessionPassword(): Promise<string | null>;
   clearSessionPassword(): Promise<void>;
+
+  // Auto-update
+  quitAndInstall?(): void;
 }
 
 // ========================================

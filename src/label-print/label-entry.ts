@@ -7,12 +7,12 @@ import DOMPurify from 'dompurify';
 (window as any).DOMPurify = DOMPurify;
 
 // Shared modules (순서 유지 - window.* 전역 설정)
-import '../shared/sanitize.js';
-import '../shared/theme.js';
-import '../shared/logger.js';
-import '../shared/error-handler.js';
-import '../shared/network-status.js';
-import '../shared/loading-manager.js';
+import '../shared/sanitize.ts';
+import '../shared/theme.ts';
+import '../shared/logger.ts';
+import '../shared/error-handler.ts';
+import '../shared/network-status.ts';
+import '../shared/loading-manager.ts';
 
 // Main script
 import './label-app.ts';

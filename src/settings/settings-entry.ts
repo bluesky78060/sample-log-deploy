@@ -8,23 +8,122 @@ import DOMPurify from 'dompurify';
 (window as unknown as { DOMPurify: typeof DOMPurify }).DOMPurify = DOMPurify;
 
 // Shared modules (order matters - window.* global setup)
-import '../shared/logger.js';
-import '../shared/error-handler.js';
-import '../shared/network-status.js';
-import '../shared/loading-manager.js';
-import '../shared/network-config.js';
-import '../shared/network-access.js';
-import '../shared/firebase-config.js';
-import '../shared/firebase-diagnostics.js';
+import '../shared/logger.ts';
+import '../shared/error-handler.ts';
+import '../shared/network-status.ts';
+import '../shared/loading-manager.ts';
+import '../shared/network-config.ts';
+import '../shared/network-access.ts';
+import '../shared/firebase-config.ts';
+import '../shared/firebase-diagnostics.ts';
 // Encryption modules (test only - load before firestore-db)
-import '../shared/crypto-utils.js';
-import '../shared/encryption-manager.js';
-import '../shared/firestore-db.js';
-import '../shared/storage-manager.js';
-import '../shared/sanitize.js';
-import '../shared/toast.js';
-import '../shared/theme.js';
-import '../shared/cache-manager.js';
+import '../shared/crypto-utils.ts';
+import '../shared/encryption-manager.ts';
+import '../shared/firestore-db.ts';
+import '../shared/storage-manager.ts';
+import '../shared/sanitize.ts';
+import '../shared/toast.ts';
+import '../shared/theme.ts';
+import '../shared/cache-manager.ts';
 
 // Main script
-import './settings-script.js';
+import * as SettingsScript from './settings-script.ts';
+
+// Make functions globally available for HTML onclick handlers
+declare global {
+  interface Window {
+    toggleManualSettings: typeof SettingsScript.toggleManualSettings;
+    parseQuickSetup: typeof SettingsScript.parseQuickSetup;
+  }
+}
+
+// Assign to window with side-effect to prevent tree-shaking
+(window as any).toggleManualSettings = SettingsScript.toggleManualSettings;
+(window as any).parseQuickSetup = SettingsScript.parseQuickSetup;
+
+// Keep functions alive
+if (false) {
+  SettingsScript.toggleManualSettings();
+  SettingsScript.parseQuickSetup();
+}
+
+// ========================================
+// Page Initialization
+// ========================================
+
+/**
+ * Initialize settings page
+ */
+async function initSettingsPage(): Promise<void> {
+  console.log('[Settings] Initializing settings page...');
+
+  // Initialize encryption manager silently (no modal)
+  if ((window as any).encryptionManager?.initSilent) {
+    try {
+      await (window as any).encryptionManager.initSilent();
+      console.log('[Settings] Encryption manager initialized');
+    } catch (err) {
+      console.warn('[Settings] Encryption manager init failed:', err);
+    }
+  }
+
+  // Show password prompt
+  const passwordVerified = await SettingsScript.showSettingsPasswordPrompt();
+
+  if (!passwordVerified) {
+    console.error('[Settings] Password verification failed - redirecting to main page');
+    window.location.href = '../index.html';
+    return;
+  }
+
+  console.log('[Settings] Password verified, loading settings...');
+
+  // Check auth file status first
+  await SettingsScript.checkAuthFileStatus();
+
+  // Load saved Firebase config
+  SettingsScript.loadSavedConfig();
+
+  // Load organization name
+  SettingsScript.loadOrgName();
+
+  // Initialize Firebase if auth file exists
+  if ((window as any).firebaseConfig?.initialize) {
+    try {
+      const initialized = await (window as any).firebaseConfig.initialize();
+      console.log('[Settings] Firebase initialization result:', initialized);
+    } catch (err) {
+      console.warn('[Settings] Firebase initialization failed:', err);
+    }
+  }
+
+  // Initialize storage manager (always, regardless of Firebase status)
+  if ((window as any).storageManager?.init) {
+    try {
+      await (window as any).storageManager.init();
+      console.log('[Settings] Storage manager initialized');
+    } catch (err) {
+      console.warn('[Settings] Storage manager init failed:', err);
+    }
+  }
+
+  // Initialize UI components
+  await Promise.all([
+    SettingsScript.initStorageModeUI(),
+    SettingsScript.updateEncryptionStatusUI(),
+    SettingsScript.initNetworkAccessUI(),
+    SettingsScript.updateCacheStatusUI(),
+  ]);
+
+  // Update UI after all initialization
+  SettingsScript.updateConnectionStatus();
+
+  console.log('[Settings] Settings page initialized');
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSettingsPage);
+} else {
+  initSettingsPage();
+}

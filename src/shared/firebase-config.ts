@@ -34,9 +34,8 @@ const DEBUG_FIREBASE = (() => {
 
 /** 조건부 로깅 */
 const logFirebase = (...args: unknown[]): void => {
-    if (DEBUG_FIREBASE) {
-        console.log('[Firebase]', ...args);
-    }
+    // 임시로 항상 로그 출력 (디버깅용)
+    console.log('[Firebase]', ...args);
 };
 
 // @ts-ignore - Firebase compat types
@@ -104,8 +103,15 @@ async function loadFirebaseConfigFromAuthFile(): Promise<FirebaseConfig | null> 
 
         const result = await window.electronAPI.readAuthFile();
 
+        // 상세 디버그 로그
+        logFirebase('readAuthFile 결과:', {
+            success: result.success,
+            hasContent: !!result.content,
+            contentLength: result.content?.length || 0
+        });
+
         if (!result.success || !result.content) {
-            logFirebase('인증 파일 없음 - 로컬 모드로 동작');
+            logFirebase('인증 파일 없음 - 로컬 모드로 동작 (success:', result.success, ', content:', !!result.content, ')');
             return null;
         }
 

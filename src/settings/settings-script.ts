@@ -104,11 +104,17 @@ function sanitizeHTML(html: string): string {
  * Check auth file status and update UI
  */
 async function checkAuthFileStatus(): Promise<void> {
+  console.log('[checkAuthFileStatus] Starting...');
   const statusEl = getElement<HTMLElement>('authFileStatus');
   const uploadArea = getElement<HTMLElement>('authFileUploadArea');
   const infoArea = getElement<HTMLElement>('authFileInfo');
 
-  if (!statusEl || !uploadArea || !infoArea) return;
+  console.log('[checkAuthFileStatus] Elements:', { statusEl, uploadArea, infoArea });
+
+  if (!statusEl || !uploadArea || !infoArea) {
+    console.warn('[checkAuthFileStatus] Missing elements!');
+    return;
+  }
 
   if (!isElectron) {
     // Web environment: check localStorage config
@@ -140,12 +146,16 @@ async function checkAuthFileStatus(): Promise<void> {
   }
 
   try {
+    console.log('[checkAuthFileStatus] Reading auth file...');
     const result = await window.electronAPI!.readAuthFile();
+    console.log('[checkAuthFileStatus] Read result:', result);
 
-    if (result.success && result.content) {
+    if (result.exists && result.content) {
       try {
         const config = JSON.parse(result.content) as FirebaseConfig;
+        console.log('[checkAuthFileStatus] Parsed config:', config);
         if (config.projectId) {
+          console.log('[checkAuthFileStatus] Updating UI to connected state');
           statusEl.className = 'status-badge connected';
           statusEl.textContent = '● 등록됨';
           uploadArea.style.display = 'none';
@@ -154,19 +164,21 @@ async function checkAuthFileStatus(): Promise<void> {
           if (projectIdEl) {
             projectIdEl.textContent = `프로젝트: ${config.projectId}`;
           }
+          console.log('[checkAuthFileStatus] UI updated successfully');
           return;
         }
       } catch (e) {
-        console.error('인증 파일 파싱 오류:', e);
+        console.error('[checkAuthFileStatus] 인증 파일 파싱 오류:', e);
       }
     }
 
+    console.log('[checkAuthFileStatus] Updating UI to disconnected state');
     statusEl.className = 'status-badge disconnected';
     statusEl.textContent = '● 미등록';
     uploadArea.style.display = 'block';
     infoArea.style.display = 'none';
   } catch (error) {
-    console.error('인증 파일 확인 오류:', error);
+    console.error('[checkAuthFileStatus] 인증 파일 확인 오류:', error);
   }
 }
 
@@ -297,6 +309,8 @@ function loadSavedConfig(): void {
 
 /**
  * Update connection status badge
+ * Note: This shows Firebase configuration status (whether Firebase is set up),
+ * NOT storage mode. Storage mode is shown separately in "저장 모드 선택" section.
  */
 function updateConnectionStatus(): void {
   const statusEl = getElement<HTMLElement>('connectionStatus');
@@ -304,13 +318,23 @@ function updateConnectionStatus(): void {
 
   if (!statusEl) return;
 
-  if (window.firebaseConfig?.isEnabled?.()) {
+  const isFirebaseEnabled = window.firebaseConfig?.isEnabled?.() || false;
+
+  // Debug logging
+  console.log('[updateConnectionStatus] Firebase enabled:', isFirebaseEnabled);
+  console.log('[updateConnectionStatus] firebaseConfig exists:', !!window.firebaseConfig);
+  console.log('[updateConnectionStatus] isEnabled function exists:', !!window.firebaseConfig?.isEnabled);
+
+  // Firebase 설정이 있고 초기화되었으면 "연결됨" (저장 모드와 무관)
+  if (isFirebaseEnabled) {
     statusEl.className = 'status-badge connected';
     statusEl.textContent = '● 연결됨';
     if (migrateAllBtn) migrateAllBtn.disabled = false;
   } else {
+    // Firebase 설정이 없거나 초기화 실패
     statusEl.className = 'status-badge disconnected';
     statusEl.textContent = '● 미연결';
+    if (migrateAllBtn) migrateAllBtn.disabled = true;
   }
 }
 
@@ -331,9 +355,6 @@ function toggleManualSettings(): void {
     toggle.textContent = '▼ 펼치기';
   }
 }
-
-// Make toggleManualSettings available globally
-(window as Window & { toggleManualSettings?: typeof toggleManualSettings }).toggleManualSettings = toggleManualSettings;
 
 /**
  * Parse quick setup code (Firebase config) from textarea
@@ -772,6 +793,7 @@ function changeStorageMode(newMode: StorageMode): void {
 
   if (result.success) {
     updateStorageModeStatus(newMode);
+    updateConnectionStatus(); // Firebase 연결 상태도 함께 업데이트
     alert(`저장 모드가 "${modeLabels[newMode]}"(으)로 변경되었습니다.\n다른 시료 페이지에서는 새로고침 후 적용됩니다.`);
   } else {
     const radio = document.querySelector<HTMLInputElement>(`input[name="storageMode"][value="${currentMode}"]`);
@@ -1027,14 +1049,29 @@ function showSettingsPasswordPrompt(): Promise<boolean> {
         return;
       }
 
+      // Hide overlay and show content
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+      const content = getElement<HTMLElement>('settingsContent');
+      if (content) {
+        content.style.display = 'block';
+      }
+
       resolve(true);
     }
 
     submitBtn.addEventListener('click', submit);
-    cancelBtn.addEventListener('click', () => resolve(false));
+    cancelBtn.addEventListener('click', () => {
+      window.location.href = '../index.html';
+      resolve(false);
+    });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !submitBtn.disabled) submit();
-      if (e.key === 'Escape') resolve(false);
+      if (e.key === 'Escape') {
+        window.location.href = '../index.html';
+        resolve(false);
+      }
     });
     input.addEventListener('input', () => {
       errDiv.style.display = 'none';
@@ -1045,30 +1082,1870 @@ function showSettingsPasswordPrompt(): Promise<boolean> {
 }
 
 // ========================================
+// Event Listeners Setup
+// ========================================
+
+/**
+ * Initialize event listeners for file upload/selection
+ */
+function initFileUploadListeners(): void {
+  // 파일 선택 버튼 클릭 (Electron 네이티브 다이얼로그 사용)
+  const selectBtn = getElement<HTMLButtonElement>('selectAuthFileBtn');
+  selectBtn?.addEventListener('click', async () => {
+    if (isElectron && (window as any).electronAPI?.selectAuthFile) {
+      // Electron 네이티브 파일 선택 다이얼로그
+      try {
+        const result = await (window as any).electronAPI.selectAuthFile();
+        if (result.canceled) {
+          return;
+        }
+        if (result.success) {
+          // Firebase 재초기화 (새 인증 파일 적용)
+          if ((window as any).firebaseConfig?.reinitialize) {
+            const initResult = await (window as any).firebaseConfig.reinitialize();
+            if (initResult) {
+              showToast('인증 파일이 등록되고 Firebase가 연결되었습니다.\n프로젝트: ' + result.projectId);
+            } else {
+              showToast('인증 파일은 등록되었지만 Firebase 연결에 실패했습니다.\n앱을 재시작해주세요.');
+            }
+          } else {
+            showToast('인증 파일이 등록되었습니다.\n앱을 재시작하면 적용됩니다.\n프로젝트: ' + result.projectId);
+          }
+          await checkAuthFileStatus();
+          updateConnectionStatus();
+        } else {
+          showToast('인증 파일 등록 실패: ' + (result.error || '알 수 없는 오류'));
+        }
+      } catch (error) {
+        showToast('파일 선택 중 오류 발생: ' + (error as Error).message);
+      }
+    } else {
+      // 웹 환경 폴백
+      getElement<HTMLInputElement>('authFileInput')?.click();
+    }
+  });
+
+  // 파일 선택 처리 (웹 환경용)
+  const fileInput = getElement<HTMLInputElement>('authFileInput');
+  fileInput?.addEventListener('change', async (e) => {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      await saveAuthFile(event.target?.result as string);
+    };
+    reader.readAsText(file);
+
+    // 입력 초기화
+    target.value = '';
+  });
+
+  // 인증 파일 삭제 버튼
+  const deleteBtn = getElement<HTMLButtonElement>('deleteAuthFileBtn');
+  deleteBtn?.addEventListener('click', deleteAuthFile);
+
+  // 연결 테스트 버튼
+  const testBtn = getElement<HTMLButtonElement>('testConnectionBtn');
+  testBtn?.addEventListener('click', async () => {
+    const statusEl = getElement<HTMLElement>('connectionStatus');
+    const authStatusEl = getElement<HTMLElement>('authFileStatus');
+
+    if (statusEl) {
+      statusEl.className = 'status-badge';
+      statusEl.style.background = '#fef3c7';
+      statusEl.style.color = '#92400e';
+      statusEl.textContent = '● 연결 중...';
+    }
+
+    try {
+      // Firebase 초기화 시도
+      const initialized = await (window as any).firebaseConfig.initialize();
+
+      if (initialized) {
+        if (statusEl) {
+          statusEl.className = 'status-badge connected';
+          statusEl.style.background = '#dcfce7';
+          statusEl.style.color = '#16a34a';
+          statusEl.textContent = '● 연결됨';
+        }
+
+        if (authStatusEl) {
+          authStatusEl.className = 'status-badge connected';
+          authStatusEl.textContent = '● 연결됨';
+        }
+
+        const migrateBtn = getElement<HTMLButtonElement>('migrateAllBtn');
+        if (migrateBtn) migrateBtn.disabled = false;
+
+        // Update connection status for manual settings section
+        updateConnectionStatus();
+
+        renderMigrationList();
+        showToast('Firebase 연결 성공!');
+      } else {
+        if (statusEl) {
+          statusEl.className = 'status-badge disconnected';
+          statusEl.style.background = '#fef3c7';
+          statusEl.style.color = '#d97706';
+          statusEl.textContent = '● 미연결';
+        }
+
+        if (isElectron) {
+          showToast('Firebase 연결 실패.\n인증 파일이 등록되어 있는지 확인하세요.');
+        } else {
+          showToast('Firebase 연결 실패.\n수동 설정값을 확인해주세요.');
+        }
+      }
+    } catch (error) {
+      if (statusEl) {
+        statusEl.className = 'status-badge error';
+        statusEl.style.background = '#fee2e2';
+        statusEl.style.color = '#dc2626';
+        statusEl.textContent = '● 연결 실패';
+      }
+      console.error('연결 테스트 실패:', error);
+      showToast('연결 실패: ' + (error as Error).message);
+    }
+  });
+
+  // 드래그 앤 드롭 지원
+  const uploadArea = getElement<HTMLElement>('authFileUploadArea');
+  if (uploadArea) {
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const innerDiv = uploadArea.querySelector('div') as HTMLElement;
+      if (innerDiv) {
+        innerDiv.style.borderColor = '#3b82f6';
+        innerDiv.style.background = '#eff6ff';
+      }
+    });
+
+    uploadArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      const innerDiv = uploadArea.querySelector('div') as HTMLElement;
+      if (innerDiv) {
+        innerDiv.style.borderColor = '#cbd5e1';
+        innerDiv.style.background = '#f8fafc';
+      }
+    });
+
+    uploadArea.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const innerDiv = uploadArea.querySelector('div') as HTMLElement;
+      if (innerDiv) {
+        innerDiv.style.borderColor = '#cbd5e1';
+        innerDiv.style.background = '#f8fafc';
+      }
+
+      const file = e.dataTransfer?.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        await saveAuthFile(event.target?.result as string);
+      };
+      reader.readAsText(file);
+    });
+  }
+}
+
+// Initialize event listeners when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFileUploadListeners);
+} else {
+  initFileUploadListeners();
+}
+
+// ========================================
+// Encryption Migration Functions
+// ========================================
+
+/**
+ * Scan plaintext data for encryption migration
+ */
+async function scanPlaintextData(): Promise<void> {
+  if (!(window as any).encryptionManager?.isReady()) {
+    showToast('암호화가 활성화되어야 합니다. (비밀번호 입력 필요)');
+    return;
+  }
+
+  const statusBadge = getElement<HTMLElement>('encMigrationStatus');
+  if (statusBadge) {
+    statusBadge.className = 'status-badge';
+    statusBadge.style.background = '#fef3c7';
+    statusBadge.style.color = '#92400e';
+    statusBadge.textContent = '● 스캔 중...';
+  }
+
+  const scanBtn = getElement<HTMLButtonElement>('scanPlaintextBtn');
+  if (scanBtn) {
+    scanBtn.disabled = true;
+    scanBtn.textContent = '스캔 중...';
+  }
+
+  const currentYear = new Date().getFullYear();
+  const MIN_YEAR = 2020;
+  encMigrationScanResults = [];
+
+  try {
+    // 1. Firebase collections scan
+    if ((window as any).firebaseConfig?.isEnabled()) {
+      const db = (window as any).firebaseConfig.getDb();
+      if (db) {
+        for (const type of SAMPLE_TYPES) {
+          for (let year = MIN_YEAR; year <= currentYear; year++) {
+            const collectionName = (window as any).firestoreDb.getCollectionName(type.key, year);
+            try {
+              const snapshot = await db.collection(collectionName).get();
+              if (snapshot.empty) continue;
+
+              let plaintextCount = 0;
+              let encryptedCount = 0;
+
+              snapshot.forEach((doc: any) => {
+                const data = doc.data();
+                if (data._enc) {
+                  encryptedCount++;
+                } else {
+                  plaintextCount++;
+                }
+              });
+
+              if (plaintextCount > 0 || encryptedCount > 0) {
+                encMigrationScanResults.push({
+                  source: 'firebase',
+                  type: type.key,
+                  typeName: type.name,
+                  typeIcon: type.icon,
+                  year,
+                  collectionName,
+                  plaintextCount,
+                  encryptedCount,
+                  totalCount: plaintextCount + encryptedCount
+                });
+              }
+            } catch (err) {
+              console.warn(`[Migration] ${collectionName} 스캔 실패:`, (err as Error).message);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Local autosave files scan (Electron only)
+    if (isElectron && window.electronAPI) {
+      for (const type of SAMPLE_TYPES) {
+        for (let year = MIN_YEAR; year <= currentYear; year++) {
+          try {
+            const filePath = await window.electronAPI.getAutoSavePath(type.key, year);
+            if (!filePath) continue;
+
+            const result = await window.electronAPI.readFile(filePath);
+            if (!result.success || !result.content) continue;
+
+            const parsed = JSON.parse(result.content);
+            // Unencrypted plaintext file (has data array but no _localEnc)
+            if (parsed && !parsed._localEnc && parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+              encMigrationScanResults.push({
+                source: 'autosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                filePath,
+                plaintextCount: parsed.data.length,
+                encryptedCount: 0,
+                totalCount: parsed.data.length,
+              });
+            }
+          } catch {
+            // File not found or parse error - ignore
+          }
+        }
+      }
+    }
+
+    // 2-1. Web autosave files scan (File System Access API)
+    if (!isElectron && (window as any).getWebDirHandle?.()) {
+      const dirHandle = (window as any).getWebDirHandle();
+      for (const type of SAMPLE_TYPES) {
+        const fileTypeKey = FILE_TYPE_MAP[type.key] || type.key;
+        for (let year = MIN_YEAR; year <= currentYear; year++) {
+          try {
+            const fileName = `auto-save-${fileTypeKey}-${year}.json`;
+            const fileHandle = await dirHandle.getFileHandle(fileName);
+            const file = await fileHandle.getFile();
+            const content = await file.text();
+            if (!content) continue;
+
+            const parsed = JSON.parse(content);
+            if (parsed && !parsed._localEnc && parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+              encMigrationScanResults.push({
+                source: 'webAutosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                fileName,
+                plaintextCount: parsed.data.length,
+                encryptedCount: 0,
+                totalCount: parsed.data.length,
+              });
+            }
+          } catch {
+            // NotFoundError = file not found, ignore
+          }
+        }
+      }
+    }
+
+    // 3. localStorage data scan (web local mode)
+    for (const type of SAMPLE_TYPES) {
+      for (let year = MIN_YEAR; year <= currentYear; year++) {
+        try {
+          const storageKey = `${type.storagePrefix}_${year}`;
+          const raw = localStorage.getItem(storageKey);
+          if (!raw) continue;
+
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data) || data.length === 0) continue;
+
+          let plaintextCount = 0;
+          let encryptedCount = 0;
+          data.forEach((item: any) => {
+            if (item._enc) {
+              encryptedCount++;
+            } else {
+              plaintextCount++;
+            }
+          });
+
+          if (plaintextCount > 0) {
+            encMigrationScanResults.push({
+              source: 'localStorage',
+              type: type.key,
+              typeName: type.name,
+              typeIcon: type.icon,
+              year,
+              storageKey,
+              plaintextCount,
+              encryptedCount,
+              totalCount: plaintextCount + encryptedCount,
+            });
+          }
+        } catch {
+          // Parse error - ignore
+        }
+      }
+    }
+
+    renderEncMigrationList();
+
+    const totalPlaintext = encMigrationScanResults.reduce((sum, r) => sum + r.plaintextCount, 0);
+    if (statusBadge) {
+      if (totalPlaintext > 0) {
+        statusBadge.className = 'status-badge';
+        statusBadge.style.background = '#fef3c7';
+        statusBadge.style.color = '#92400e';
+        statusBadge.textContent = `● 평문 ${totalPlaintext}건`;
+        const encryptAllBtn = getElement<HTMLButtonElement>('encryptAllBtn');
+        if (encryptAllBtn) encryptAllBtn.disabled = false;
+      } else {
+        statusBadge.className = 'status-badge connected';
+        statusBadge.textContent = '● 전체 암호화됨';
+        const encryptAllBtn = getElement<HTMLButtonElement>('encryptAllBtn');
+        if (encryptAllBtn) encryptAllBtn.disabled = true;
+      }
+    }
+  } catch (err) {
+    console.error('[Migration] 스캔 오류:', err);
+    if (statusBadge) {
+      statusBadge.className = 'status-badge error';
+      statusBadge.textContent = '● 스캔 실패';
+    }
+  } finally {
+    if (scanBtn) {
+      scanBtn.disabled = false;
+      scanBtn.textContent = '🔍 평문 데이터 스캔';
+    }
+  }
+}
+
+/**
+ * Render encryption migration list
+ */
+function renderEncMigrationList(): void {
+  const container = getElement<HTMLElement>('encMigrationList');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (encMigrationScanResults.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'text-align: center; color: #94a3b8; padding: 1rem;';
+    empty.textContent = '데이터가 있는 컬렉션이 없습니다.';
+    container.appendChild(empty);
+    return;
+  }
+
+  encMigrationScanResults.forEach((result, index) => {
+    const item = document.createElement('div');
+    item.className = 'migration-item';
+
+    const info = document.createElement('div');
+    info.className = 'migration-item-info';
+
+    const icon = document.createElement('span');
+    icon.className = 'migration-item-icon';
+    icon.textContent = result.typeIcon;
+
+    const textDiv = document.createElement('div');
+
+    const name = document.createElement('div');
+    name.className = 'migration-item-name';
+    if (result.source === 'autosave' || result.source === 'webAutosave') {
+      name.textContent = `${result.typeName} ${result.year}년 (자동저장 파일)`;
+    } else if (result.source === 'localStorage') {
+      name.textContent = `${result.typeName} ${result.year}년 (로컬 데이터)`;
+    } else {
+      name.textContent = `${result.typeName} ${result.year}년 (Firebase)`;
+    }
+
+    const countDiv = document.createElement('div');
+    countDiv.className = 'migration-item-count';
+
+    if (result.plaintextCount > 0) {
+      const plaintextSpan = document.createElement('span');
+      plaintextSpan.style.color = '#dc2626';
+      plaintextSpan.style.fontWeight = '600';
+      plaintextSpan.textContent = `평문 ${result.plaintextCount}건`;
+      countDiv.appendChild(plaintextSpan);
+
+      if (result.encryptedCount > 0) {
+        countDiv.appendChild(document.createTextNode(' / '));
+      }
+    }
+    if (result.encryptedCount > 0) {
+      const encSpan = document.createElement('span');
+      encSpan.style.color = '#16a34a';
+      encSpan.textContent = `암호화 ${result.encryptedCount}건`;
+      countDiv.appendChild(encSpan);
+    }
+
+    textDiv.appendChild(name);
+    textDiv.appendChild(countDiv);
+    info.appendChild(icon);
+    info.appendChild(textDiv);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.style.fontSize = '0.8rem';
+    btn.style.padding = '0.5rem 1rem';
+
+    if (result.plaintextCount > 0) {
+      btn.textContent = '암호화';
+      btn.addEventListener('click', () => encryptSingleItem(index));
+    } else {
+      btn.textContent = '완료';
+      btn.disabled = true;
+      btn.style.background = '#94a3b8';
+    }
+
+    item.appendChild(info);
+    item.appendChild(btn);
+    container.appendChild(item);
+  });
+}
+
+/**
+ * Enable/disable all migration-related buttons to prevent race conditions
+ */
+function setMigrationButtonsEnabled(enabled: boolean): void {
+  const scanBtn = getElement<HTMLButtonElement>('scanPlaintextBtn');
+  const encryptAllBtn = getElement<HTMLButtonElement>('encryptAllBtn');
+  if (scanBtn) scanBtn.disabled = !enabled;
+  if (encryptAllBtn) encryptAllBtn.disabled = !enabled;
+
+  // Individual collection encrypt buttons
+  const listContainer = getElement<HTMLElement>('encMigrationList');
+  if (listContainer) {
+    listContainer.querySelectorAll('button').forEach((btn) => {
+      (btn as HTMLButtonElement).disabled = !enabled;
+    });
+  }
+}
+
+/**
+ * Encrypt a single item from the scan results
+ */
+async function encryptSingleItem(resultIndex: number): Promise<void> {
+  const result = encMigrationScanResults[resultIndex];
+  if (!result || result.plaintextCount === 0) return;
+
+  let label: string;
+  if (result.source === 'autosave') {
+    label = `${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)`;
+  } else if (result.source === 'webAutosave') {
+    label = `${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)`;
+  } else if (result.source === 'localStorage') {
+    label = `${result.typeName} ${result.year}년 로컬 데이터 (${result.plaintextCount}건)`;
+  } else {
+    label = `${result.typeName} ${result.year}년 Firebase 데이터 ${result.plaintextCount}건`;
+  }
+
+  if (!confirm(`${label}을(를) 암호화하시겠습니까?`)) {
+    return;
+  }
+
+  // Disable all migration buttons to prevent race conditions
+  setMigrationButtonsEnabled(false);
+
+  try {
+    if (result.source === 'autosave' && result.filePath) {
+      await encryptAutoSaveFile(result.filePath, result.typeName, result.year);
+    } else if (result.source === 'webAutosave' && result.fileName) {
+      await encryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
+    } else if (result.source === 'localStorage' && result.storageKey) {
+      await encryptLocalStorageData(result.storageKey, result.typeName, result.year);
+    } else if (result.collectionName) {
+      await encryptPlaintextInCollection(result.collectionName, result.plaintextCount);
+    }
+  } finally {
+    setMigrationButtonsEnabled(true);
+  }
+
+  // Rescan
+  await scanPlaintextData();
+}
+
+/**
+ * Encrypt all plaintext data in a Firebase collection
+ */
+async function encryptPlaintextInCollection(collectionName: string, expectedCount: number): Promise<void> {
+  const db = (window as any).firebaseConfig?.getDb();
+  const key = (window as any).encryptionManager?.getKey();
+  if (!db || !key) return;
+
+  const progressDiv = getElement<HTMLElement>('encMigrationProgress');
+  const progressBar = getElement<HTMLElement>('encMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('encMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${collectionName} 암호화 중...`;
+
+  try {
+    const snapshot = await db.collection(collectionName).get();
+    if (snapshot.empty) return;
+
+    // Filter plaintext documents
+    const plaintextDocs: Array<{ ref: any; id: string; data: any }> = [];
+    snapshot.forEach((doc: any) => {
+      const data = doc.data();
+      if (!data._enc) {
+        plaintextDocs.push({ ref: doc.ref, id: doc.id, data });
+      }
+    });
+
+    if (plaintextDocs.length === 0) {
+      if (progressText) progressText.textContent = '평문 데이터가 없습니다.';
+      return;
+    }
+
+    const BATCH_SIZE = 200;
+    let processed = 0;
+
+    for (let i = 0; i < plaintextDocs.length; i += BATCH_SIZE) {
+      const chunk = plaintextDocs.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      let batchHasOps = false;
+
+      for (const { ref, id, data } of chunk) {
+        try {
+          const encrypted = await (window as any).CryptoUtils.encryptRecord({ ...data }, key);
+          const saveData: any = { ...encrypted };
+
+          if (encrypted._enc) {
+            // Delete sensitive fields in plaintext
+            for (const field of (window as any).CryptoUtils.SENSITIVE_FIELDS) {
+              if (!(field in saveData) || saveData[field] === undefined) {
+                saveData[field] = (window as any).firebase.firestore.FieldValue.delete();
+              }
+            }
+          } else {
+            // Add processing marker for records without sensitive fields
+            saveData._enc = { v: 1 };
+          }
+          saveData.updatedAt = (window as any).firebase.firestore.FieldValue.serverTimestamp();
+
+          batch.set(ref, saveData, { merge: true });
+          batchHasOps = true;
+        } catch (docErr) {
+          console.warn(`[Migration] ${collectionName}/${id}: 암호화 실패 -`, (docErr as Error).message);
+        }
+
+        processed++;
+        const pct = Math.round((processed / plaintextDocs.length) * 100);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = `${collectionName}: ${processed}/${plaintextDocs.length}건 처리 중...`;
+      }
+
+      if (batchHasOps) {
+        await batch.commit();
+      }
+    }
+
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = '#22c55e';
+    }
+    if (progressText) progressText.textContent = `${collectionName}: ${processed}건 암호화 완료!`;
+
+    console.log(`[Migration] ${collectionName}: ${processed}건 암호화 완료`);
+  } catch (err) {
+    console.error(`[Migration] ${collectionName} 암호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Encrypt a local autosave file (Electron)
+ */
+async function encryptAutoSaveFile(filePath: string, typeName: string, year: number): Promise<void> {
+  const progressDiv = getElement<HTMLElement>('encMigrationProgress');
+  const progressBar = getElement<HTMLElement>('encMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('encMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 중...`;
+
+  try {
+    const result = await window.electronAPI!.readFile(filePath);
+    if (!result.success || !result.content) {
+      if (progressText) progressText.textContent = '파일 읽기 실패';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '30%';
+
+    // Encrypt using CryptoUtils.encryptForFile
+    const encrypted = await (window as any).CryptoUtils.encryptForFile(result.content);
+    if (!encrypted) {
+      if (progressText) progressText.textContent = '암호화 실패';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '70%';
+
+    const writeResult = await window.electronAPI!.writeFile(filePath, encrypted);
+    if (writeResult.success) {
+      if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.style.background = '#22c55e';
+      }
+      if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 완료!`;
+      console.log(`[Migration] ${typeName} ${year}년 autosave 암호화 완료`);
+    } else {
+      if (progressBar) progressBar.style.background = '#dc2626';
+      if (progressText) progressText.textContent = '파일 저장 실패';
+    }
+  } catch (err) {
+    console.error(`[Migration] autosave 암호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Encrypt a web autosave file (File System Access API)
+ */
+async function encryptWebAutoSaveFile(fileName: string, typeName: string, year: number): Promise<void> {
+  const dirHandle = (window as any).getWebDirHandle?.();
+  if (!dirHandle) {
+    showToast('자동저장 폴더가 선택되지 않았습니다.');
+    return;
+  }
+
+  const progressDiv = getElement<HTMLElement>('encMigrationProgress');
+  const progressBar = getElement<HTMLElement>('encMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('encMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 중...`;
+
+  try {
+    const fileHandle = await dirHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    const content = await file.text();
+    if (!content) {
+      if (progressText) progressText.textContent = '파일 읽기 실패';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '30%';
+
+    // Encrypt using CryptoUtils.encryptForFile
+    const encrypted = await (window as any).CryptoUtils.encryptForFile(content);
+    if (!encrypted) {
+      if (progressText) progressText.textContent = '암호화 실패';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '70%';
+
+    // Check permission and write file
+    const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      const requested = await dirHandle.requestPermission({ mode: 'readwrite' });
+      if (requested !== 'granted') {
+        if (progressText) progressText.textContent = '폴더 쓰기 권한이 없습니다.';
+        if (progressBar) progressBar.style.background = '#dc2626';
+        return;
+      }
+    }
+
+    const writeHandle = await dirHandle.getFileHandle(fileName, { create: true });
+    const writable = await writeHandle.createWritable();
+    await writable.write(encrypted);
+    await writable.close();
+
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = '#22c55e';
+    }
+    if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 완료!`;
+    console.log(`[Migration] ${fileName} 웹 autosave 암호화 완료`);
+  } catch (err) {
+    console.error(`[Migration] ${fileName} 웹 autosave 암호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Encrypt localStorage data
+ */
+async function encryptLocalStorageData(storageKey: string, typeName: string, year: number): Promise<void> {
+  const key = (window as any).encryptionManager?.getKey();
+  if (!key) return;
+
+  const progressDiv = getElement<HTMLElement>('encMigrationProgress');
+  const progressBar = getElement<HTMLElement>('encMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('encMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${typeName} ${year}년 로컬 데이터 암호화 중...`;
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      if (progressText) progressText.textContent = '데이터를 찾을 수 없습니다.';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data) || data.length === 0) {
+      if (progressText) progressText.textContent = '암호화할 데이터가 없습니다.';
+      return;
+    }
+
+    let processed = 0;
+    const encryptedData: any[] = [];
+
+    for (const item of data) {
+      try {
+        if (item._enc) {
+          // Already encrypted, keep as is
+          encryptedData.push(item);
+        } else {
+          const encrypted = await (window as any).CryptoUtils.encryptRecord({ ...item }, key);
+          encryptedData.push(encrypted);
+        }
+      } catch (itemErr) {
+        console.warn(`[Migration] ${storageKey}: 항목 암호화 실패 -`, (itemErr as Error).message);
+        encryptedData.push(item); // Keep original on failure
+      }
+
+      processed++;
+      const pct = Math.round((processed / data.length) * 100);
+      if (progressBar) progressBar.style.width = pct + '%';
+      if (progressText) progressText.textContent = `${typeName} ${year}년: ${processed}/${data.length}건 처리 중...`;
+    }
+
+    // Save to localStorage
+    localStorage.setItem(storageKey, JSON.stringify(encryptedData));
+
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = '#22c55e';
+    }
+    if (progressText) progressText.textContent = `${typeName} ${year}년 로컬 데이터 ${processed}건 암호화 완료!`;
+    console.log(`[Migration] ${storageKey}: ${processed}건 암호화 완료`);
+  } catch (err) {
+    console.error(`[Migration] ${storageKey} 암호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Encrypt all plaintext data (Firebase + autosave + localStorage)
+ */
+async function encryptAllPlaintext(): Promise<void> {
+  const plaintextResults = encMigrationScanResults.filter((r) => r.plaintextCount > 0);
+  if (plaintextResults.length === 0) {
+    showToast('암호화할 평문 데이터가 없습니다.');
+    return;
+  }
+
+  const firebaseResults = plaintextResults.filter((r) => r.source === 'firebase');
+  const autosaveResults = plaintextResults.filter((r) => r.source === 'autosave');
+  const webAutosaveResults = plaintextResults.filter((r) => r.source === 'webAutosave');
+  const localStorageResults = plaintextResults.filter((r) => r.source === 'localStorage');
+
+  const details: string[] = [];
+  if (firebaseResults.length > 0) {
+    const totalFb = firebaseResults.reduce((sum, r) => sum + r.plaintextCount, 0);
+    details.push(`Firebase: ${totalFb}건`);
+    firebaseResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
+  }
+  if (autosaveResults.length > 0) {
+    details.push(`자동저장 파일 (Electron): ${autosaveResults.length}개`);
+    autosaveResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
+  }
+  if (webAutosaveResults.length > 0) {
+    details.push(`자동저장 파일 (웹): ${webAutosaveResults.length}개`);
+    webAutosaveResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
+  }
+  if (localStorageResults.length > 0) {
+    const totalLs = localStorageResults.reduce((sum, r) => sum + r.plaintextCount, 0);
+    details.push(`로컬 데이터: ${totalLs}건`);
+    localStorageResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년: ${r.plaintextCount}건`));
+  }
+
+  const totalPlaintext = plaintextResults.reduce((sum, r) => sum + r.plaintextCount, 0);
+  if (!confirm(`총 ${totalPlaintext}건의 평문 데이터를 암호화하시겠습니까?\n\n${details.join('\n')}`)) {
+    return;
+  }
+
+  // Disable all migration buttons to prevent race conditions
+  setMigrationButtonsEnabled(false);
+
+  try {
+    for (const result of firebaseResults) {
+      if (result.collectionName) {
+        await encryptPlaintextInCollection(result.collectionName, result.plaintextCount);
+      }
+    }
+    for (const result of autosaveResults) {
+      if (result.filePath) {
+        await encryptAutoSaveFile(result.filePath, result.typeName, result.year);
+      }
+    }
+    for (const result of webAutosaveResults) {
+      if (result.fileName) {
+        await encryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
+      }
+    }
+    for (const result of localStorageResults) {
+      if (result.storageKey) {
+        await encryptLocalStorageData(result.storageKey, result.typeName, result.year);
+      }
+    }
+  } finally {
+    setMigrationButtonsEnabled(true);
+  }
+
+  alert(`암호화 완료! 총 ${totalPlaintext}건이 처리되었습니다.`);
+
+  // Rescan
+  await scanPlaintextData();
+}
+
+// ========================================
+// Decryption Migration Functions
+// ========================================
+
+/**
+ * Scan encrypted data for decryption migration
+ */
+async function scanEncryptedData(): Promise<void> {
+  if (!(window as any).encryptionManager?.isReady()) {
+    showToast('암호화가 활성화되어야 합니다. (비밀번호 입력 필요)');
+    return;
+  }
+
+  const statusBadge = getElement<HTMLElement>('decMigrationStatus');
+  if (statusBadge) {
+    statusBadge.className = 'status-badge';
+    statusBadge.style.background = '#fef3c7';
+    statusBadge.style.color = '#92400e';
+    statusBadge.textContent = '● 스캔 중...';
+  }
+
+  const scanBtn = getElement<HTMLButtonElement>('scanEncryptedBtn');
+  if (scanBtn) {
+    scanBtn.disabled = true;
+    scanBtn.textContent = '스캔 중...';
+  }
+
+  const currentYear = getCurrentYear();
+  decMigrationScanResults = [];
+
+  try {
+    // 1. Firebase collections scan
+    if ((window as any).firebaseConfig?.isEnabled()) {
+      const db = (window as any).firebaseConfig.getDb();
+      if (db) {
+        for (const type of SAMPLE_TYPES) {
+          for (let year = MIN_YEAR; year <= currentYear; year++) {
+            const collectionName = (window as any).firestoreDb?.getCollectionName(type.key, year);
+            if (!collectionName) continue;
+            try {
+              const snapshot = await db.collection(collectionName).get();
+              if (snapshot.empty) continue;
+
+              let encryptedCount = 0;
+              let plaintextCount = 0;
+
+              snapshot.forEach((doc: any) => {
+                const data = doc.data();
+                if (data._enc && data._enc.v) {
+                  encryptedCount++;
+                } else {
+                  plaintextCount++;
+                }
+              });
+
+              if (encryptedCount > 0) {
+                decMigrationScanResults.push({
+                  source: 'firebase',
+                  type: type.key,
+                  typeName: type.name,
+                  typeIcon: type.icon,
+                  year,
+                  collectionName,
+                  encryptedCount,
+                  plaintextCount,
+                  totalCount: encryptedCount + plaintextCount,
+                });
+              }
+            } catch (err) {
+              console.warn(`[DecMigration] ${collectionName} 스캔 실패:`, (err as Error).message);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Local autosave files scan (Electron)
+    if (isElectron && window.electronAPI) {
+      for (const type of SAMPLE_TYPES) {
+        for (let year = MIN_YEAR; year <= currentYear; year++) {
+          try {
+            const filePath = await window.electronAPI.getAutoSavePath(type.key, year);
+            if (!filePath) continue;
+
+            const result = await window.electronAPI.readFile(filePath);
+            if (!result.success || !result.content) continue;
+
+            const parsed = JSON.parse(result.content);
+            if (parsed && parsed._localEnc && parsed.iv && parsed.ct) {
+              // Legacy whole-file encrypted
+              decMigrationScanResults.push({
+                source: 'autosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                filePath,
+                encryptedCount: 1,
+                plaintextCount: 0,
+                status: 'encrypted',
+              });
+            } else if (parsed && parsed._fileEnc && Array.isArray(parsed.data)) {
+              // Per-record field encryption
+              const encCount = parsed.data.filter((r: any) => r && r._enc).length;
+              decMigrationScanResults.push({
+                source: 'autosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                filePath,
+                encryptedCount: encCount,
+                plaintextCount: parsed.data.length - encCount,
+                status: 'encrypted',
+              });
+            } else if (parsed && parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+              // Plaintext file
+              decMigrationScanResults.push({
+                source: 'autosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                filePath,
+                encryptedCount: 0,
+                plaintextCount: parsed.data.length,
+                status: 'plaintext',
+              });
+            }
+          } catch {
+            // File not found or parse error - ignore
+          }
+        }
+      }
+    }
+
+    // 2-1. Web autosave files scan (File System Access API)
+    if (!isElectron && (window as any).getWebDirHandle?.()) {
+      const dirHandle = (window as any).getWebDirHandle();
+      for (const type of SAMPLE_TYPES) {
+        const fileTypeKey = FILE_TYPE_MAP[type.key] || type.key;
+        for (let year = MIN_YEAR; year <= currentYear; year++) {
+          try {
+            const fileName = `auto-save-${fileTypeKey}-${year}.json`;
+            const fileHandle = await dirHandle.getFileHandle(fileName);
+            const file = await fileHandle.getFile();
+            const content = await file.text();
+            if (!content) continue;
+
+            const parsed = JSON.parse(content);
+            if (parsed && parsed._localEnc && parsed.iv && parsed.ct) {
+              decMigrationScanResults.push({
+                source: 'webAutosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                fileName,
+                encryptedCount: 1,
+                plaintextCount: 0,
+                status: 'encrypted',
+              });
+            } else if (parsed && parsed._fileEnc && Array.isArray(parsed.data)) {
+              const encCount = parsed.data.filter((r: any) => r && r._enc).length;
+              decMigrationScanResults.push({
+                source: 'webAutosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                fileName,
+                encryptedCount: encCount,
+                plaintextCount: parsed.data.length - encCount,
+                status: 'encrypted',
+              });
+            } else if (parsed && parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+              decMigrationScanResults.push({
+                source: 'webAutosave',
+                type: type.key,
+                typeName: type.name,
+                typeIcon: type.icon,
+                year,
+                fileName,
+                encryptedCount: 0,
+                plaintextCount: parsed.data.length,
+                status: 'plaintext',
+              });
+            }
+          } catch {
+            // NotFoundError = file not found, ignore
+          }
+        }
+      }
+    }
+
+    // 3. localStorage data scan
+    for (const type of SAMPLE_TYPES) {
+      for (let year = MIN_YEAR; year <= currentYear; year++) {
+        try {
+          const storageKey = `${type.storagePrefix}_${year}`;
+          const raw = localStorage.getItem(storageKey);
+          if (!raw) continue;
+
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data) || data.length === 0) continue;
+
+          let encryptedCount = 0;
+          let plaintextCount = 0;
+          data.forEach((item: any) => {
+            if (item._enc && item._enc.v) {
+              encryptedCount++;
+            } else {
+              plaintextCount++;
+            }
+          });
+
+          if (encryptedCount > 0 || plaintextCount > 0) {
+            decMigrationScanResults.push({
+              source: 'localStorage',
+              type: type.key,
+              typeName: type.name,
+              typeIcon: type.icon,
+              year,
+              storageKey,
+              encryptedCount,
+              plaintextCount,
+              totalCount: encryptedCount + plaintextCount,
+            });
+          }
+        } catch {
+          // Parse error - ignore
+        }
+      }
+    }
+
+    renderDecMigrationList();
+
+    const totalEncrypted = decMigrationScanResults.reduce((sum, r) => sum + r.encryptedCount, 0);
+    const totalAutoPlaintext = decMigrationScanResults.filter((r) => r.source === 'autosave' && r.status === 'plaintext').length;
+    const totalItems = totalEncrypted + totalAutoPlaintext;
+
+    if (statusBadge) {
+      if (totalItems > 0) {
+        const parts: string[] = [];
+        if (totalEncrypted > 0) parts.push(`암호화 ${totalEncrypted}건`);
+        if (totalAutoPlaintext > 0) parts.push(`평문 파일 ${totalAutoPlaintext}개`);
+        statusBadge.className = 'status-badge';
+        statusBadge.style.background = '#fef3c7';
+        statusBadge.style.color = '#92400e';
+        statusBadge.textContent = `● ${parts.join(' / ')}`;
+        const decryptAllBtn = getElement<HTMLButtonElement>('decryptAllBtn');
+        if (decryptAllBtn) decryptAllBtn.disabled = totalEncrypted === 0;
+      } else {
+        statusBadge.className = 'status-badge connected';
+        statusBadge.textContent = '● 데이터 없음';
+        const decryptAllBtn = getElement<HTMLButtonElement>('decryptAllBtn');
+        if (decryptAllBtn) decryptAllBtn.disabled = true;
+      }
+    }
+  } catch (err) {
+    console.error('[DecMigration] 스캔 오류:', err);
+    if (statusBadge) {
+      statusBadge.className = 'status-badge error';
+      statusBadge.textContent = '● 스캔 실패';
+    }
+  } finally {
+    if (scanBtn) {
+      scanBtn.disabled = false;
+      scanBtn.textContent = '🔍 암호화 데이터 스캔';
+    }
+  }
+}
+
+/**
+ * Render decryption migration list
+ */
+function renderDecMigrationList(): void {
+  const container = getElement<HTMLElement>('decMigrationList');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (decMigrationScanResults.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'text-align: center; color: #94a3b8; padding: 1rem;';
+    empty.textContent = '암호화된 데이터가 없습니다.';
+    container.appendChild(empty);
+    return;
+  }
+
+  decMigrationScanResults.forEach((result, index) => {
+    const item = document.createElement('div');
+    item.className = 'migration-item';
+
+    const info = document.createElement('div');
+    info.className = 'migration-item-info';
+
+    const icon = document.createElement('span');
+    icon.className = 'migration-item-icon';
+    icon.textContent = result.typeIcon;
+
+    const textDiv = document.createElement('div');
+
+    const name = document.createElement('div');
+    name.className = 'migration-item-name';
+    if (result.source === 'firebase') {
+      name.textContent = `${result.typeName} ${result.year}년 (Firebase)`;
+    } else if (result.source === 'localStorage') {
+      name.textContent = `${result.typeName} ${result.year}년 (로컬 데이터)`;
+    } else {
+      name.textContent = `${result.typeName} ${result.year}년 (자동저장 파일)`;
+    }
+
+    const countDiv = document.createElement('div');
+    countDiv.className = 'migration-item-count';
+
+    if (result.source === 'autosave' || result.source === 'webAutosave') {
+      const statusSpan = document.createElement('span');
+      statusSpan.style.fontWeight = '600';
+      if (result.status === 'encrypted') {
+        statusSpan.style.color = '#2563eb';
+        statusSpan.textContent = '🔒 암호화됨';
+      } else {
+        statusSpan.style.color = '#dc2626';
+        statusSpan.textContent = `🔓 평문 ${result.plaintextCount}건`;
+      }
+      countDiv.appendChild(statusSpan);
+    } else {
+      const encSpan = document.createElement('span');
+      encSpan.style.color = '#2563eb';
+      encSpan.style.fontWeight = '600';
+      encSpan.textContent = `암호화 ${result.encryptedCount}건`;
+      countDiv.appendChild(encSpan);
+
+      if (result.plaintextCount > 0) {
+        countDiv.appendChild(document.createTextNode(' / '));
+        const ptSpan = document.createElement('span');
+        ptSpan.style.color = '#94a3b8';
+        ptSpan.textContent = `평문 ${result.plaintextCount}건`;
+        countDiv.appendChild(ptSpan);
+      }
+    }
+
+    textDiv.appendChild(name);
+    textDiv.appendChild(countDiv);
+    info.appendChild(icon);
+    info.appendChild(textDiv);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.style.fontSize = '0.8rem';
+    btn.style.padding = '0.5rem 1rem';
+
+    if (result.source === 'autosave' && result.status === 'plaintext') {
+      btn.textContent = '암호화';
+      btn.style.background = '#f59e0b';
+      btn.addEventListener('click', () => encryptSingleAutoSave(index));
+    } else if (result.source === 'webAutosave' && result.status === 'plaintext') {
+      btn.textContent = '암호화';
+      btn.style.background = '#f59e0b';
+      btn.addEventListener('click', () => encryptSingleWebAutoSave(index));
+    } else if (result.source === 'localStorage' && result.encryptedCount > 0) {
+      btn.textContent = '복호화';
+      btn.addEventListener('click', () => decryptSingleItem(index));
+    } else if (result.source === 'localStorage' && result.plaintextCount > 0) {
+      btn.textContent = '암호화';
+      btn.style.background = '#f59e0b';
+      btn.addEventListener('click', () => encryptSingleLocalStorage(index));
+    } else {
+      btn.textContent = '복호화';
+      btn.addEventListener('click', () => decryptSingleItem(index));
+    }
+
+    item.appendChild(info);
+    item.appendChild(btn);
+    container.appendChild(item);
+  });
+}
+
+/**
+ * Enable/disable decryption migration buttons
+ */
+function setDecMigrationButtonsEnabled(enabled: boolean): void {
+  const scanBtn = getElement<HTMLButtonElement>('scanEncryptedBtn');
+  const decryptAllBtn = getElement<HTMLButtonElement>('decryptAllBtn');
+  if (scanBtn) scanBtn.disabled = !enabled;
+  if (decryptAllBtn) decryptAllBtn.disabled = !enabled;
+
+  const listContainer = getElement<HTMLElement>('decMigrationList');
+  if (listContainer) {
+    listContainer.querySelectorAll('button').forEach((btn) => {
+      (btn as HTMLButtonElement).disabled = !enabled;
+    });
+  }
+}
+
+/**
+ * Encrypt single autosave file (from decryption section - plaintext files)
+ */
+async function encryptSingleAutoSave(resultIndex: number): Promise<void> {
+  const result = decMigrationScanResults[resultIndex];
+  if (!result || result.source !== 'autosave' || result.status !== 'plaintext') return;
+
+  if (!confirm(`${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)을 암호화하시겠습니까?`)) {
+    return;
+  }
+
+  setDecMigrationButtonsEnabled(false);
+
+  try {
+    if (result.filePath) {
+      await encryptAutoSaveFile(result.filePath, result.typeName, result.year);
+    }
+  } finally {
+    setDecMigrationButtonsEnabled(true);
+  }
+
+  await scanEncryptedData();
+}
+
+/**
+ * Encrypt single localStorage item (from decryption section)
+ */
+async function encryptSingleLocalStorage(resultIndex: number): Promise<void> {
+  const result = decMigrationScanResults[resultIndex];
+  if (!result || result.source !== 'localStorage') return;
+
+  if (!confirm(`${result.typeName} ${result.year}년 로컬 데이터 (${result.plaintextCount}건)을 암호화하시겠습니까?`)) {
+    return;
+  }
+
+  setDecMigrationButtonsEnabled(false);
+
+  try {
+    if (result.storageKey) {
+      await encryptLocalStorageData(result.storageKey, result.typeName, result.year);
+    }
+  } finally {
+    setDecMigrationButtonsEnabled(true);
+  }
+
+  await scanEncryptedData();
+}
+
+/**
+ * Encrypt single web autosave file (from decryption section - plaintext files)
+ */
+async function encryptSingleWebAutoSave(resultIndex: number): Promise<void> {
+  const result = decMigrationScanResults[resultIndex];
+  if (!result || result.source !== 'webAutosave' || result.status !== 'plaintext') return;
+
+  if (!confirm(`${result.typeName} ${result.year}년 자동저장 파일 (${result.plaintextCount}건)을 암호화하시겠습니까?`)) {
+    return;
+  }
+
+  setDecMigrationButtonsEnabled(false);
+
+  try {
+    if (result.fileName) {
+      await encryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
+    }
+  } finally {
+    setDecMigrationButtonsEnabled(true);
+  }
+
+  await scanEncryptedData();
+}
+
+/**
+ * Decrypt single item from scan results
+ */
+async function decryptSingleItem(resultIndex: number): Promise<void> {
+  const result = decMigrationScanResults[resultIndex];
+  if (!result) return;
+
+  let label: string;
+  if (result.source === 'firebase') {
+    label = `${result.typeName} ${result.year}년 Firebase 데이터 ${result.encryptedCount}건`;
+  } else if (result.source === 'localStorage') {
+    label = `${result.typeName} ${result.year}년 로컬 데이터 ${result.encryptedCount}건`;
+  } else if (result.source === 'webAutosave') {
+    label = `${result.typeName} ${result.year}년 자동저장 파일`;
+  } else {
+    label = `${result.typeName} ${result.year}년 자동저장 파일`;
+  }
+
+  if (!confirm(`${label}을(를) 평문으로 변환하시겠습니까?\n\n⚠️ 복호화 후 민감 정보가 노출됩니다.`)) {
+    return;
+  }
+
+  setDecMigrationButtonsEnabled(false);
+
+  try {
+    if (result.source === 'firebase' && result.collectionName) {
+      await decryptFirebaseCollection(result.collectionName, result.encryptedCount);
+    } else if (result.source === 'localStorage' && result.storageKey) {
+      await decryptLocalStorageData(result.storageKey, result.typeName, result.year);
+    } else if (result.source === 'webAutosave' && result.fileName) {
+      await decryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
+    } else if (result.filePath) {
+      await decryptAutoSaveFile(result.filePath, result.typeName, result.year);
+    }
+  } finally {
+    setDecMigrationButtonsEnabled(true);
+  }
+
+  await scanEncryptedData();
+}
+
+/**
+ * Decrypt Firebase collection data to plaintext
+ */
+async function decryptFirebaseCollection(collectionName: string, expectedCount: number): Promise<void> {
+  const db = (window as any).firebaseConfig?.getDb();
+  const key = (window as any).encryptionManager?.getKey();
+  if (!db || !key) return;
+
+  const progressDiv = getElement<HTMLElement>('decMigrationProgress');
+  const progressBar = getElement<HTMLElement>('decMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('decMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${collectionName} 복호화 중...`;
+
+  try {
+    const snapshot = await db.collection(collectionName).get();
+    if (snapshot.empty) return;
+
+    const encryptedDocs: Array<{ ref: any; id: string; data: any }> = [];
+    snapshot.forEach((doc: any) => {
+      const data = doc.data();
+      if (data._enc && data._enc.v) {
+        encryptedDocs.push({ ref: doc.ref, id: doc.id, data });
+      }
+    });
+
+    if (encryptedDocs.length === 0) {
+      if (progressText) progressText.textContent = '암호화된 데이터가 없습니다.';
+      return;
+    }
+
+    const BATCH_SIZE = 200;
+    let processed = 0;
+
+    for (let i = 0; i < encryptedDocs.length; i += BATCH_SIZE) {
+      const chunk = encryptedDocs.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      let batchHasOps = false;
+
+      for (const { ref, id, data } of chunk) {
+        try {
+          const decrypted = await (window as any).CryptoUtils.decryptRecord({ ...data }, key);
+          const saveData: any = { ...decrypted };
+
+          // Delete _enc field
+          saveData._enc = (window as any).firebase.firestore.FieldValue.delete();
+          saveData.updatedAt = (window as any).firebase.firestore.FieldValue.serverTimestamp();
+
+          batch.set(ref, saveData, { merge: true });
+          batchHasOps = true;
+        } catch (docErr) {
+          console.warn(`[DecMigration] ${collectionName}/${id}: 복호화 실패 -`, (docErr as Error).message);
+        }
+
+        processed++;
+        const pct = Math.round((processed / encryptedDocs.length) * 100);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = `${collectionName}: ${processed}/${encryptedDocs.length}건 복호화 중...`;
+      }
+
+      if (batchHasOps) {
+        await batch.commit();
+      }
+    }
+
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = '#22c55e';
+    }
+    if (progressText) progressText.textContent = `${collectionName}: ${processed}건 평문 변환 완료!`;
+
+    console.log(`[DecMigration] ${collectionName}: ${processed}건 복호화 완료`);
+  } catch (err) {
+    console.error(`[DecMigration] ${collectionName} 복호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Decrypt local autosave file to plaintext
+ */
+async function decryptAutoSaveFile(filePath: string, typeName: string, year: number): Promise<void> {
+  const progressDiv = getElement<HTMLElement>('decMigrationProgress');
+  const progressBar = getElement<HTMLElement>('decMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('decMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 복호화 중...`;
+
+  try {
+    const result = await window.electronAPI!.readFile(filePath);
+    if (!result.success || !result.content) {
+      if (progressText) progressText.textContent = '파일 읽기 실패';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '30%';
+
+    // Decrypt using CryptoUtils.decryptFromFile
+    const decrypted = await (window as any).CryptoUtils.decryptFromFile(result.content);
+    if (!decrypted) {
+      if (progressText) progressText.textContent = '복호화 실패 (키 불일치 또는 데이터 손상)';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '70%';
+
+    // Save as plaintext JSON
+    const plainContent = JSON.stringify(decrypted, null, 2);
+    const writeResult = await window.electronAPI!.writeFile(filePath, plainContent);
+
+    if (writeResult.success) {
+      if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.style.background = '#22c55e';
+      }
+      if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 평문 변환 완료!`;
+      console.log(`[DecMigration] ${typeName} ${year}년 autosave 복호화 완료`);
+    } else {
+      if (progressBar) progressBar.style.background = '#dc2626';
+      if (progressText) progressText.textContent = '파일 저장 실패';
+    }
+  } catch (err) {
+    console.error(`[DecMigration] autosave 복호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Decrypt web autosave file (File System Access API)
+ */
+async function decryptWebAutoSaveFile(fileName: string, typeName: string, year: number): Promise<void> {
+  const dirHandle = (window as any).getWebDirHandle?.();
+  if (!dirHandle) {
+    showToast('자동저장 폴더가 선택되지 않았습니다.');
+    return;
+  }
+
+  const progressDiv = getElement<HTMLElement>('decMigrationProgress');
+  const progressBar = getElement<HTMLElement>('decMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('decMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 복호화 중...`;
+
+  try {
+    const fileHandle = await dirHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    const content = await file.text();
+    if (!content) {
+      if (progressText) progressText.textContent = '파일 읽기 실패';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '30%';
+
+    // Decrypt using CryptoUtils.decryptFromFile
+    const decrypted = await (window as any).CryptoUtils.decryptFromFile(content);
+    if (!decrypted) {
+      if (progressText) progressText.textContent = '복호화 실패 (키 불일치 또는 데이터 손상)';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    if (progressBar) progressBar.style.width = '70%';
+
+    // Check permission and save as plaintext JSON
+    const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      const requested = await dirHandle.requestPermission({ mode: 'readwrite' });
+      if (requested !== 'granted') {
+        if (progressText) progressText.textContent = '폴더 쓰기 권한이 없습니다.';
+        if (progressBar) progressBar.style.background = '#dc2626';
+        return;
+      }
+    }
+
+    const plainContent = JSON.stringify(decrypted, null, 2);
+    const writeHandle = await dirHandle.getFileHandle(fileName, { create: true });
+    const writable = await writeHandle.createWritable();
+    await writable.write(plainContent);
+    await writable.close();
+
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = '#22c55e';
+    }
+    if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 평문 변환 완료!`;
+    console.log(`[DecMigration] ${fileName} 웹 autosave 복호화 완료`);
+  } catch (err) {
+    console.error(`[DecMigration] ${fileName} 웹 autosave 복호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Decrypt localStorage data to plaintext
+ */
+async function decryptLocalStorageData(storageKey: string, typeName: string, year: number): Promise<void> {
+  const key = (window as any).encryptionManager?.getKey();
+  if (!key) return;
+
+  const progressDiv = getElement<HTMLElement>('decMigrationProgress');
+  const progressBar = getElement<HTMLElement>('decMigrationProgressBar');
+  const progressText = getElement<HTMLElement>('decMigrationProgressText');
+
+  if (progressDiv) progressDiv.style.display = 'block';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.style.background = '#3b82f6';
+  }
+  if (progressText) progressText.textContent = `${typeName} ${year}년 로컬 데이터 복호화 중...`;
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      if (progressText) progressText.textContent = '데이터를 찾을 수 없습니다.';
+      if (progressBar) progressBar.style.background = '#dc2626';
+      return;
+    }
+
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data) || data.length === 0) {
+      if (progressText) progressText.textContent = '복호화할 데이터가 없습니다.';
+      return;
+    }
+
+    let processed = 0;
+    const decryptedData: any[] = [];
+
+    for (const item of data) {
+      try {
+        if (item._enc && item._enc.v) {
+          const decrypted = await (window as any).CryptoUtils.decryptRecord({ ...item }, key);
+          // Remove _enc field
+          delete decrypted._enc;
+          decryptedData.push(decrypted);
+        } else {
+          // Already plaintext, keep as is
+          decryptedData.push(item);
+        }
+      } catch (itemErr) {
+        console.warn(`[DecMigration] ${storageKey}: 항목 복호화 실패 -`, (itemErr as Error).message);
+        decryptedData.push(item); // Keep original on failure
+      }
+
+      processed++;
+      const pct = Math.round((processed / data.length) * 100);
+      if (progressBar) progressBar.style.width = pct + '%';
+      if (progressText) progressText.textContent = `${typeName} ${year}년: ${processed}/${data.length}건 복호화 중...`;
+    }
+
+    // Save to localStorage
+    localStorage.setItem(storageKey, JSON.stringify(decryptedData));
+
+    if (progressBar) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = '#22c55e';
+    }
+    if (progressText) progressText.textContent = `${typeName} ${year}년 로컬 데이터 ${processed}건 평문 변환 완료!`;
+    console.log(`[DecMigration] ${storageKey}: ${processed}건 복호화 완료`);
+  } catch (err) {
+    console.error(`[DecMigration] ${storageKey} 복호화 오류:`, err);
+    if (progressBar) progressBar.style.background = '#dc2626';
+    if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
+  }
+}
+
+/**
+ * Decrypt all encrypted data to plaintext
+ */
+async function decryptAllEncrypted(): Promise<void> {
+  if (decMigrationScanResults.length === 0) {
+    showToast('복호화할 암호화 데이터가 없습니다.');
+    return;
+  }
+
+  const firebaseResults = decMigrationScanResults.filter((r) => r.source === 'firebase');
+  const autosaveResults = decMigrationScanResults.filter((r) => r.source === 'autosave');
+  const webAutosaveResults = decMigrationScanResults.filter((r) => r.source === 'webAutosave' && r.status === 'encrypted');
+  const localStorageResults = decMigrationScanResults.filter((r) => r.source === 'localStorage' && r.encryptedCount > 0);
+
+  const details: string[] = [];
+  if (firebaseResults.length > 0) {
+    const totalFb = firebaseResults.reduce((sum, r) => sum + r.encryptedCount, 0);
+    details.push(`Firebase: ${totalFb}건`);
+    firebaseResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년: ${r.encryptedCount}건`));
+  }
+  if (autosaveResults.length > 0) {
+    details.push(`자동저장 파일 (Electron): ${autosaveResults.length}개`);
+    autosaveResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년`));
+  }
+  if (webAutosaveResults.length > 0) {
+    details.push(`자동저장 파일 (웹): ${webAutosaveResults.length}개`);
+    webAutosaveResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년`));
+  }
+  if (localStorageResults.length > 0) {
+    const totalLs = localStorageResults.reduce((sum, r) => sum + r.encryptedCount, 0);
+    details.push(`로컬 데이터: ${totalLs}건`);
+    localStorageResults.forEach((r) => details.push(`  ${r.typeName} ${r.year}년: ${r.encryptedCount}건`));
+  }
+
+  if (!confirm(`전체 암호화 데이터를 평문으로 변환하시겠습니까?\n\n${details.join('\n')}\n\n⚠️ 복호화 후 민감 정보가 노출됩니다.`)) {
+    return;
+  }
+
+  setDecMigrationButtonsEnabled(false);
+
+  try {
+    for (const result of firebaseResults) {
+      if (result.collectionName) {
+        await decryptFirebaseCollection(result.collectionName, result.encryptedCount);
+      }
+    }
+    for (const result of autosaveResults) {
+      if (result.filePath) {
+        await decryptAutoSaveFile(result.filePath, result.typeName, result.year);
+      }
+    }
+    for (const result of webAutosaveResults) {
+      if (result.fileName) {
+        await decryptWebAutoSaveFile(result.fileName, result.typeName, result.year);
+      }
+    }
+    for (const result of localStorageResults) {
+      if (result.storageKey) {
+        await decryptLocalStorageData(result.storageKey, result.typeName, result.year);
+      }
+    }
+  } finally {
+    setDecMigrationButtonsEnabled(true);
+  }
+
+  const total = decMigrationScanResults.reduce((sum, r) => sum + r.encryptedCount, 0);
+  alert(`평문 변환 완료! 총 ${total}건이 처리되었습니다.`);
+
+  await scanEncryptedData();
+}
+
+/**
+ * Initialize encryption migration event listeners
+ */
+function initEncryptionMigrationListeners(): void {
+  // Encryption section listeners
+  const scanPlaintextBtn = getElement<HTMLButtonElement>('scanPlaintextBtn');
+  scanPlaintextBtn?.addEventListener('click', scanPlaintextData);
+
+  const encryptAllBtn = getElement<HTMLButtonElement>('encryptAllBtn');
+  encryptAllBtn?.addEventListener('click', encryptAllPlaintext);
+
+  // Decryption section listeners
+  const scanEncryptedBtn = getElement<HTMLButtonElement>('scanEncryptedBtn');
+  scanEncryptedBtn?.addEventListener('click', scanEncryptedData);
+
+  const decryptAllBtn = getElement<HTMLButtonElement>('decryptAllBtn');
+  decryptAllBtn?.addEventListener('click', decryptAllEncrypted);
+
+  // Show encryption migration section if encryption is active
+  if ((window as any).encryptionManager?.isReady()) {
+    const encSection = getElement<HTMLElement>('encMigrationSection');
+    if (encSection) encSection.style.display = 'block';
+    const decSection = getElement<HTMLElement>('decMigrationSection');
+    if (decSection) decSection.style.display = 'block';
+  }
+}
+
+// Initialize encryption migration listeners when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initEncryptionMigrationListeners);
+} else {
+  initEncryptionMigrationListeners();
+}
+
+// ========================================
 // Export functions for module usage
 // ========================================
 
 export {
+  // Constants
   SAMPLE_TYPES,
   FILE_TYPE_MAP,
   isElectron,
+  // Auth file functions
   checkAuthFileStatus,
   saveAuthFile,
   deleteAuthFile,
+  // Firebase config functions
   loadSavedConfig,
   updateConnectionStatus,
   toggleManualSettings,
+  parseQuickSetup,
+  // Migration list functions
   renderMigrationList,
   migrateTypeAllYears,
+  // Cache management
   updateCacheStatusUI,
+  // Network access
   initNetworkAccessUI,
+  // Organization settings
   loadOrgName,
+  // Storage mode
   initStorageModeUI,
   updateStorageModeStatus,
   changeStorageMode,
+  // Encryption status
   updateEncryptionStatusUI,
   showSettingsPasswordPrompt,
+  // Encryption migration (scan results)
   encMigrationScanResults,
   decMigrationScanResults,
-  parseQuickSetup,
+  // Encryption migration functions
+  scanPlaintextData,
+  renderEncMigrationList,
+  setMigrationButtonsEnabled,
+  encryptSingleItem,
+  encryptPlaintextInCollection,
+  encryptAutoSaveFile,
+  encryptWebAutoSaveFile,
+  encryptLocalStorageData,
+  encryptAllPlaintext,
+  // Decryption migration functions
+  scanEncryptedData,
+  renderDecMigrationList,
+  setDecMigrationButtonsEnabled,
+  decryptSingleItem,
+  decryptFirebaseCollection,
+  decryptAutoSaveFile,
+  decryptWebAutoSaveFile,
+  decryptLocalStorageData,
+  decryptAllEncrypted,
+  encryptSingleAutoSave,
+  encryptSingleLocalStorage,
+  encryptSingleWebAutoSave,
+  // Initialization
+  initEncryptionMigrationListeners,
 };

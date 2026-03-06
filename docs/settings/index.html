@@ -614,12 +614,12 @@
             color: #D4A96A;
         }
     </style>
-  <script type="module" crossorigin src="../assets/settings-DHAfx12v.js"></script>
-  <link rel="modulepreload" crossorigin href="../assets/theme-c_wpbGKG.js">
-  <link rel="modulepreload" crossorigin href="../assets/storage-manager-BOpQB7EV.js">
-  <link rel="modulepreload" crossorigin href="../assets/firestore-db-DJXGQXaa.js">
-  <link rel="modulepreload" crossorigin href="../assets/cache-manager-CYeXdLtk.js">
-  <link rel="stylesheet" crossorigin href="../assets/storage-manager-DA_4X5KB.css">
+  <script type="module" crossorigin src="../assets/settings-Btw7sUQ_.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/theme-M_jpg7T1.js">
+  <link rel="modulepreload" crossorigin href="../assets/storage-manager-CFddbxoU.js">
+  <link rel="modulepreload" crossorigin href="../assets/toast-BlIrdoot.js">
+  <link rel="modulepreload" crossorigin href="../assets/cache-manager-3wYBxwGe.js">
+  <link rel="stylesheet" crossorigin href="../assets/storage-manager-CpZsFdd4.css">
 </head>
 
 <body>
@@ -745,7 +745,7 @@
 
             <!-- Firebase 수동 설정 (인증 파일 카드 내 하단) -->
             <div style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
-                <h3 style="cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #475569; display: flex; align-items: center; gap: 0.5rem;" onclick="toggleManualSettings()">
+                <h3 style="cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #475569; display: flex; align-items: center; gap: 0.5rem;" onclick="window.toggleManualSettings()">
                     <span>☁️</span>
                     수동 설정
                     <span id="connectionStatus" class="status-badge disconnected">● 미연결</span>
@@ -797,7 +797,7 @@
                             rows="8"
                             style="width: 100%; padding: 12px; border: 2px dashed #22c55e; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; background: #f0fdf4;"
                         ></textarea>
-                        <button type="button" onclick="parseQuickSetup()" class="btn btn-primary" style="margin-top: 8px; background: linear-gradient(135deg, #22c55e, #16a34a);">
+                        <button type="button" onclick="window.parseQuickSetup()" class="btn btn-primary" style="margin-top: 8px; background: linear-gradient(135deg, #22c55e, #16a34a);">
                             ✨ 자동 입력
                         </button>
                     </div>
@@ -1105,6 +1105,9 @@
             </p>
         </div>
     </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
 
 </body>
 
