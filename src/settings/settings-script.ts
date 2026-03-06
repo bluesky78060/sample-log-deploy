@@ -335,6 +335,82 @@ function toggleManualSettings(): void {
 // Make toggleManualSettings available globally
 (window as Window & { toggleManualSettings?: typeof toggleManualSettings }).toggleManualSettings = toggleManualSettings;
 
+/**
+ * Parse quick setup code (Firebase config) from textarea
+ * Supports both JavaScript object and JSON format
+ */
+function parseQuickSetup(): void {
+  const textarea = getElement<HTMLTextAreaElement>('quickSetupPaste');
+  if (!textarea) return;
+
+  const code = textarea.value.trim();
+  if (!code) {
+    alert('설정 코드를 붙여넣어주세요.');
+    return;
+  }
+
+  try {
+    let config: FirebaseConfig | null = null;
+
+    // Try to extract firebaseConfig object from JavaScript code
+    const jsMatch = code.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
+    if (jsMatch) {
+      // Remove comments and eval
+      const cleaned = jsMatch[1].replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+      config = eval(`(${cleaned})`);
+    } else {
+      // Try JSON parse
+      const jsonMatch = code.match(/({[\s\S]*})/);
+      if (jsonMatch) {
+        config = JSON.parse(jsonMatch[1]);
+      }
+    }
+
+    if (!config || !config.apiKey || !config.projectId) {
+      throw new Error('유효한 Firebase 설정을 찾을 수 없습니다.');
+    }
+
+    // Fill form fields
+    const fields = [
+      { id: 'apiKey', value: config.apiKey },
+      { id: 'projectId', value: config.projectId },
+      { id: 'authDomain', value: config.authDomain || '' },
+      { id: 'storageBucket', value: config.storageBucket || '' },
+      { id: 'messagingSenderId', value: config.messagingSenderId || '' },
+      { id: 'appId', value: config.appId || '' },
+    ];
+
+    fields.forEach(({ id, value }) => {
+      const input = getElement<HTMLInputElement>(id);
+      if (input) input.value = value;
+    });
+
+    // Clear textarea
+    textarea.value = '';
+
+    // Show success message
+    textarea.style.borderColor = '#22c55e';
+    textarea.placeholder = '✅ 자동 입력 완료! 아래에서 확인 후 "설정 저장" 버튼을 클릭하세요.';
+
+    setTimeout(() => {
+      textarea.style.borderColor = '';
+    }, 2000);
+
+    // Scroll to form
+    const form = getElement<HTMLElement>('firebaseForm');
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+  } catch (error) {
+    console.error('[QuickSetup] Parse error:', error);
+    alert('설정 코드를 파싱하는 중 오류가 발생했습니다.\n\nFirebase Console에서 다음 형식으로 복사해주세요:\n\nconst firebaseConfig = {\n  apiKey: "...",\n  authDomain: "...",\n  projectId: "...",\n  storageBucket: "...",\n  messagingSenderId: "...",\n  appId: "..."\n};');
+  }
+}
+
+// Make parseQuickSetup available globally
+(window as Window & { parseQuickSetup?: typeof parseQuickSetup }).parseQuickSetup = parseQuickSetup;
+
 // ========================================
 // Migration List Rendering
 // ========================================
@@ -994,4 +1070,5 @@ export {
   showSettingsPasswordPrompt,
   encMigrationScanResults,
   decMigrationScanResults,
+  parseQuickSetup,
 };
