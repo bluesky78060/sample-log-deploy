@@ -3,11 +3,36 @@
 ## 다운로드
 
 최신 버전 Windows 설치 파일:
-- **[v1.7.7 다운로드](https://github.com/bluesky78060/sample-log-electron/releases/download/v1.7.7/sample-log-setup.exe)**
+- **[v1.8.0 다운로드](https://github.com/bluesky78060/sample-log-electron/releases/download/v1.8.0/sample-log-setup.exe)**
 
 ## 버전 히스토리
 
-### v1.7.7 (2026-01-15) - 최신 버전
+### v1.8.0 (2026-03-06) - 최신 버전
+**TypeScript 마이그레이션 완료 (주요 업데이트)**
+
+**코드베이스 현대화**
+- 전체 프로젝트 TypeScript로 마이그레이션 (42개 파일, 100% 완료)
+- 타입 안전성 확보 (5,127개 타입 에러 → 0개)
+- 코드 품질 및 유지보수성 대폭 향상
+
+**버그 수정**
+- Firebase 인증 파일 읽기 IPC 핸들러 수정 (설정 페이지 연결 상태 문제 해결)
+- PesticideSampleManager 중복 클래스 정의 제거
+- DOMPurify import 오류 수정 (XSS 방지 기능 정상화)
+- 중복 JS 파일 참조 제거 (97개 잘못된 import 수정)
+
+**성능 및 UX 개선**
+- 불필요한 콘솔 로그 제거 (Firebase, Encryption Manager)
+- Content Security Policy 설정 추가 (Google Fonts 허용)
+- IndexedDB 잠금 문제 해결
+- Firebase 로그 레벨 최적화 (deprecation 경고 억제)
+
+**개발 경험 개선**
+- Vite 모듈 해상도 최적화 (.ts 자동 해상도)
+- 타입 정의 일관성 확보 (globals.d.ts 통합)
+- 빌드 속도 향상
+
+### v1.7.7 (2026-01-15)
 **토양 중금속 페이지 법인 정보 필드 추가**
 - 토양 중금속 페이지에 법인여부/생년월일/법인번호 필드 추가
 - 개인 선택 시 생년월일 입력, 법인 선택 시 법인번호 입력

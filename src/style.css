@@ -6413,6 +6413,7 @@ select {
 }
 
 .loading-message {
+    display: none;
     margin: 0 0 16px;
     font-size: 16px;
     color: #333;

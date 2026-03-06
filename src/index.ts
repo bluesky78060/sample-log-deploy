@@ -360,6 +360,21 @@ const createWindow = (): void => {
     }
   }
 
+  // Content Security Policy 설정 (보안 경고 제거)
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          // 개발 모드: Vite HMR 허용
+          process.env.NODE_ENV === 'development'
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com;"
+            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com;"
+        ]
+      }
+    });
+  });
+
   loadApp();
 
   // Beta indicator in title (if beta channel)
@@ -877,14 +892,14 @@ ipcMain.handle('read-auth-file', async () => {
     const authFilePath = getAuthFilePath();
 
     if (!fs.existsSync(authFilePath)) {
-      return { exists: false };
+      return { success: false, exists: false };
     }
 
     const content = fs.readFileSync(authFilePath, 'utf8');
-    return { exists: true, content };
+    return { success: true, exists: true, content };
   } catch (error) {
     console.error('[AuthFile] 읽기 오류:', error);
-    return { exists: false, error: (error as Error).message };
+    return { success: false, exists: false, error: (error as Error).message };
   }
 });
 

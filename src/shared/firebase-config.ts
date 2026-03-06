@@ -34,8 +34,9 @@ const DEBUG_FIREBASE = (() => {
 
 /** 조건부 로깅 */
 const logFirebase = (...args: unknown[]): void => {
-    // 임시로 항상 로그 출력 (디버깅용)
-    console.log('[Firebase]', ...args);
+    if (DEBUG_FIREBASE) {
+        console.log('[Firebase]', ...args);
+    }
 };
 
 // @ts-ignore - Firebase compat types
@@ -106,12 +107,13 @@ async function loadFirebaseConfigFromAuthFile(): Promise<FirebaseConfig | null> 
         // 상세 디버그 로그
         logFirebase('readAuthFile 결과:', {
             success: result.success,
+            exists: result.exists,
             hasContent: !!result.content,
             contentLength: result.content?.length || 0
         });
 
         if (!result.success || !result.content) {
-            logFirebase('인증 파일 없음 - 로컬 모드로 동작 (success:', result.success, ', content:', !!result.content, ')');
+            logFirebase('인증 파일 없음 - 로컬 모드로 동작 (success:', result.success, ', exists:', result.exists, ', content:', !!result.content, ')');
             return null;
         }
 
@@ -270,6 +272,13 @@ async function initializeFirebase(): Promise<boolean> {
         if (!firebase.apps.length) {
             // @ts-ignore - Firebase compat
             firebase.initializeApp(firebaseConfigData);
+
+            // Firebase 로그 레벨 설정 (deprecation 경고 억제)
+            // @ts-ignore - Firebase compat
+            if (firebase.firestore && firebase.firestore.setLogLevel) {
+                // @ts-ignore - Firebase compat
+                firebase.firestore.setLogLevel('error'); // 'silent', 'error', 'warn', 'info', 'debug'
+            }
         }
 
         // @ts-ignore - Firebase compat

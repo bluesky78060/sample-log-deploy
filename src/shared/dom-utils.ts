@@ -3,7 +3,7 @@
  * 안전한 DOM 조작을 위한 헬퍼 함수 모음
  */
 
-import { sanitizeHTML } from './sanitize.js';
+import { sanitizeHTML } from './sanitize';
 
 type InsertPosition = 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
 

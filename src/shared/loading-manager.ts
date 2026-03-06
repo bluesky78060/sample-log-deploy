@@ -53,7 +53,7 @@ class LoadingManager {
         this.overlay.innerHTML = `
             <div class="loading-content">
                 <div class="loading-spinner"></div>
-                <p class="loading-message">처리 중...</p>
+                <p class="loading-message"></p>
                 <div class="loading-progress-container hidden">
                     <div class="loading-progress-bar">
                         <div class="loading-progress-fill"></div>

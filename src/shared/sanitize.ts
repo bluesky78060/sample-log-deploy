@@ -2,7 +2,7 @@
 // 공통 XSS 방지 모듈
 // DOMPurify를 사용한 HTML 새니타이징
 // ========================================
-import * as DOMPurify from 'dompurify';
+import DOMPurify from 'dompurify';
 
 /** DOMPurify 설정 타입 */
 interface DOMPurifyConfig {

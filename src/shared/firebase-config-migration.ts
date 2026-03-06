@@ -3,7 +3,7 @@
  * Base64 인코딩에서 암호화 스토리지로 마이그레이션
  */
 
-import { secureStorage } from './secure-storage.js';
+import { secureStorage } from './secure-storage';
 
 const FIREBASE_CONFIG_KEY = 'firebaseConfig';
 const SECURE_CONFIG_KEY = 'firebase_config';

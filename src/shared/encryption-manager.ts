@@ -62,6 +62,19 @@ interface LocalFirestoreDb {
 }
 
 // ========================================
+// Debug Configuration
+// ========================================
+
+const DEBUG_ENCRYPTION = false; // true로 변경하면 디버그 로그 활성화
+
+/** 조건부 로깅 헬퍼 */
+const logEncryption = (...args: unknown[]): void => {
+    if (DEBUG_ENCRYPTION) {
+        console.log(...args);
+    }
+};
+
+// ========================================
 // Type Definitions
 // ========================================
 
@@ -395,11 +408,11 @@ async function loadKeyFileContent(): Promise<string | null> {
                     const config = doc.data() as { keyFileContent?: string };
                     if (config.keyFileContent) {
                         _keySource = 'firebase';
-                        console.log(`[Encryption] Key loaded from Firebase ${systemCollection}/encryptionKey`);
+                        logEncryption(`\[Encryption\] Key loaded from Firebase ${systemCollection}/encryptionKey`);
                         return config.keyFileContent;
                     }
                 }
-                console.log(`[Encryption] ${systemCollection}/encryptionKey not found or empty`);
+                logEncryption(`\[Encryption\] ${systemCollection}/encryptionKey not found or empty`);
             } catch (fbErr) {
                 console.warn(`[Encryption] Firebase ${systemCollection} read failed:`, (fbErr as Error).message);
             }
@@ -408,18 +421,18 @@ async function loadKeyFileContent(): Promise<string | null> {
             if (prefix) {
                 const legacyCollection = prefix + '_system';
                 try {
-                    console.log(`[Encryption] Trying fallback: ${legacyCollection}/encryptionKey...`);
+                    logEncryption(`\[Encryption\] Trying fallback: ${legacyCollection}/encryptionKey...`);
                     const doc = await db.collection(legacyCollection).doc('encryptionKey').get();
                     if (doc.exists && (doc.data() as { keyFileContent?: string })?.keyFileContent) {
                         _keySource = 'firebase';
-                        console.log(`[Encryption] Key loaded from Firebase ${legacyCollection} (fallback)`);
+                        logEncryption(`\[Encryption\] Key loaded from Firebase ${legacyCollection} (fallback)`);
                         try {
                             await db.collection(systemCollection).doc('encryptionKey').set(doc.data()!);
-                            console.log(`[Encryption] Migrated encryptionKey: ${legacyCollection} → ${systemCollection}`);
+                            logEncryption(`\[Encryption\] Migrated encryptionKey: ${legacyCollection} → ${systemCollection}`);
                             const recoveryDoc = await db.collection(legacyCollection).doc('recoveryBlob').get();
                             if (recoveryDoc.exists) {
                                 await db.collection(systemCollection).doc('recoveryBlob').set(recoveryDoc.data()!);
-                                console.log(`[Encryption] Migrated recoveryBlob: ${legacyCollection} → ${systemCollection}`);
+                                logEncryption(`\[Encryption\] Migrated recoveryBlob: ${legacyCollection} → ${systemCollection}`);
                             }
                         } catch (migrateErr) {
                             console.warn('[Encryption] Migration failed:', (migrateErr as Error).message);
@@ -432,11 +445,11 @@ async function loadKeyFileContent(): Promise<string | null> {
 
                 // 원본 _system 폴백
                 try {
-                    console.log('[Encryption] Trying fallback: _system/encryptionKey...');
+                    logEncryption('\[Encryption\] Trying fallback: _system/encryptionKey...');
                     const doc = await db.collection('_system').doc('encryptionKey').get();
                     if (doc.exists && (doc.data() as { keyFileContent?: string })?.keyFileContent) {
                         _keySource = 'firebase';
-                        console.log('[Encryption] Key loaded from Firebase _system (fallback)');
+                        logEncryption('\[Encryption\] Key loaded from Firebase _system (fallback)');
                         return (doc.data() as { keyFileContent: string }).keyFileContent;
                     }
                 } catch (fbErr3) {
@@ -466,7 +479,7 @@ async function loadKeyFileContent(): Promise<string | null> {
         const lsKey = localStorage.getItem(LS_KEY_ENCRYPTION_KEY);
         if (lsKey) {
             _keySource = 'local';
-            console.log('[Encryption] Key loaded from localStorage');
+            logEncryption('\[Encryption\] Key loaded from localStorage');
             return lsKey;
         }
     } catch (lsErr) {
@@ -489,7 +502,7 @@ async function syncKeyToFirebase(keyContent: string): Promise<void> {
     try {
         const existing = await db.collection(systemCollection).doc('encryptionKey').get();
         if (existing.exists && (existing.data() as { keyFileContent?: string })?.keyFileContent) {
-            console.log(`[Encryption] Firebase already has key in ${systemCollection} - skip sync`);
+            logEncryption(`\[Encryption\] Firebase already has key in ${systemCollection} - skip sync`);
             return;
         }
         await db.collection(systemCollection).doc('encryptionKey').set({
@@ -498,7 +511,7 @@ async function syncKeyToFirebase(keyContent: string): Promise<void> {
             version: '2.0',
             syncedFrom: 'local'
         });
-        console.log(`[Encryption] Local key synced to Firebase ${systemCollection}/encryptionKey`);
+        logEncryption(`\[Encryption\] Local key synced to Firebase ${systemCollection}/encryptionKey`);
     } catch (err) {
         console.warn('[Encryption] Failed to sync key to Firebase:', (err as Error).message);
     }
@@ -550,7 +563,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
                     createdAt: new Date().toISOString(),
                     version: '2.0'
                 });
-                console.log(`[Encryption] Key stored in Firebase ${systemCollection}/encryptionKey`);
+                logEncryption(`\[Encryption\] Key stored in Firebase ${systemCollection}/encryptionKey`);
                 _keySource = 'generated';
                 return keyFileContent;
             } catch (err) {
@@ -566,7 +579,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
             try {
                 const result = await window.electronAPI.saveKeyFile(keyFileContent);
                 if (result?.success) {
-                    console.log('[Encryption] Key stored in local file (safeStorage protected)');
+                    logEncryption('\[Encryption\] Key stored in local file (safeStorage protected)');
                     _keySource = 'local';
                     // 백업 안내는 비밀번호 설정 완료 후에 표시됨
                     return keyFileContent;
@@ -578,7 +591,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
     } else {
         try {
             localStorage.setItem(LS_KEY_ENCRYPTION_KEY, keyFileContent);
-            console.log('[Encryption] Key stored in localStorage');
+            logEncryption('\[Encryption\] Key stored in localStorage');
             _keySource = 'local';
             return keyFileContent;
         } catch (lsErr) {
@@ -611,7 +624,7 @@ async function exportKeyFile(): Promise<OperationResult> {
             console.error('[Encryption] Key export failed:', result?.error);
             return { success: false, error: result?.error || '내보내기 실패' };
         }
-        console.log('[Encryption] Key file exported to:', (result as { filePath?: string }).filePath);
+        logEncryption('\[Encryption\] Key file exported to:', (result as { filePath?: string }).filePath);
         if (window.showToast) {
             window.showToast('키 파일이 저장되었습니다. 안전한 곳에 보관하세요.', 'success');
         }
@@ -692,7 +705,7 @@ async function importKeyFile(): Promise<OperationResult> {
 
     _keyFileContent = importedContent;
     _keySource = 'local';
-    console.log('[Encryption] Key file imported successfully');
+    logEncryption('\[Encryption\] Key file imported successfully');
 
     if (window.showToast) {
         window.showToast('키 파일을 가져왔습니다. 비밀번호를 입력하여 암호화를 활성화하세요.', 'success');
@@ -714,7 +727,7 @@ async function loadSalt(): Promise<ArrayBuffer | null> {
         try {
             const saltBase64 = await window.electronAPI.loadSalt();
             if (saltBase64 && CryptoUtils) {
-                console.log(`[Encryption] Salt loaded from Electron (${saltBase64.length} chars)`);
+                logEncryption(`\[Encryption\] Salt loaded from Electron (${saltBase64.length} chars)`);
                 return CryptoUtils.base64ToBuffer(saltBase64);
             }
         } catch (err) {
@@ -725,14 +738,14 @@ async function loadSalt(): Promise<ArrayBuffer | null> {
     try {
         const saltBase64 = localStorage.getItem(LS_KEY_SALT);
         if (saltBase64 && CryptoUtils) {
-            console.log(`[Encryption] Salt loaded from localStorage (${saltBase64.length} chars)`);
+            logEncryption(`\[Encryption\] Salt loaded from localStorage (${saltBase64.length} chars)`);
             return CryptoUtils.base64ToBuffer(saltBase64);
         }
     } catch (lsErr) {
         console.warn('[Encryption] localStorage salt load failed:', (lsErr as Error).message);
     }
 
-    console.log('[Encryption] No saved salt found');
+    logEncryption('\[Encryption\] No saved salt found');
     return null;
 }
 
@@ -747,7 +760,7 @@ async function saveSalt(salt: ArrayBuffer): Promise<void> {
     if (window.electronAPI?.saveSalt) {
         try {
             await window.electronAPI.saveSalt(saltBase64);
-            console.log('[Encryption] Salt saved to Electron');
+            logEncryption('\[Encryption\] Salt saved to Electron');
             return;
         } catch (err) {
             console.warn('[Encryption] Electron salt save failed:', (err as Error).message);
@@ -756,7 +769,7 @@ async function saveSalt(salt: ArrayBuffer): Promise<void> {
 
     try {
         localStorage.setItem(LS_KEY_SALT, saltBase64);
-        console.log('[Encryption] Salt saved to localStorage');
+        logEncryption('\[Encryption\] Salt saved to localStorage');
     } catch (lsErr) {
         console.warn('[Encryption] localStorage salt save failed:', (lsErr as Error).message);
     }
@@ -772,13 +785,13 @@ async function saveSalt(salt: ArrayBuffer): Promise<void> {
 async function storeSessionPassword(password: string): Promise<void> {
     if (window.electronAPI?.storeSessionPassword) {
         await window.electronAPI.storeSessionPassword(password);
-        console.log('[Encryption] Password stored in session (main process memory)');
+        logEncryption('\[Encryption\] Password stored in session (main process memory)');
         return;
     }
 
     try {
         sessionStorage.setItem(LS_KEY_SESSION_PW, password);
-        console.log('[Encryption] Password stored in sessionStorage');
+        logEncryption('\[Encryption\] Password stored in sessionStorage');
     } catch (e) {
         console.warn('[Encryption] sessionStorage password store failed:', (e as Error).message);
     }
@@ -791,7 +804,7 @@ async function getStoredSessionPassword(): Promise<string | null> {
     if (window.electronAPI?.getSessionPassword) {
         const pw = await window.electronAPI.getSessionPassword();
         if (pw) {
-            console.log('[Encryption] Session password found in main process');
+            logEncryption('\[Encryption\] Session password found in main process');
             return pw;
         }
     }
@@ -799,7 +812,7 @@ async function getStoredSessionPassword(): Promise<string | null> {
     try {
         const pw = sessionStorage.getItem(LS_KEY_SESSION_PW);
         if (pw) {
-            console.log('[Encryption] Session password found in sessionStorage');
+            logEncryption('\[Encryption\] Session password found in sessionStorage');
             return pw;
         }
     } catch (e) {
@@ -820,7 +833,7 @@ async function verifyKeyWithData(key: CryptoKey): Promise<KeyVerificationResult>
     const CryptoUtils = window.CryptoUtils as CryptoUtilsExtended | undefined;
 
     if (!window.firebaseConfig?.isEnabled() || !window.firestoreDb) {
-        console.log('[Encryption] Key verification skipped (no Firestore)');
+        logEncryption('\[Encryption\] Key verification skipped (no Firestore)');
         return { verified: true, skipped: true };
     }
 
@@ -854,19 +867,19 @@ async function verifyKeyWithData(key: CryptoKey): Promise<KeyVerificationResult>
         // Type assertion needed because TypeScript doesn't track mutation in forEach callback
         const foundDoc = encDoc as EncryptedDoc | null;
         if (!foundDoc?._enc) {
-            console.log('[Encryption] Key verification: no encrypted documents found - skipping');
+            logEncryption('\[Encryption\] Key verification: no encrypted documents found - skipping');
             return { verified: true, skipped: true };
         }
 
         const encData: EncDataType = foundDoc._enc;
         const firstField = Object.keys(encData).find(f => f !== 'v');
         if (!firstField || !encData[firstField]?.iv || !encData[firstField]?.ct) {
-            console.log('[Encryption] Key verification: no valid encrypted field found - skipping');
+            logEncryption('\[Encryption\] Key verification: no valid encrypted field found - skipping');
             return { verified: true, skipped: true };
         }
 
         const useAAD = (encData as { v?: string }).v === '2.1';
-        console.log(`[Encryption] Key verification: testing decrypt of "${firstField}" (v${encData.v || '1'}, AAD=${useAAD})...`);
+        logEncryption(`\[Encryption\] Key verification: testing decrypt of "${firstField}" (v${encData.v || '1'}, AAD=${useAAD})...`);
 
         if (!CryptoUtils) {
             return { verified: false, skipped: false };
@@ -880,7 +893,7 @@ async function verifyKeyWithData(key: CryptoKey): Promise<KeyVerificationResult>
         );
 
         if (result !== null) {
-            console.log('[Encryption] Key verification: SUCCESS');
+            logEncryption('\[Encryption\] Key verification: SUCCESS');
             return { verified: true, skipped: false };
         }
         console.warn('[Encryption] Key verification: decrypt returned null (wrong key)');
@@ -982,7 +995,7 @@ async function createAndStoreRecoveryBlob(masterKey: CryptoKey): Promise<string 
             const systemCollection = getSystemCollection();
             try {
                 await db.collection(systemCollection).doc('recoveryBlob').set(blobData);
-                console.log(`[Encryption] Recovery blob (v2.0) stored in ${systemCollection}/recoveryBlob`);
+                logEncryption(`\[Encryption\] Recovery blob (v2.0) stored in ${systemCollection}/recoveryBlob`);
                 stored = true;
             } catch (err) {
                 console.error('[Encryption] Failed to store recovery blob in Firebase:', (err as Error).message);
@@ -995,7 +1008,7 @@ async function createAndStoreRecoveryBlob(masterKey: CryptoKey): Promise<string 
         try {
             const result = await window.electronAPI.saveRecoveryBlob(JSON.stringify(blobData));
             if (result?.success) {
-                console.log('[Encryption] Recovery blob stored locally (safeStorage protected)');
+                logEncryption('\[Encryption\] Recovery blob stored locally (safeStorage protected)');
                 stored = true;
             }
         } catch (localErr) {
@@ -1006,7 +1019,7 @@ async function createAndStoreRecoveryBlob(masterKey: CryptoKey): Promise<string 
     if (!stored) {
         try {
             localStorage.setItem(LS_KEY_RECOVERY_BLOB, JSON.stringify(blobData));
-            console.log('[Encryption] Recovery blob stored in localStorage');
+            logEncryption('\[Encryption\] Recovery blob stored in localStorage');
             stored = true;
         } catch (lsErr) {
             console.error('[Encryption] Failed to store recovery blob in localStorage:', (lsErr as Error).message);
@@ -1066,11 +1079,11 @@ async function ensureRecoveryBlob(masterKey: CryptoKey): Promise<void> {
     try {
         const exists = await checkRecoveryBlobExists();
         if (!exists) {
-            console.log('[Encryption] No recovery blob found - generating for existing user...');
+            logEncryption('\[Encryption\] No recovery blob found - generating for existing user...');
             const recoveryKey = await createAndStoreRecoveryBlob(masterKey);
             if (recoveryKey) {
                 await showRecoveryKeyModal(recoveryKey);
-                console.log('[Encryption] Recovery blob created for existing user');
+                logEncryption('\[Encryption\] Recovery blob created for existing user');
             }
         }
     } catch (err) {
@@ -1121,7 +1134,7 @@ async function decryptMasterKeyFromBlob(recoveryKeyInput: string): Promise<Crypt
             const lsBlob = localStorage.getItem(LS_KEY_RECOVERY_BLOB);
             if (lsBlob) {
                 blob = JSON.parse(lsBlob) as RecoveryBlob;
-                console.log('[Encryption] Recovery blob loaded from localStorage');
+                logEncryption('\[Encryption\] Recovery blob loaded from localStorage');
             }
         } catch (lsErr) {
             console.warn('[Encryption] Recovery blob load (localStorage) failed:', (lsErr as Error).message);
@@ -2018,7 +2031,7 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
     const CryptoUtils = window.CryptoUtils as CryptoUtilsExtended | undefined;
     if (!CryptoUtils) return false;
 
-    console.log('[Encryption] === FIRST-TIME SETUP ===');
+    logEncryption('\[Encryption\] === FIRST-TIME SETUP ===');
 
     const password = await showFirstTimePasswordPrompt();
     if (!password) {
@@ -2027,7 +2040,7 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
         return false;
     }
 
-    console.log('[Encryption] Deriving master key (PBKDF2 600K iterations)...');
+    logEncryption('\[Encryption\] Deriving master key (PBKDF2 600K iterations)...');
     const result = await CryptoUtils.createMasterKey(
         password, _keyFileContent!, _salt
     );
@@ -2036,7 +2049,7 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
     _salt = result.salt;
 
     if (isNewSalt) {
-        console.log('[Encryption] Saving new salt...');
+        logEncryption('\[Encryption\] Saving new salt...');
         await saveSalt(_salt);
     }
 
@@ -2056,7 +2069,7 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
         _promptKeyFileBackup(_keyFileContent);
     }
 
-    console.log('[Encryption] First-time setup SUCCESS (verification skipped - no existing encrypted data)');
+    logEncryption('\[Encryption\] First-time setup SUCCESS (verification skipped - no existing encrypted data)');
     _keyFileContent = null;
     _isFirstTimeSetup = false;
     return true;
@@ -2071,7 +2084,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
 
     const storedPassword = await getStoredSessionPassword();
     if (storedPassword) {
-        console.log('[Encryption] Auto-login with stored session password...');
+        logEncryption('\[Encryption\] Auto-login with stored session password...');
         const result = await CryptoUtils.createMasterKey(
             storedPassword, _keyFileContent!, _salt
         );
@@ -2087,7 +2100,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
         if (autoVerify.verified) {
             await ensureRecoveryBlob(_cryptoKey);
             _keyFileContent = null;
-            console.log('[Encryption] Auto-login SUCCESS (session password)');
+            logEncryption('\[Encryption\] Auto-login SUCCESS (session password)');
             return true;
         }
 
@@ -2102,7 +2115,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
     let errorMsg: string | null = null;
 
     const validatePassword = async (pw: string): Promise<PasswordValidationResult> => {
-        console.log(`[Encryption] Deriving master key (PBKDF2 600K iterations)...`);
+        logEncryption(`\[Encryption\] Deriving master key (PBKDF2 600K iterations)...`);
         const result = await CryptoUtils.createMasterKey(
             pw, _keyFileContent!, _salt
         );
@@ -2111,11 +2124,11 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
         _salt = result.salt;
 
         if (isNewSalt && retryCount === 0) {
-            console.log('[Encryption] Saving new salt...');
+            logEncryption('\[Encryption\] Saving new salt...');
             await saveSalt(_salt);
         }
 
-        console.log('[Encryption] Verifying key against encrypted data...');
+        logEncryption('\[Encryption\] Verifying key against encrypted data...');
         const loginVerify = await verifyKeyWithData(_cryptoKey);
 
         if (loginVerify.verified) {
@@ -2133,7 +2146,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
     };
 
     while (retryCount < MAX_PASSWORD_RETRIES) {
-        console.log(`[Encryption] Password prompt (attempt ${retryCount + 1}/${MAX_PASSWORD_RETRIES})...`);
+        logEncryption(`\[Encryption\] Password prompt (attempt ${retryCount + 1}/${MAX_PASSWORD_RETRIES})...`);
         const password = await showPasswordPrompt(errorMsg, validatePassword);
 
         if (!password) {
@@ -2143,11 +2156,11 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
         }
 
         if (password === RECOVER_SENTINEL) {
-            console.log('[Encryption] Password recovery requested from login prompt');
+            logEncryption('\[Encryption\] Password recovery requested from login prompt');
             try {
                 const recoverResult = await recoverPassword();
                 if (recoverResult?.success) {
-                    console.log('[Encryption] Password recovered successfully');
+                    logEncryption('\[Encryption\] Password recovered successfully');
                     return true;
                 }
                 errorMsg = recoverResult?.error === 'Cancelled' ? null : '비밀번호 복구에 실패했습니다. 다시 시도해주세요.';
@@ -2161,7 +2174,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
         await storeSessionPassword(password);
         await ensureRecoveryBlob(_cryptoKey!);
         _keyFileContent = null;
-        console.log(`[Encryption] Login SUCCESS (source: ${_keySource})`);
+        logEncryption(`\[Encryption\] Login SUCCESS (source: ${_keySource})`);
         return true;
     }
 
@@ -2196,18 +2209,18 @@ async function _doInitEncryption(): Promise<boolean> {
     }
 
     try {
-        console.log('[Encryption] Step 1: Loading key file...');
+        logEncryption('\[Encryption\] Step 1: Loading key file...');
         _keyFileContent = await loadKeyFileContent();
 
         if (!_keyFileContent) {
             if (window.firebaseConfig?.isEnabled()) {
-                console.log('[Encryption] Retrying Firebase key load...');
+                logEncryption('\[Encryption\] Retrying Firebase key load...');
                 _keyFileContent = await loadKeyFileContent();
             }
         }
 
         if (!_keyFileContent) {
-            console.log('[Encryption] No existing key found - starting first-time setup');
+            logEncryption('\[Encryption\] No existing key found - starting first-time setup');
             _isFirstTimeSetup = true;
 
             _keyFileContent = await generateAndStoreKeyFile();
@@ -2220,17 +2233,17 @@ async function _doInitEncryption(): Promise<boolean> {
         console.debug(`[Encryption] Key ready (source: ${_keySource})`);
 
         if (_keySource === 'local') {
-            console.log('[Encryption] Key loaded from local - syncing to Firebase...');
+            logEncryption('\[Encryption\] Key loaded from local - syncing to Firebase...');
             await syncKeyToFirebase(_keyFileContent);
         }
 
-        console.log('[Encryption] Step 2: Loading salt...');
+        logEncryption('\[Encryption\] Step 2: Loading salt...');
         _salt = await loadSalt();
         const isNewSalt = !_salt;
         if (_salt) {
-            console.log(`[Encryption] Salt loaded (${new Uint8Array(_salt).length} bytes)`);
+            logEncryption(`\[Encryption\] Salt loaded (${new Uint8Array(_salt).length} bytes)`);
         } else {
-            console.log('[Encryption] No saved salt - will generate new one');
+            logEncryption('\[Encryption\] No saved salt - will generate new one');
         }
 
         let success: boolean;
@@ -2273,7 +2286,7 @@ async function initSilent(): Promise<boolean> {
     try {
         const storedPassword = await getStoredSessionPassword();
         if (!storedPassword) {
-            console.log('[Encryption] Silent init: no session password - skipping');
+            logEncryption('\[Encryption\] Silent init: no session password - skipping');
             _initInProgress = false;
             return false;
         }
@@ -2299,7 +2312,7 @@ async function initSilent(): Promise<boolean> {
         if (silentVerify.verified) {
             _initialized = true;
             _keyFileContent = null;
-            console.log('[Encryption] Silent init SUCCESS');
+            logEncryption('\[Encryption\] Silent init SUCCESS');
             _initInProgress = false;
             return true;
         }
@@ -2491,7 +2504,7 @@ async function recoverPassword(): Promise<OperationResult> {
                 await showRecoveryKeyModal(newRecoveryKey);
             }
 
-            console.log('[Encryption] Password recovery completed successfully');
+            logEncryption('\[Encryption\] Password recovery completed successfully');
             if (window.showToast) {
                 window.showToast('비밀번호가 성공적으로 복구되었습니다.', 'success');
             }
@@ -2650,7 +2663,7 @@ function reset(): void {
  * 기존 암호화 키 폐기 및 새 키 생성
  */
 async function regenerateKey(): Promise<boolean> {
-    console.log('[Encryption] === KEY REGENERATION ===');
+    logEncryption('\[Encryption\] === KEY REGENERATION ===');
 
     if (window.firebaseConfig?.isEnabled()) {
         const db = window.firebaseConfig.getDb();
@@ -2658,7 +2671,7 @@ async function regenerateKey(): Promise<boolean> {
             const systemCollection = getSystemCollection();
             try {
                 await db.collection(systemCollection).doc('encryptionKey').delete();
-                console.log(`[Encryption] Deleted ${systemCollection}/encryptionKey from Firebase`);
+                logEncryption(`\[Encryption\] Deleted ${systemCollection}/encryptionKey from Firebase`);
             } catch (err) {
                 console.warn('[Encryption] Firebase key delete failed:', (err as Error).message);
             }

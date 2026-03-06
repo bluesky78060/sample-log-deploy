@@ -367,8 +367,9 @@
 
         /* 닫기 버튼 */
         .close-btn {
-            display: block;
-            margin: 1rem auto 0;
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
             padding: 0.6rem 2rem;
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             color: white;
@@ -377,17 +378,17 @@
             font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
-            box-shadow: 0 3px 12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
             transition: all 0.2s ease;
             font-family: 'Noto Sans KR', sans-serif;
             text-decoration: none;
             text-align: center;
-            width: fit-content;
+            z-index: 100;
         }
 
         .close-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 6px 24px rgba(59, 130, 246, 0.5);
         }
 
         /* 접기/펼치기 */
@@ -538,6 +539,25 @@
             color: #94a3b8;
         }
 
+        [data-theme="dark"] .close-btn {
+            background: linear-gradient(135deg, #4f46e5, #3730a3);
+            box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
+        }
+
+        [data-theme="dark"] .close-btn:hover {
+            box-shadow: 0 6px 24px rgba(79, 70, 229, 0.5);
+        }
+
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            .close-btn {
+                bottom: 1rem;
+                right: 1rem;
+                padding: 0.5rem 1.5rem;
+                font-size: 0.85rem;
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
@@ -569,36 +589,64 @@
         <!-- 타임라인 -->
         <div class="timeline">
 
-            <!-- v1.8.0 (개발중) -->
+            <!-- v1.9.0 (최신) -->
             <div class="version-entry">
-                <div class="version-dot in-dev"></div>
-                <div class="version-card in-dev">
+                <div class="version-dot latest"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.9.0</span>
+                                <span class="version-date">2026-03-06</span>
+                            </div>
+                            <div class="version-title">TypeScript 마이그레이션 완료</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-latest">★ 최신</span>
+                            <span class="badge badge-feature">기능</span>
+                            <span class="badge badge-fix">수정</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>전체 프로젝트 TypeScript 마이그레이션</strong> — 42개 파일, 타입 에러 5,127개 → 0개 (100% 완료)</li>
+                        <li><strong>Firebase 인증 파일 읽기 수정</strong> — 설정 페이지 연결 상태 동기화 문제 해결</li>
+                        <li><strong>PesticideSampleManager 중복 클래스 제거</strong> — 타입 충돌 해결</li>
+                        <li><strong>DOMPurify import 오류 수정</strong> — XSS 방지 기능 정상화</li>
+                        <li><strong>콘솔 로그 정리</strong> — Firebase, Encryption Manager 디버그 로그 제거</li>
+                        <li><strong>CSP 설정 추가</strong> — Google Fonts 허용, 보안 강화</li>
+                        <li><strong>코드 품질 향상</strong> — 타입 안전성, 유지보수성 대폭 개선</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.8.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
+                <div class="version-card">
                     <div class="version-card-header">
                         <div>
                             <div class="version-meta">
                                 <span class="version-number">v1.8.0</span>
-                                <span class="version-date">개발 진행중</span>
+                                <span class="version-date">2026-01-20</span>
                             </div>
                             <div class="version-title">데이터 암호화 시스템</div>
                         </div>
                         <div class="badge-row">
-                            <span class="badge badge-in-dev">● 개발중</span>
-                            <span class="badge badge-security">🔒 보안</span>
+                            <span class="badge badge-feature">기능</span>
                         </div>
                     </div>
                     <ul class="change-list">
-                        <li><strong>AES-256-GCM 기반 민감 데이터 암호화</strong> — 이름, 전화번호, 주소 등 개인정보 보호</li>
-                        <li><strong>PBKDF2 키 유도</strong> — 600,000 iterations 고강도 키 생성</li>
-                        <li><strong>비밀번호 복구 시스템</strong> — 복구 키 기반 비밀번호 분실 대응</li>
-                        <li><strong>기존 평문 데이터 자동 마이그레이션</strong> — 암호화 전환 자동 처리</li>
-                        <li><strong>Electron safeStorage 기반 키 관리</strong> — 운영체제 키체인 연동</li>
+                        <li><strong>민감한 데이터 암호화 기능</strong> — 저장 데이터 보안 강화</li>
+                        <li><strong>암호화 키 관리 시스템</strong> — 안전한 키 생성 및 저장</li>
+                        <li><strong>웹 자동저장 암호화</strong> — .json 파일 암호화/복호화 마이그레이션 지원</li>
+                        <li><strong>localStorage 암호화</strong> — 로컬 모드에서 데이터 보호</li>
                     </ul>
                 </div>
             </div>
 
             <!-- v1.7.63 -->
             <div class="version-entry">
-                <div class="version-dot latest"></div>
+                <div class="version-dot"></div>
                 <div class="version-card">
                     <div class="version-card-header">
                         <div>
@@ -609,7 +657,6 @@
                             <div class="version-title">토양 그룹 수정 및 데이터 안정성 개선</div>
                         </div>
                         <div class="badge-row">
-                            <span class="badge badge-latest">★ 최신</span>
                             <span class="badge badge-feature">기능</span>
                             <span class="badge badge-fix">수정</span>
                         </div>
@@ -1160,40 +1207,7 @@
         <a href="../index.html" class="close-btn">닫기</a>
     </div>
 
-    <script>
-        // 다크 모드 토글
-        const html = document.documentElement;
-        const toggleBtn = document.getElementById('themeToggleBtn');
-
-        // 저장된 테마 로드
-        const savedTheme = localStorage.getItem('theme-preference') || 'light';
-        html.setAttribute('data-theme', savedTheme);
-        if (savedTheme === 'dark') {
-            toggleBtn.classList.add('dark');
-        }
-
-        toggleBtn.addEventListener('click', function() {
-            var isDark = html.getAttribute('data-theme') === 'dark';
-            var newTheme = isDark ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme-preference', newTheme);
-            toggleBtn.classList.toggle('dark', !isDark);
-        });
-
-        // 접기/펼치기 토글
-        document.querySelectorAll('.toggle-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var card = btn.closest('.version-card');
-                if (card.classList.contains('collapsed')) {
-                    card.classList.remove('collapsed');
-                    btn.textContent = '▲ 접기';
-                } else {
-                    card.classList.add('collapsed');
-                    btn.textContent = '▼ 펼치기';
-                }
-            });
-        });
-    </script>
+    <script src="release-script.js"></script>
 </body>
 
 </html>
