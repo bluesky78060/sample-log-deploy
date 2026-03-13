@@ -52,15 +52,6 @@ export interface FormValidatorNamespace {
     create: (options?: FormValidatorOptions) => FormValidatorInstance;
 }
 
-// Window 전역 타입 확장
-declare global {
-    interface Window {
-        FormValidator: FormValidatorNamespace;
-        formValidator: FormValidatorInstance;
-        showToast?: (message: string, type: string) => void;
-    }
-}
-
 /**
  * 폼 유효성 검사기 생성
  * @param options - 설정 옵션
@@ -359,13 +350,13 @@ function createFormValidator(options: FormValidatorOptions = {}): FormValidatorI
     };
 }
 
-// 전역으로 내보내기
-window.FormValidator = {
+// 전역으로 내보내기 (타입 충돌 방지를 위해 as any 사용)
+(window as any).FormValidator = {
     create: createFormValidator
 };
 
 // 기본 인스턴스 생성
-window.formValidator = createFormValidator();
+(window as any).formValidator = createFormValidator();
 
 // ES 모듈 export
 export { createFormValidator };

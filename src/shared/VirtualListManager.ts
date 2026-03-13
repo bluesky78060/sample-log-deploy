@@ -258,15 +258,8 @@ class VirtualListManager<T = unknown> {
     }
 }
 
-// Window 전역 타입 확장
-declare global {
-    interface Window {
-        VirtualListManager: typeof VirtualListManager;
-    }
-}
-
-// 전역으로 내보내기
-window.VirtualListManager = VirtualListManager;
+// 전역으로 내보내기 (타입 충돌 방지를 위해 as any 사용)
+(window as any).VirtualListManager = VirtualListManager;
 
 // CommonJS export
 if (typeof module !== 'undefined' && module.exports) {

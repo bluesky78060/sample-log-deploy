@@ -66,7 +66,7 @@ type ToastTypeLocal = 'success' | 'error' | 'warning' | 'info';
     ): void {
         const container = document.getElementById('toastContainer');
         if (!container) {
-            console.warn('Toast container not found');
+            (window.logger?.warn || console.warn)('Toast container not found');
             return;
         }
 
@@ -122,7 +122,7 @@ type ToastTypeLocal = 'success' | 'error' | 'warning' | 'info';
                 try {
                     action();
                 } catch (error) {
-                    console.error('[Toast] Action error:', error);
+                    (window.logger?.error || console.error)('[Toast] Action error:', error);
                 }
                 toast.remove();
             };

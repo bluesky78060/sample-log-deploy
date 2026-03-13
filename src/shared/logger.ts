@@ -16,7 +16,7 @@ export interface LogEntry {
 }
 
 export interface ErrorReport {
-    error: any[];
+    error: unknown[];
     context: LogEntry[];
     timestamp: string;
     userAgent: string;
@@ -90,7 +90,7 @@ export class Logger {
      * 로그 버퍼에 추가
      * @private
      */
-    private addToBuffer(level: LogLevel, args: any[]): void {
+    private addToBuffer(level: LogLevel, args: unknown[]): void {
         const entry: LogEntry = {
             timestamp: new Date().toISOString(),
             level,
@@ -125,7 +125,7 @@ export class Logger {
     /**
      * 디버그 로그 (개발 환경에서만)
      */
-    debug(...args: any[]): void {
+    debug(...args: unknown[]): void {
         this.addToBuffer('debug', args);
 
         if (this.shouldLog('debug')) {
@@ -136,7 +136,7 @@ export class Logger {
     /**
      * 정보성 로그
      */
-    info(...args: any[]): void {
+    info(...args: unknown[]): void {
         this.addToBuffer('info', args);
 
         if (this.shouldLog('info')) {
@@ -147,7 +147,7 @@ export class Logger {
     /**
      * 경고 로그
      */
-    warn(...args: any[]): void {
+    warn(...args: unknown[]): void {
         this.addToBuffer('warn', args);
 
         if (this.shouldLog('warn')) {
@@ -158,7 +158,7 @@ export class Logger {
     /**
      * 에러 로그 (항상 출력)
      */
-    error(...args: any[]): void {
+    error(...args: unknown[]): void {
         this.addToBuffer('error', args);
 
         // 에러는 항상 출력
@@ -174,7 +174,7 @@ export class Logger {
      * 에러 리포팅 (프로덕션 전용)
      * @private
      */
-    private reportError(errorData: any[]): void {
+    private reportError(errorData: unknown[]): void {
         // 에러 발생 시 최근 로그 버퍼도 함께 전송
         const errorReport: ErrorReport = {
             error: errorData,
@@ -185,9 +185,9 @@ export class Logger {
             appVersion: (window as any).electronAPI?.getVersion?.() || 'unknown'
         };
 
-        // TODO: 실제 에러 리포팅 서비스 연동
-        // 예: Sentry, LogRocket, Rollbar 등
-        // 지금은 로컬 스토리지에 저장
+        // NOTE: 에러 리포팅 서비스 연동은 현재 범위 외
+        // 추후 필요시 Sentry, LogRocket 등 연동 검토
+        // 현재는 로컬 스토리지에 저장
         try {
             const errors: ErrorReport[] = JSON.parse(localStorage.getItem('errorReports') || '[]');
             errors.push(errorReport);
@@ -224,7 +224,7 @@ export class Logger {
     /**
      * 테이블 형태로 데이터 출력 (개발용)
      */
-    table(data: any): void {
+    table(data: unknown): void {
         if (this.shouldLog('debug')) {
             console.table(data);
         }
@@ -251,7 +251,7 @@ export class Logger {
     /**
      * 조건부 로깅
      */
-    assert(condition: boolean, ...args: any[]): void {
+    assert(condition: boolean, ...args: unknown[]): void {
         if (!condition) {
             this.error('Assertion failed:', ...args);
         }
@@ -291,24 +291,13 @@ export class Logger {
 }
 
 // ========================================
-// Window 전역 타입 확장
-// ========================================
-
-declare global {
-    interface Window {
-        logger: Logger;
-        setLogLevel: (level: LogLevel) => void;
-    }
-}
-
-// ========================================
 // 싱글톤 인스턴스 생성 및 전역 노출
 // ========================================
 
 // 싱글톤 인스턴스 생성
 export const logger = new Logger();
 
-// 전역 변수로 노출 (디버깅용)
+// 전역 변수로 노출 (디버깅용, 타입 충돌 방지를 위해 as any 사용)
 if (typeof window !== 'undefined') {
     (window as any).logger = logger;
 
@@ -317,9 +306,9 @@ if (typeof window !== 'undefined') {
 
     // console 메서드 대체 옵션 (선택적)
     if (typeof process !== 'undefined' && process.env?.REPLACE_CONSOLE === 'true') {
-        (window as any).console.log = (...args: any[]) => logger.debug(...args);
-        (window as any).console.info = (...args: any[]) => logger.info(...args);
-        (window as any).console.warn = (...args: any[]) => logger.warn(...args);
+        (window as any).console.log = (...args: unknown[]) => logger.debug(...args);
+        (window as any).console.info = (...args: unknown[]) => logger.info(...args);
+        (window as any).console.warn = (...args: unknown[]) => logger.warn(...args);
         // error는 대체하지 않음 (스택 트레이스 보존)
     }
 }

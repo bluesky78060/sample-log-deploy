@@ -210,7 +210,7 @@ function setupGlobalErrorHandler(): void {
     // 처리되지 않은 Promise rejection 캐치
     window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
         const win = window as Window & WindowExtensions;
-        const logError = win.logger?.error || console.error;
+        const logError = (win.logger?.error || console.error).bind(console);
         logError('처리되지 않은 Promise rejection:', event.reason);
 
         // 네트워크 에러인 경우 사용자에게 알림
@@ -230,7 +230,7 @@ function setupGlobalErrorHandler(): void {
     // 전역 에러 캐치
     window.addEventListener('error', (event: ErrorEvent) => {
         const win = window as Window & WindowExtensions;
-        const logError = win.logger?.error || console.error;
+        const logError = (win.logger?.error || console.error).bind(console);
         logError('전역 에러:', event.error || event.message);
 
         // 스크립트 로드 실패
@@ -427,8 +427,7 @@ function safeParseJSON<T = unknown[]>(key: string, defaultValue: T = [] as unkno
         if (!value) return defaultValue;
         return JSON.parse(value) as T;
     } catch (error) {
-        const logError = win.logger?.error || console.error;
-        logError(`JSON 파싱 오류 (${key}):`, error);
+        (win.logger?.error || console.error)(`JSON 파싱 오류 (${key}):`, error);
         return defaultValue;
     }
 }
@@ -465,7 +464,6 @@ function getLocalStorageUsage(): LocalStorageUsage {
 function safeSetJSON(key: string, data: unknown, options: SafeSetJSONOptions = {}): boolean {
     const { onQuotaExceeded, showToast } = options;
     const win = window as Window & WindowExtensions;
-    const logError = win.logger?.error || console.error;
 
     try {
         const jsonString = JSON.stringify(data);
@@ -478,7 +476,7 @@ function safeSetJSON(key: string, data: unknown, options: SafeSetJSONOptions = {
             err.code === 1014 || // Firefox
             err.message?.includes('quota')) {
 
-            logError('localStorage 용량 초과:', error);
+            (win.logger?.error || console.error)('localStorage 용량 초과:', error);
 
             const usage = getLocalStorageUsage();
             const message = `저장 공간이 부족합니다.\n현재 사용량: ${usage.usedMB}MB / ${usage.totalMB}MB (${usage.percent}%)\n\n오래된 데이터를 삭제하거나 JSON 파일로 백업 후 정리해주세요.`;
@@ -496,7 +494,7 @@ function safeSetJSON(key: string, data: unknown, options: SafeSetJSONOptions = {
             return false;
         }
 
-        logError('localStorage 저장 오류:', error);
+        (win.logger?.error || console.error)('localStorage 저장 오류:', error);
         return false;
     }
 }
@@ -508,7 +506,7 @@ function safeSetJSON(key: string, data: unknown, options: SafeSetJSONOptions = {
  * @param log - 로그 함수
  * @returns 마이그레이션된 데이터
  */
-function migrateOldData(oldKey: string, newKey: string, log: (...args: unknown[]) => void = console.log): unknown[] {
+function migrateOldData(oldKey: string, newKey: string, log: (...args: unknown[]) => void = (window.logger?.debug || console.log)): unknown[] {
     const newData = safeParseJSON<unknown[]>(newKey, []);
     if (newData.length > 0) return newData;
 
@@ -573,7 +571,7 @@ function updateAutoSaveStatus(status: AutoSaveStatus): void {
  * @param options - 옵션
  */
 async function initAutoSave(options: InitAutoSaveOptions): Promise<void> {
-    const { moduleKey, moduleName, FileAPI, currentYear, log = console.log, showToast } = options;
+    const { moduleKey, moduleName, FileAPI, currentYear, log = (window.logger?.debug || console.log), showToast } = options;
     const win = window as Window & WindowExtensions;
 
     const autoSaveToggle = document.getElementById('autoSaveToggle') as HTMLInputElement | null;
@@ -603,8 +601,7 @@ async function initAutoSave(options: InitAutoSaveOptions): Promise<void> {
                             log(`📁 ${moduleName} 자동 저장 폴더 설정됨:`, result.folder);
                         }
                     } catch (error) {
-                        const logError = win.logger?.error || console.error;
-                        logError('폴더 선택 오류:', error);
+                        (win.logger?.error || console.error)('폴더 선택 오류:', error);
                     }
                 }
             }, 500);
@@ -648,8 +645,7 @@ async function initAutoSave(options: InitAutoSaveOptions): Promise<void> {
                             if (showToast) showToast(`자동 저장 폴더가 설정되었습니다: ${result.folderName}`, 'success');
                         }
                     } catch (error) {
-                        const logError = win.logger?.error || console.error;
-                        logError('폴더 선택 오류:', error);
+                        (win.logger?.error || console.error)('폴더 선택 오류:', error);
                     }
                 }
             }, 500);
@@ -684,7 +680,7 @@ async function initAutoSave(options: InitAutoSaveOptions): Promise<void> {
  * @param log - 로그 함수
  * @returns 로드된 데이터 또는 null
  */
-async function loadFromAutoSaveFile(FileAPI: FileAPIInstance, log: (...args: unknown[]) => void = console.log): Promise<unknown[] | null> {
+async function loadFromAutoSaveFile(FileAPI: FileAPIInstance, log: (...args: unknown[]) => void = (window.logger?.debug || console.log)): Promise<unknown[] | null> {
     const win = window as Window & WindowExtensions;
     // Electron: autoSavePath 필요, Web: 폴더 핸들 필요
     const canLoad = (win.isElectron && FileAPI.autoSavePath) ||
@@ -708,8 +704,7 @@ async function loadFromAutoSaveFile(FileAPI: FileAPIInstance, log: (...args: unk
             }
         }
     } catch (error) {
-        const logError = win.logger?.error || console.error;
-        logError('자동 저장 파일 로드 오류:', error);
+        (win.logger?.error || console.error)('자동 저장 파일 로드 오류:', error);
     }
     return null;
 }
@@ -720,7 +715,7 @@ async function loadFromAutoSaveFile(FileAPI: FileAPIInstance, log: (...args: unk
  * @returns 성공 여부
  */
 async function performAutoSave(options: PerformAutoSaveOptions): Promise<boolean> {
-    const { FileAPI, moduleKey, data, webFileHandle, log = console.log } = options;
+    const { FileAPI, moduleKey, data, webFileHandle, log = (window.logger?.debug || console.log) } = options;
     const enabledKey = `${moduleKey}AutoSaveEnabled`;
     const win = window as Window & WindowExtensions;
 
@@ -768,16 +763,14 @@ async function performAutoSave(options: PerformAutoSaveOptions): Promise<boolean
                 return true;
             } catch (error) {
                 if (webFileHandle) {
-                    const logError = win.logger?.error || console.error;
-                    logError('Web 자동 저장 오류:', error);
+                    (win.logger?.error || console.error)('Web 자동 저장 오류:', error);
                 }
                 updateAutoSaveStatus('error');
                 return false;
             }
         }
     } catch (error) {
-        const logError = win.logger?.error || console.error;
-        logError('자동 저장 오류:', error);
+        (win.logger?.error || console.error)('자동 저장 오류:', error);
         updateAutoSaveStatus('error');
         return false;
     }
@@ -849,8 +842,7 @@ function setupAutoSaveToggle(options: AutoSaveToggleOptions): void {
                 autoSaveToggle.checked = false;
                 updateAutoSaveStatus('inactive');
             } else {
-                const logError = win.logger?.error || console.error;
-                logError('자동 저장 설정 오류:', error);
+                (win.logger?.error || console.error)('자동 저장 설정 오류:', error);
                 if (showToast) showToast('자동 저장 설정에 실패했습니다.', 'error');
                 autoSaveToggle.checked = false;
                 localStorage.setItem(enabledKey, 'false');
@@ -897,8 +889,7 @@ function setupAutoSaveFolderButton(options: AutoSaveFolderButtonOptions): void {
                     if (showToast) showToast('폴더 선택에 실패했습니다.', 'error');
                 }
             } catch (error) {
-                const logError = win.logger?.error || console.error;
-                logError('폴더 선택 오류:', error);
+                (win.logger?.error || console.error)('폴더 선택 오류:', error);
                 if (showToast) showToast('폴더 선택 중 오류가 발생했습니다.', 'error');
             }
         });
@@ -909,8 +900,7 @@ function setupAutoSaveFolderButton(options: AutoSaveFolderButtonOptions): void {
                 const folder = await win.electronAPI!.getAutoSaveFolder();
                 selectAutoSaveFolderBtn.title = `저장 폴더: ${folder}`;
             } catch (error) {
-                const logError = win.logger?.error || console.error;
-                logError('폴더 경로 조회 오류:', error);
+                (win.logger?.error || console.error)('폴더 경로 조회 오류:', error);
             }
         })();
     } else {
@@ -945,8 +935,7 @@ function setupAutoSaveFolderButton(options: AutoSaveFolderButtonOptions): void {
             } catch (error) {
                 const err = error as { name?: string };
                 if (err.name !== 'AbortError') {
-                    const logError = win.logger?.error || console.error;
-                    logError('폴더 선택 오류:', error);
+                    (win.logger?.error || console.error)('폴더 선택 오류:', error);
                     if (showToast) showToast('폴더 선택 중 오류가 발생했습니다.', 'error');
                 }
             }
@@ -961,7 +950,7 @@ function setupAutoSaveFolderButton(options: AutoSaveFolderButtonOptions): void {
  */
 function createLogger(debug: boolean): (...args: unknown[]) => void {
     const win = window as Window & WindowExtensions;
-    return (...args: unknown[]) => debug && (win.logger?.info || console.log)(...args);
+    return (...args: unknown[]) => debug && (win.logger?.debug || console.log)(...args);
 }
 
 /**
@@ -1004,6 +993,16 @@ function generateUUID(): string {
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
+}
+
+/**
+ * 엑셀 셀 CSV Injection 방지 sanitizer
+ * =, +, -, @ 로 시작하는 문자열 앞에 작은따옴표(') 추가
+ */
+function sanitizeExcelCell(value: string | undefined | null): string {
+    const str = String(value ?? '');
+    if (/^[=+\-@\t\r]/.test(str)) return `'${str}`;
+    return str;
 }
 
 /**
@@ -1088,8 +1087,7 @@ function setupJSONLoadHandler(options: JSONLoadHandlerOptions): void {
                 if (showToast) showToast('파일 형식이 올바르지 않습니다.', 'error');
             }
         } catch (error) {
-            const logError = win.logger?.error || console.error;
-            logError('JSON 파일 로드 오류:', error);
+            (win.logger?.error || console.error)('JSON 파일 로드 오류:', error);
             if (showToast) showToast('파일을 읽는 중 오류가 발생했습니다.', 'error');
         }
 
@@ -1129,8 +1127,7 @@ function setupElectronLoadHandler(options: ElectronLoadHandlerOptions): void {
                 if (showToast) showToast('파일 형식이 올바르지 않습니다.', 'error');
             }
         } catch (error) {
-            const logError = win.logger?.error || console.error;
-            logError('JSON 파일 로드 오류:', error);
+            (win.logger?.error || console.error)('JSON 파일 로드 오류:', error);
             if (showToast) showToast('파일을 읽는 중 오류가 발생했습니다.', 'error');
         }
     });
@@ -1200,6 +1197,7 @@ interface SampleUtilsInterface {
     createLogger: typeof createLogger;
     setTodayDate: typeof setTodayDate;
     generateUUID: typeof generateUUID;
+    sanitizeExcelCell: typeof sanitizeExcelCell;
 }
 
 // 전역으로 내보내기
@@ -1242,7 +1240,8 @@ const SampleUtils: SampleUtilsInterface = {
     // 유틸리티
     createLogger,
     setTodayDate,
-    generateUUID
+    generateUUID,
+    sanitizeExcelCell
 };
 
 (window as Window & WindowExtensions).SampleUtils = SampleUtils;
@@ -1298,5 +1297,6 @@ export {
     createLogger,
     setTodayDate,
     generateUUID,
+    sanitizeExcelCell,
     SampleUtils
 };

@@ -48,6 +48,22 @@ interface RateLimiterEntry {
 }
 
 // ========================================
+// IPC Rate Limiter Constants
+// ========================================
+
+/**
+ * IPC Rate Limiter 설정
+ * - WINDOW_MS: 측정 윈도우 (밀리초)
+ * - MAX_CALLS_FILE: 파일 작업 최대 호출 수 (보안상 제한적)
+ * - MAX_CALLS_GENERAL: 일반 IPC 최대 호출 수
+ */
+const IPC_RATE_LIMIT = {
+  WINDOW_MS: 1000,
+  MAX_CALLS_FILE: 10,      // 파일 작업: 초당 10회 (보안 강화)
+  MAX_CALLS_GENERAL: 30,   // 일반 IPC: 초당 30회
+} as const;
+
+// ========================================
 // Release Channel Configuration
 // ========================================
 
@@ -368,8 +384,9 @@ const createWindow = (): void => {
         'Content-Security-Policy': [
           // 개발 모드: Vite HMR 허용
           process.env.NODE_ENV === 'development'
-            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com;"
-            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com;"
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:* ws://localhost:* https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;"
+            // 프로덕션: frame-src HTTP 제거(HTTPS만 허용), unsafe-inline은 추후 nonce/hash 방식으로 전환 예정
+            : "default-src 'self'; script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' https://postcode.map.daum.net https://*.daumcdn.net https://postcode.map.kakao.com https://*.kakaocdn.net;"
         ]
       }
     });
@@ -429,7 +446,7 @@ app.whenReady().then(async () => {
               // unsafe-eval 제거 완료: eval(), Function(), setTimeout(string) 사용 차단
               // unsafe-inline은 단계적 마이그레이션을 위해 일시적으로 유지 (추후 해시 방식으로 전환 예정)
               "script-src 'self' 'unsafe-inline' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://t1.kakaocdn.net https://t1.daumcdn.net https://cdnjs.cloudflare.com; " +
-              "style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; " +
+              "style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com https://t1.kakaocdn.net; " +
               "font-src 'self' file: https://fonts.gstatic.com; " +
               "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.ipify.org https://www.gstatic.com https://cdnjs.cloudflare.com; " +
               "img-src 'self' file: data:; " +
@@ -626,18 +643,23 @@ ipcMain.handle('open-file-dialog', async (_event, options) => {
 
 const ipcRateLimiter = (() => {
   const callCounts = new Map<string, RateLimiterEntry>();
-  const WINDOW_MS = 1000;
-  const MAX_CALLS = 30;
+  // 파일 작업 채널 목록 (보안상 더 엄격한 제한 적용)
+  const fileChannels = new Set(['write-file', 'read-file', 'save-file-dialog', 'open-file-dialog']);
+
   return {
     check(channel: string): boolean {
       const now = Date.now();
       const entry = callCounts.get(channel);
-      if (!entry || now - entry.start > WINDOW_MS) {
+      const maxCalls = fileChannels.has(channel)
+        ? IPC_RATE_LIMIT.MAX_CALLS_FILE
+        : IPC_RATE_LIMIT.MAX_CALLS_GENERAL;
+
+      if (!entry || now - entry.start > IPC_RATE_LIMIT.WINDOW_MS) {
         callCounts.set(channel, { start: now, count: 1 });
         return true;
       }
       entry.count++;
-      if (entry.count > MAX_CALLS) return false;
+      if (entry.count > maxCalls) return false;
       return true;
     },
   };
@@ -873,6 +895,56 @@ ipcMain.handle('get-app-path', async () => {
 // 앱 버전 가져오기
 ipcMain.handle('get-app-version', async () => {
   return app.getVersion();
+});
+
+// ========================================
+// 흙토람 팝업 윈도우
+// ========================================
+
+ipcMain.handle('open-heuktoram', async () => {
+  const heuktoramWindow = new BrowserWindow({
+    width: 1400,
+    height: 850,
+    minWidth: 1000,
+    minHeight: 600,
+    title: '흙토람 내보내기',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  const heuktoramPath = path.join(__dirname, '..', 'docs', 'heuktoram', 'index.html');
+
+  // 프로덕션에서는 개발 서버 체크 없이 직접 파일 로드
+  if (!app.isPackaged) {
+    const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3005';
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = http.get(VITE_DEV_SERVER_URL, { timeout: 1000 }, (res) => {
+          res.destroy();
+          resolve();
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      heuktoramWindow.loadURL(`${VITE_DEV_SERVER_URL}/heuktoram/`);
+      return true;
+    } catch {
+      // 개발 서버 없으면 파일 로드로 폴백
+    }
+  }
+
+  if (fs.existsSync(heuktoramPath)) {
+    heuktoramWindow.loadFile(heuktoramPath);
+  } else {
+    dialog.showErrorBox('오류', '흙토람 페이지를 찾을 수 없습니다. 먼저 빌드를 실행해 주세요.');
+    heuktoramWindow.close();
+    return false;
+  }
+  return true;
 });
 
 // ========================================

@@ -189,7 +189,7 @@ class LoadingManager {
                 try {
                     operation.onCancel();
                 } catch (error) {
-                    console.error('[LoadingManager] Cancel error:', error);
+                    (window.logger?.error || console.error)('[LoadingManager] Cancel error:', error);
                 }
             }
         });
@@ -213,15 +213,8 @@ class LoadingManager {
     }
 }
 
-// 전역 타입 확장
-declare global {
-    interface Window {
-        loadingManager: LoadingManager;
-    }
-}
-
-// 전역 싱글톤 인스턴스
-window.loadingManager = new LoadingManager();
+// 전역 싱글톤 인스턴스 (타입 충돌 방지를 위해 as any 사용)
+(window as any).loadingManager = new LoadingManager();
 
 // CommonJS export
 if (typeof module !== 'undefined' && module.exports) {

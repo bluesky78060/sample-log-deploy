@@ -82,7 +82,7 @@ async function selectWebAutoSaveFolder(): Promise<{
         return { success: true, folderName: _webDirHandle.name };
     } catch (e: any) {
         if (e.name === 'AbortError') return { success: false, error: 'cancelled' };
-        console.error('[FileAPI] Folder select error:', e);
+        (window.logger?.error || console.error)('[FileAPI] Folder select error:', e);
         return { success: false, error: e.message };
     }
 }
@@ -119,7 +119,7 @@ async function webWriteFile(fileName: string, content: string): Promise<boolean>
         await writable.close();
         return true;
     } catch (e: any) {
-        console.warn('[FileAPI] Web write failed:', e.message);
+        (window.logger?.warn || console.warn)('[FileAPI] Web write failed:', e.message);
         return false;
     }
 }
@@ -136,7 +136,7 @@ async function webReadFile(fileName: string): Promise<string | null> {
     } catch (e: any) {
         // NotFoundError는 정상 (파일이 아직 없는 경우)
         if (e.name !== 'NotFoundError') {
-            console.warn('[FileAPI] Web read failed:', e.message);
+            (window.logger?.warn || console.warn)('[FileAPI] Web read failed:', e.message);
         }
         return null;
     }

@@ -24,7 +24,8 @@ export default defineConfig({
         pesticide: resolve(__dirname, 'src/pesticide/index.html'),
         settings: resolve(__dirname, 'src/settings/index.html'),
         labelPrint: resolve(__dirname, 'src/label-print/index.html'),
-        manual: resolve(__dirname, 'src/manual/index.html')
+        manual: resolve(__dirname, 'src/manual/index.html'),
+        heuktoram: resolve(__dirname, 'src/heuktoram/index.html')
       }
     }
   }

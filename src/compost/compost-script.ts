@@ -1922,7 +1922,13 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
                 this.showToast(`선택한 ${logsToExport.length}건을 내보냅니다.`, 'info');
             }
 
-            const excelData = logsToExport.map(log => {
+            const sortedLogs = [...logsToExport].sort((a, b) => {
+                const aNum = parseInt(String(a.receptionNumber).replace(/\D/g, ''), 10) || 0;
+                const bNum = parseInt(String(b.receptionNumber).replace(/\D/g, ''), 10) || 0;
+                return aNum - bNum;
+            });
+            const sanitizeCell = (window as any).SampleUtils?.sanitizeExcelCell ?? ((v: string) => v);
+            const excelData = sortedLogs.map(log => {
                 let areaDisplay = '-';
                 if (log.farmArea) {
                     const unit = log.farmAreaUnit === 'pyeong' ? '평' : 'm\u00B2';
@@ -1939,25 +1945,25 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
                     '접수일자': log.date || '-',
                     '법인여부': applicantType,
                     '생년월일/법인번호': birthOrCorp,
-                    '농장명': log.farmName || '-',
-                    '대표자': log.name || '-',
+                    '농장명': sanitizeCell(log.farmName || '-'),
+                    '대표자': sanitizeCell(log.name || '-'),
                     '연락처': log.phoneNumber || '-',
                     '우편번호': log.addressPostcode || '-',
                     '시도': addressParts.sido || '-',
                     '시군구': addressParts.sigungu || '-',
                     '읍면동': addressParts.eupmyeondong || '-',
-                    '나머지주소': (addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-',
-                    '전체주소': fullAddress,
-                    '농장주소': log.farmAddress || '-',
+                    '나머지주소': sanitizeCell((addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-'),
+                    '전체주소': sanitizeCell(fullAddress),
+                    '농장주소': sanitizeCell(log.farmAddress || '-'),
                     '농장면적': areaDisplay,
                     '시료종류': log.sampleType || '-',
                     '축종': log.animalType || '-',
-                    '원료(부재료)': log.rawMaterials || '-',
+                    '원료(부재료)': sanitizeCell(log.rawMaterials || '-'),
                     '생산일': log.productionDate || '-',
                     '시료수': log.sampleCount || '-',
                     '검사목적': log.purpose || '-',
                     '통보방법': log.receptionMethod || '-',
-                    '비고': log.note || '-',
+                    '비고': sanitizeCell(log.note || '-'),
                     '완료여부': log.isComplete ? '완료' : '미완료',
                     '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
                 };

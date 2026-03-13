@@ -53,7 +53,7 @@ interface LabelTemplate {
 
   /** 조건부 로깅 */
   const log = (...args: unknown[]): void => {
-    if (DEBUG_LABEL) console.log('[Label]', ...args);
+    if (DEBUG_LABEL) (window.logger?.debug || console.log)('[Label]', ...args);
   };
 
   let labelData: LabelData | null = null;
@@ -829,6 +829,19 @@ interface LabelTemplate {
   // ========================================
 
   document.addEventListener('DOMContentLoaded', () => {
+    // 뒤로가기 버튼
+    const btnBack = document.getElementById('btnBack');
+    if (btnBack) {
+      btnBack.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (document.referrer && document.referrer !== window.location.href) {
+          window.history.back();
+        } else {
+          window.location.href = '../index.html';
+        }
+      });
+    }
+
     const labelDropArea = document.getElementById('labelFileDropArea');
     if (labelDropArea) {
       labelDropArea.addEventListener('click', () => {

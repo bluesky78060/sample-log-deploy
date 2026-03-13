@@ -360,7 +360,7 @@ async function encryptRecord(record: PlainRecord, key: CryptoKey): Promise<Encry
                     hasEncryptedFields = true;
                 }
             } catch (err) {
-                console.warn(`[CryptoUtils] Failed to encrypt field "${field}":`, err);
+                (window.logger?.warn || console.warn)(`[CryptoUtils] Failed to encrypt field "${field}":`, err);
                 // 암호화 실패 시 원본 유지
             }
         }
@@ -412,7 +412,7 @@ async function decryptRecord(record: EncryptedRecord, key: CryptoKey): Promise<P
                     }
                 }
             } catch (err) {
-                console.warn(`[CryptoUtils] Failed to decrypt field "${field}":`, err);
+                (window.logger?.warn || console.warn)(`[CryptoUtils] Failed to decrypt field "${field}":`, err);
                 // 복호화 실패 시 타입에 맞는 기본값으로 표시
                 if (field === 'parcels') {
                     decrypted[field] = []; // parcels는 배열이어야 함
@@ -709,7 +709,7 @@ async function saveToLocalStorage(key: string, data: unknown): Promise<void> {
         }
         localStorage.setItem(key, JSON.stringify(data));
     } catch (err) {
-        console.error('[SecureStorage] 암호화 저장 실패:', (err as Error).message);
+        (window.logger?.error || console.error)('[SecureStorage] 암호화 저장 실패:', (err as Error).message);
         if (win.encryptionManager?.isReady()) {
             // 암호화가 활성화된 상태에서 실패하면 저장 중단 (평문 폴백 금지)
             throw new Error('데이터 암호화에 실패하여 저장을 중단합니다: ' + (err as Error).message);
@@ -744,14 +744,14 @@ async function loadFromLocalStorage<T = unknown>(key: string): Promise<T | null>
                     }
                 }
             }
-            console.warn('[SecureStorage] 암호화된 데이터이나 키 미준비:', key);
+            (window.logger?.warn || console.warn)('[SecureStorage] 암호화된 데이터이나 키 미준비:', key);
             return null;
         }
 
         // 평문 데이터 (하위 호환)
         return parsed as T;
     } catch (e) {
-        console.error('[SecureStorage] 로드 실패:', key, (e as Error).message);
+        (window.logger?.error || console.error)('[SecureStorage] 로드 실패:', key, (e as Error).message);
         return null;
     }
 }
@@ -823,7 +823,7 @@ async function decryptFromFile<T = unknown>(content: string): Promise<T | null> 
                     return result as T;
                 }
             }
-            console.warn('[SecureStorage] 암호화된 파일이나 키 미준비');
+            (window.logger?.warn || console.warn)('[SecureStorage] 암호화된 파일이나 키 미준비');
             return null;
         }
 
@@ -839,13 +839,13 @@ async function decryptFromFile<T = unknown>(content: string): Promise<T | null> 
                     }
                 }
             }
-            console.warn('[SecureStorage] 암호화된 파일이나 키 미준비');
+            (window.logger?.warn || console.warn)('[SecureStorage] 암호화된 파일이나 키 미준비');
             return null;
         }
 
         return parsed as T;
     } catch (e) {
-        console.error('[SecureStorage] 파일 복호화 실패:', (e as Error).message);
+        (window.logger?.error || console.error)('[SecureStorage] 파일 복호화 실패:', (e as Error).message);
         return null;
     }
 }

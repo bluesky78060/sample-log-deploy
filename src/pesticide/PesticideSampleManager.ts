@@ -104,7 +104,268 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    * 타입별 추가 이벤트 설정 (잔류농약 전용)
    */
   protected override setupTypeSpecificEvents(): void {
-    // 잔류농약 특화 이벤트는 별도 설정 필요 없음
+    this.setupExcelExport();
+    this.setupExcelImport();
+    this.setupLabelPrint();
+  }
+
+  /**
+   * 엑셀 내보내기
+   */
+  setupExcelExport(): void {
+    const exportBtn = document.getElementById('exportBtn');
+    if (!exportBtn) return;
+
+    exportBtn.addEventListener('click', () => {
+      if (this.sampleLogs.length === 0) {
+        this.showToast('내보낼 데이터가 없습니다.', 'warning');
+        return;
+      }
+
+      const selectedIds = Array.from(
+        document.querySelectorAll<HTMLInputElement>('.row-checkbox:checked')
+      ).map(cb => cb.dataset.id);
+
+      const logsToExport = selectedIds.length > 0
+        ? this.sampleLogs.filter(log => selectedIds.includes(log.id))
+        : this.sampleLogs;
+
+      if (selectedIds.length > 0) {
+        this.showToast(`선택한 ${logsToExport.length}건을 내보냅니다.`, 'info');
+      }
+
+      const sortedLogs = [...logsToExport].sort((a, b) => {
+        const aNum = parseInt(String(a.receptionNumber).replace(/\D/g, ''), 10) || 0;
+        const bNum = parseInt(String(b.receptionNumber).replace(/\D/g, ''), 10) || 0;
+        return aNum - bNum;
+      });
+
+      const parseAddressParts = (window as any).parseAddressParts || (() => ({ sido: '', sigungu: '', eupmyeondong: '', rest: '' }));
+      const sanitizeCell = (window as any).SampleUtils?.sanitizeExcelCell ?? ((v: string) => v);
+
+      const exportData = sortedLogs.map(log => {
+        const applicantType = log.applicantType || '개인';
+        const birthOrCorp = applicantType === '법인' ? (log.corpNumber || '-') : (log.birthDate || '-');
+        const addressParts = parseAddressParts(log.addressRoad || log.address || '');
+        const fullAddress = [log.addressRoad, log.addressDetail].filter(Boolean).join(' ') || '-';
+
+        return {
+          '접수번호': log.receptionNumber || '-',
+          '접수일자': log.date || '-',
+          '법인여부': applicantType,
+          '생년월일/법인번호': birthOrCorp,
+          '성명': sanitizeCell(log.name || '-'),
+          '연락처': log.phoneNumber || '-',
+          '우편번호': log.addressPostcode || '-',
+          '시도': addressParts.sido || '-',
+          '시군구': addressParts.sigungu || '-',
+          '읍면동': addressParts.eupmyeondong || '-',
+          '나머지주소': sanitizeCell((addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-'),
+          '전체주소': sanitizeCell(fullAddress),
+          '구분': log.subCategory || '-',
+          '목적': log.purpose || '-',
+          '생산자 성명': sanitizeCell(log.producerName || '-'),
+          '생산지 주소': sanitizeCell(log.producerAddress || '-'),
+          '의뢰물품명': sanitizeCell(log.requestContent || '-'),
+          '수령방법': log.receptionMethod || '-',
+          '비고': sanitizeCell(log.note || '-'),
+          '완료여부': log.completed ? '완료' : '미완료',
+          '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-',
+        };
+      });
+
+      const XLSX = (window as any).XLSX;
+      if (!XLSX) { this.showToast('XLSX 라이브러리가 로드되지 않았습니다.', 'error'); return; }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws['!cols'] = [
+        { wch: 10 }, { wch: 12 }, { wch: 8 }, { wch: 15 },
+        { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 12 },
+        { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 40 },
+        { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 30 },
+        { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 20 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, '잔류농약 접수목록');
+
+      const fileName = `잔류농약_접수목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      if ((window as any).isElectron && (this as any).FileAPI?.saveExcel) {
+        const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+        (this as any).FileAPI.saveExcel(xlsxData, fileName).then((saved: boolean) => {
+          if (saved) this.showToast('엑셀 파일로 내보내기 완료', 'success');
+        });
+      } else {
+        XLSX.writeFile(wb, fileName);
+        this.showToast('엑셀 파일이 저장되었습니다.', 'success');
+      }
+    });
+  }
+
+  /**
+   * 엑셀 가져오기
+   */
+  setupExcelImport(): void {
+    const ExcelImportManager = (window as any).ExcelImportManager;
+    if (!ExcelImportManager) return;
+
+    const excelImporter = new ExcelImportManager({
+      appFields: [
+        { key: 'receptionNumber', label: '접수번호' },
+        { key: 'date', label: '접수일자' },
+        { key: 'name', label: '성명' },
+        { key: 'phoneNumber', label: '전화번호' },
+        { key: 'address', label: '주소' },
+        { key: 'subCategory', label: '구분' },
+        { key: 'purpose', label: '목적' },
+        { key: 'producerName', label: '생산자 성명' },
+        { key: 'producerAddress', label: '생산지 주소' },
+        { key: 'requestContent', label: '의뢰물품명' },
+        { key: 'receptionMethod', label: '수령방법' },
+        { key: 'note', label: '비고' },
+      ],
+      autoMapRules: {
+        '접수번호': 'receptionNumber', '번호': 'receptionNumber', 'no': 'receptionNumber',
+        '접수일자': 'date', '날짜': 'date', '일자': 'date',
+        '성명': 'name', '이름': 'name', '신청인': 'name',
+        '전화번호': 'phoneNumber', '연락처': 'phoneNumber', '전화': 'phoneNumber', '휴대폰': 'phoneNumber',
+        '주소': 'address', '신청인주소': 'address',
+        '구분': 'subCategory', '구분명': 'subCategory',
+        '목적': 'purpose', '용도': 'purpose', '검사목적': 'purpose',
+        '생산자': 'producerName', '생산자성명': 'producerName', '생산자 성명': 'producerName',
+        '생산지주소': 'producerAddress', '생산지': 'producerAddress', '생산지 주소': 'producerAddress',
+        '의뢰물품명': 'requestContent', '작물명': 'requestContent', '물품명': 'requestContent',
+        '수령방법': 'receptionMethod', '통보방법': 'receptionMethod', '수령 방법': 'receptionMethod',
+        '비고': 'note', '메모': 'note', '참고': 'note',
+      },
+      templateConfig: {
+        headers: ['접수번호', '구분', '목적', '성명', '생산자 성명', '생산지 주소', '의뢰물품명', '비고'],
+        sampleRow: ['1', '농산물', '자가검정', '홍길동', '홍길동', '봉화읍 내성리 123', '사과', ''],
+        colWidths: [
+          { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+          { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 20 },
+        ],
+        sheetName: '잔류농약시료',
+        fileName: '잔류농약_가져오기_서식',
+      },
+      previewColumns: [
+        { key: 'receptionNumber', label: '접수번호' },
+        { key: 'date', label: '접수일자' },
+        { key: 'name', label: '성명' },
+        { key: 'subCategory', label: '구분' },
+        { key: 'producerName', label: '생산자 성명' },
+        { key: 'producerAddress', label: '생산지 주소' },
+        { key: 'requestContent', label: '의뢰물품명' },
+        { key: 'note', label: '비고' },
+      ],
+      getCommonData: () => ({
+        date: (document.getElementById('importDate') as HTMLInputElement | null)?.value || new Date().toISOString().slice(0, 10),
+        name: (document.getElementById('importName') as HTMLInputElement | null)?.value.trim() || '',
+        phone: (document.getElementById('importPhone') as HTMLInputElement | null)?.value.trim() || '',
+        address: (document.getElementById('importAddress') as HTMLInputElement | null)?.value.trim() || '',
+        method: (document.getElementById('importMethod') as HTMLSelectElement | null)?.value || '',
+        purpose: (document.getElementById('importPurpose') as HTMLSelectElement | null)?.value || '',
+        now: new Date().toISOString(),
+      }),
+      buildRecord: (getVal: (key: string) => string, parseExcelDate: (val: string) => string, common: Record<string, string>): PesticideSampleData => {
+        const receptionNumber = getVal('receptionNumber') || '';
+        const date = parseExcelDate(getVal('date')) || common.date;
+        const name = getVal('name') || common.name;
+        const phoneNumber = getVal('phoneNumber') || common.phone;
+        const address = getVal('address') || common.address;
+        const subCategory = getVal('subCategory') || '';
+        const purpose = getVal('purpose') || common.purpose;
+        const producerName = getVal('producerName') || '';
+        const producerAddress = getVal('producerAddress') || '';
+        const requestContent = getVal('requestContent') || '';
+        const receptionMethod = getVal('receptionMethod') || common.method;
+        const note = getVal('note') || '';
+
+        return {
+          id: crypto.randomUUID(),
+          receptionNumber, date,
+          applicantType: '개인',
+          birthDate: '', corpNumber: '',
+          name, phoneNumber, address,
+          addressPostcode: '', addressRoad: address, addressDetail: '',
+          subCategory, purpose,
+          producerName, producerAddress, requestContent,
+          receptionMethod, note,
+          completed: false,
+          createdAt: common.now, updatedAt: common.now,
+        };
+      },
+      skipRowCheck: (record: PesticideSampleData, rowIdx: number) => {
+        if (!record.name && !record.producerName && !record.requestContent) {
+          return `행 ${rowIdx + 2}: 성명, 생산자, 의뢰물품명이 모두 비어 있어 건너뜁니다.`;
+        }
+        return null;
+      },
+      onImportComplete: (records: PesticideSampleData[]) => {
+        records.forEach(r => this.sampleLogs.push(r));
+        this.sampleLogs.sort((a, b) => {
+          const numA = parseInt(String(a.receptionNumber).replace(/\D/g, ''), 10) || 0;
+          const numB = parseInt(String(b.receptionNumber).replace(/\D/g, ''), 10) || 0;
+          return numA - numB;
+        });
+        this.saveLogs();
+        this.filterAndRenderLogs();
+      },
+    });
+    excelImporter.init();
+  }
+
+  /**
+   * 라벨 인쇄
+   */
+  openLabelPrintWithData(logs: PesticideSampleData[]): void {
+    const labelData = logs.map(log => {
+      const address = [log.addressRoad, log.addressDetail].filter(Boolean).join(' ')
+        || (log.address?.replace(/^\(\d{5}\)\s*/, '') || '');
+      const postalCode = log.addressPostcode || (log.address?.match(/^\((\d{5})\)/)?.[1] ?? '');
+      return { name: log.name || '', address, postalCode };
+    });
+
+    const uniqueMap = new Map<string, { name: string; address: string; postalCode: string }>();
+    labelData.forEach(item => {
+      const key = `${item.address}|${item.postalCode}`;
+      if (!uniqueMap.has(key)) uniqueMap.set(key, item);
+    });
+    const uniqueLabelData = Array.from(uniqueMap.values());
+
+    const duplicateCount = labelData.length - uniqueLabelData.length;
+    if (duplicateCount > 0) {
+      this.showToast(`주소 중복 ${duplicateCount}건 제거됨 (총 ${uniqueLabelData.length}건)`, 'info');
+    }
+
+    localStorage.setItem('labelPrintData', JSON.stringify(uniqueLabelData));
+    window.location.href = '../label-print/index.html';
+  }
+
+  /**
+   * 라벨 인쇄 버튼 이벤트 설정
+   */
+  setupLabelPrint(): void {
+    const btnLabelPrint = document.getElementById('btnLabelPrint');
+    if (!btnLabelPrint) return;
+
+    btnLabelPrint.addEventListener('click', () => {
+      const selectedIds = Array.from(
+        document.querySelectorAll<HTMLInputElement>('.row-checkbox:checked')
+      ).map(cb => cb.dataset.id).filter(Boolean) as string[];
+
+      if (selectedIds.length === 0) {
+        if (this.sampleLogs.length === 0) {
+          this.showToast('인쇄할 데이터가 없습니다.', 'warning');
+          return;
+        }
+        if (!confirm(`선택된 항목이 없습니다.\n전체 ${this.sampleLogs.length}건을 라벨 인쇄하시겠습니까?`)) return;
+        this.openLabelPrintWithData(this.sampleLogs);
+      } else {
+        const selectedLogs = this.sampleLogs.filter(log => selectedIds.includes(log.id));
+        this.openLabelPrintWithData(selectedLogs);
+      }
+    });
   }
 
   constructor() {
@@ -147,11 +408,11 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     const applicantType = log.applicantType || '개인';
     const birthOrCorp = applicantType === '법인' ? (log.corpNumber || '-') : (log.birthDate || '-');
 
-    // 주소 파싱
-    const addressFull = log.address || '';
-    const zipMatch = addressFull.match(/^\((\d{5})\)\s*/);
-    const zipcode = log.addressPostcode || (zipMatch ? zipMatch[1] : '');
-    const addressOnly = zipMatch ? addressFull.replace(zipMatch[0], '') : addressFull;
+    // 주소: addressRoad 우선, 없으면 address 폴백 + addressDetail 추가
+    const zipcode = log.addressPostcode || (log.address?.match(/^\((\d{5})\)/)?.[1] ?? '');
+    const addressOnly = log.addressRoad
+        ? [log.addressRoad, log.addressDetail].filter(Boolean).join(' ')
+        : (log.address?.replace(/^\(\d{5}\)\s*/, '') || '');
 
     // XSS 방지: 사용자 입력 데이터 이스케이프
     const escapeHTML = (window as any).escapeHTML || ((str: string | undefined | null) => String(str || '').replace(/[&<>"']/g, (m: string) => ({
@@ -398,6 +659,19 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     this.setInputValue('addressPostcode', log.addressPostcode);
     this.setInputValue('addressRoad', log.addressRoad);
     this.setInputValue('addressDetail', log.addressDetail);
+    // 레거시 데이터 폴백: addressRoad가 없으면 address 파싱
+    if (!log.addressRoad && log.address) {
+      const m = log.address.match(/^\((\d{5})\)\s*(.+)$/);
+      if (m) {
+        const pcEl = document.getElementById('addressPostcode') as HTMLInputElement | null;
+        const rdEl = document.getElementById('addressRoad') as HTMLInputElement | null;
+        if (pcEl && !pcEl.value) pcEl.value = m[1];
+        if (rdEl) rdEl.value = m[2];
+      } else {
+        const rdEl = document.getElementById('addressRoad') as HTMLInputElement | null;
+        if (rdEl) rdEl.value = log.address;
+      }
+    }
     this.setInputValue('subCategory', log.subCategory);
     this.setInputValue('purpose', log.purpose);
     this.setInputValue('receptionMethod', log.receptionMethod);
@@ -525,7 +799,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     this.log('✅ renderLogs 호출, logs:', logs ? logs.length : 0, '건');
 
     if (!this.tableBody) {
-      console.error(`[${this.moduleName}] tableBody가 없음!`);
+      (window.logger?.error || console.error)(`[${this.moduleName}] tableBody가 없음!`);
       return;
     }
 

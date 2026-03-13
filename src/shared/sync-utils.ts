@@ -190,7 +190,7 @@ window.SyncUtils = {
     getTimestamp,
     normalizeId,
     getItemId
-} as SyncUtilsAPI;
+} as unknown as SyncUtilsAPI;
 
 export {
     smartMerge,

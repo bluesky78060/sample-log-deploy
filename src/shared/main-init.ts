@@ -78,7 +78,7 @@ if (window.CacheManager) {
                 const diagnosis = await window.firebaseDiagnostics!.diagnose();
 
                 if (diagnosis.overallStatus !== 'healthy') {
-                    console.warn('[App] Firebase 연결 문제 감지, 자동 복구 시도...');
+                    (window.logger?.warn || console.warn)('[App] Firebase 연결 문제 감지, 자동 복구 시도...');
                     await window.firebaseDiagnostics!.attemptAutoRecovery();
                 }
 

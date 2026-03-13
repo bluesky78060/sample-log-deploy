@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:* https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;">
     <title>토양 시료 접수 대장</title>
     <!-- 폰트 preconnect 및 preload로 성능 최적화 (bundle-defer-third-party) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -129,6 +130,7 @@
                 <span class="util-btn-label">가져오기</span>
                 <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" hidden>
             </label>
+            <button type="button" id="heuktoramBtn" class="util-btn" title="흙토람 내보내기" style="color:#8B5CF6;"><span class="material-icons-outlined">agriculture</span><span class="util-btn-label">흙토람</span></button>
         </div>
 
         <div class="navbar-divider"></div>
@@ -296,7 +298,7 @@
                             <div class="card-body">
                                 <div class="info-banner">
                                     <span class="info-icon">💡</span>
-                                    <span>같은 필지에 여러 시료 접수 가능 (비고로 구분)</span>
+                                    <span>같은 필지에 여러 시료 접수 가능 (기타주소로 구분)</span>
                                 </div>
                                 <div id="parcelsContainer" class="parcels-list">
                                     <!-- 필지가 동적으로 추가됩니다 -->
@@ -381,6 +383,7 @@
                             <th class="col-zipcode">우편번호</th>
                             <th>주소</th>
                             <th>필지 주소</th>
+                            <th>기타주소</th>
                             <th>작물명</th>
                             <th>면적</th>
                             <th>전화번호</th>

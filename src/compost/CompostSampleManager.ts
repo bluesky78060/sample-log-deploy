@@ -120,7 +120,7 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
         this.log('renderLogs 호출, logs:', logs ? logs.length : 0, '건');
 
         if (!this.tableBody) {
-            console.error(`[${this.moduleName}] tableBody가 없음!`);
+            (window.logger?.error || console.error)(`[${this.moduleName}] tableBody가 없음!`);
             return;
         }
 
@@ -457,6 +457,18 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
         (document.getElementById('addressRoad') as HTMLInputElement).value = log.addressRoad || '';
         (document.getElementById('addressDetail') as HTMLInputElement).value = log.addressDetail || '';
         (document.getElementById('address') as HTMLInputElement).value = log.address || '';
+        // 레거시 데이터 폴백: addressRoad가 없으면 address 파싱
+        if (!log.addressRoad && log.address) {
+            const m = log.address.match(/^\((\d{5})\)\s*(.+)$/);
+            const postcodeEl = document.getElementById('addressPostcode') as HTMLInputElement | null;
+            const roadEl = document.getElementById('addressRoad') as HTMLInputElement | null;
+            if (m) {
+                if (postcodeEl) postcodeEl.value = postcodeEl.value || m[1];
+                if (roadEl) roadEl.value = m[2];
+            } else {
+                if (roadEl) roadEl.value = log.address;
+            }
+        }
         (document.getElementById('farmAddress') as HTMLInputElement).value = log.farmAddress || '';
         (document.getElementById('farmArea') as HTMLInputElement).value = String(log.farmArea || '');
 

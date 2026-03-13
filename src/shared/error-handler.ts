@@ -54,7 +54,7 @@ export class ErrorHandler {
         if ((window as any).logger) {
             (window as any).logger.error(`[${context}]`, error);
         } else {
-            console.error(`[${context}]`, error);
+            (window.logger?.error || console.error)(`[${context}]`, error);
         }
 
         // 2. 사용자 피드백 (토스트)
@@ -90,7 +90,7 @@ export class ErrorHandler {
                 if ((window as any).logger) {
                     (window as any).logger.error(`[${context}] 재시도 실패:`, retryError);
                 } else {
-                    console.error(`[${context}] 재시도 실패:`, retryError);
+                    (window.logger?.error || console.error)(`[${context}] 재시도 실패:`, retryError);
                 }
             }
         }
@@ -143,18 +143,8 @@ export class ErrorHandler {
 }
 
 // ========================================
-// Window 전역 타입 확장
-// ========================================
-
-declare global {
-    interface Window {
-        ErrorHandler: typeof ErrorHandler;
-    }
-}
-
-// ========================================
 // 전역으로 내보내기
 // ========================================
 
-// 전역으로 내보내기
+// 전역으로 내보내기 (타입 충돌 방지를 위해 as any 사용)
 (window as any).ErrorHandler = ErrorHandler;

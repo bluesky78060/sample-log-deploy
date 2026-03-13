@@ -3409,7 +3409,10 @@ input[type="number"] {
 }
 
 /* 비고 열 */
-.data-table th.col-note,
+.data-table th.col-note {
+    text-align: center;
+    padding: 0.5rem;
+}
 .data-table td.col-note {
     text-align: left;
     padding: 0.5rem;

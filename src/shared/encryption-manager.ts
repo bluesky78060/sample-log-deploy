@@ -70,7 +70,7 @@ const DEBUG_ENCRYPTION = false; // true로 변경하면 디버그 로그 활성�
 /** 조건부 로깅 헬퍼 */
 const logEncryption = (...args: unknown[]): void => {
     if (DEBUG_ENCRYPTION) {
-        console.log(...args);
+        (window.logger?.info || console.log)(...args);
     }
 };
 
@@ -358,7 +358,7 @@ async function acquireLock(lockName: string): Promise<boolean> {
         });
         return result;
     } catch (err) {
-        console.warn(`[Encryption] Lock acquire failed (${lockName}):`, (err as Error).message);
+        (window.logger?.warn || console.warn)(`[Encryption] Lock acquire failed (${lockName}):`, (err as Error).message);
         return true;
     }
 }
@@ -382,7 +382,7 @@ async function releaseLock(lockName: string): Promise<void> {
             }
         });
     } catch (err) {
-        console.warn(`[Encryption] Lock release failed (${lockName}):`, (err as Error).message);
+        (window.logger?.warn || console.warn)(`[Encryption] Lock release failed (${lockName}):`, (err as Error).message);
     }
 }
 
@@ -414,7 +414,7 @@ async function loadKeyFileContent(): Promise<string | null> {
                 }
                 logEncryption(`\[Encryption\] ${systemCollection}/encryptionKey not found or empty`);
             } catch (fbErr) {
-                console.warn(`[Encryption] Firebase ${systemCollection} read failed:`, (fbErr as Error).message);
+                (window.logger?.warn || console.warn)(`[Encryption] Firebase ${systemCollection} read failed:`, (fbErr as Error).message);
             }
 
             // 접두사 있으면 이전 컬렉션명(test__system) 폴백 + 마이그레이션
@@ -435,12 +435,12 @@ async function loadKeyFileContent(): Promise<string | null> {
                                 logEncryption(`\[Encryption\] Migrated recoveryBlob: ${legacyCollection} → ${systemCollection}`);
                             }
                         } catch (migrateErr) {
-                            console.warn('[Encryption] Migration failed:', (migrateErr as Error).message);
+                            (window.logger?.warn || console.warn)('[Encryption] Migration failed:', (migrateErr as Error).message);
                         }
                         return (doc.data() as { keyFileContent: string }).keyFileContent;
                     }
                 } catch (fbErr2) {
-                    console.warn(`[Encryption] ${legacyCollection} fallback failed:`, (fbErr2 as Error).message);
+                    (window.logger?.warn || console.warn)(`[Encryption] ${legacyCollection} fallback failed:`, (fbErr2 as Error).message);
                 }
 
                 // 원본 _system 폴백
@@ -453,7 +453,7 @@ async function loadKeyFileContent(): Promise<string | null> {
                         return (doc.data() as { keyFileContent: string }).keyFileContent;
                     }
                 } catch (fbErr3) {
-                    console.warn('[Encryption] _system fallback failed:', (fbErr3 as Error).message);
+                    (window.logger?.warn || console.warn)('[Encryption] _system fallback failed:', (fbErr3 as Error).message);
                 }
             }
         }
@@ -465,11 +465,11 @@ async function loadKeyFileContent(): Promise<string | null> {
             const keyContent = await window.electronAPI.readKeyFile?.();
             if (keyContent) {
                 _keySource = 'local';
-                console.debug('[Encryption] Key loaded from local file');
+                (window.logger?.debug || console.debug)('[Encryption] Key loaded from local file');
                 return keyContent;
             }
         } catch (localErr) {
-            console.warn('[Encryption] Local key file not found:', (localErr as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] Local key file not found:', (localErr as Error).message);
         }
         return null;
     }
@@ -483,7 +483,7 @@ async function loadKeyFileContent(): Promise<string | null> {
             return lsKey;
         }
     } catch (lsErr) {
-        console.warn('[Encryption] localStorage key load failed:', (lsErr as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] localStorage key load failed:', (lsErr as Error).message);
     }
 
     return null;
@@ -513,7 +513,7 @@ async function syncKeyToFirebase(keyContent: string): Promise<void> {
         });
         logEncryption(`\[Encryption\] Local key synced to Firebase ${systemCollection}/encryptionKey`);
     } catch (err) {
-        console.warn('[Encryption] Failed to sync key to Firebase:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Failed to sync key to Firebase:', (err as Error).message);
     }
 }
 
@@ -534,7 +534,7 @@ function _promptKeyFileBackup(keyFileContent: string): void {
                 await exportKeyFile();
             }
         } catch (e) {
-            console.warn('[Encryption] Key backup prompt failed:', (e as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] Key backup prompt failed:', (e as Error).message);
         }
     }, 1000);
 }
@@ -545,12 +545,12 @@ function _promptKeyFileBackup(keyFileContent: string): void {
 async function generateAndStoreKeyFile(): Promise<string | null> {
     const CryptoUtils = window.CryptoUtils as CryptoUtilsExtended | undefined;
     if (!CryptoUtils?.generateKeyFileContent) {
-        console.error('[Encryption] CryptoUtils.generateKeyFileContent not available');
+        (window.logger?.error || console.error)('[Encryption] CryptoUtils.generateKeyFileContent not available');
         return null;
     }
 
     const keyFileContent = CryptoUtils.generateKeyFileContent();
-    console.debug('[Encryption] New key file generated');
+    (window.logger?.debug || console.debug)('[Encryption] New key file generated');
 
     // Firebase에 저장
     if (window.firebaseConfig?.isEnabled()) {
@@ -567,7 +567,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
                 _keySource = 'generated';
                 return keyFileContent;
             } catch (err) {
-                console.error('[Encryption] Failed to store key in Firebase:', (err as Error).message);
+                (window.logger?.error || console.error)('[Encryption] Failed to store key in Firebase:', (err as Error).message);
             }
         }
     }
@@ -585,7 +585,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
                     return keyFileContent;
                 }
             } catch (localErr) {
-                console.error('[Encryption] Failed to store key locally:', (localErr as Error).message);
+                (window.logger?.error || console.error)('[Encryption] Failed to store key locally:', (localErr as Error).message);
             }
         }
     } else {
@@ -595,7 +595,7 @@ async function generateAndStoreKeyFile(): Promise<string | null> {
             _keySource = 'local';
             return keyFileContent;
         } catch (lsErr) {
-            console.warn('[Encryption] localStorage key save failed:', (lsErr as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] localStorage key save failed:', (lsErr as Error).message);
         }
     }
 
@@ -621,7 +621,7 @@ async function exportKeyFile(): Promise<OperationResult> {
         const result = await window.electronAPI.exportKeyFile(keyContent);
         if (!result?.success) {
             if (result?.error === 'canceled') return { success: false, error: '취소됨' };
-            console.error('[Encryption] Key export failed:', result?.error);
+            (window.logger?.error || console.error)('[Encryption] Key export failed:', result?.error);
             return { success: false, error: result?.error || '내보내기 실패' };
         }
         logEncryption('\[Encryption\] Key file exported to:', (result as { filePath?: string }).filePath);
@@ -731,7 +731,7 @@ async function loadSalt(): Promise<ArrayBuffer | null> {
                 return CryptoUtils.base64ToBuffer(saltBase64);
             }
         } catch (err) {
-            console.warn('[Encryption] Electron salt load failed:', (err as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] Electron salt load failed:', (err as Error).message);
         }
     }
 
@@ -742,7 +742,7 @@ async function loadSalt(): Promise<ArrayBuffer | null> {
             return CryptoUtils.base64ToBuffer(saltBase64);
         }
     } catch (lsErr) {
-        console.warn('[Encryption] localStorage salt load failed:', (lsErr as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] localStorage salt load failed:', (lsErr as Error).message);
     }
 
     logEncryption('\[Encryption\] No saved salt found');
@@ -763,7 +763,7 @@ async function saveSalt(salt: ArrayBuffer): Promise<void> {
             logEncryption('\[Encryption\] Salt saved to Electron');
             return;
         } catch (err) {
-            console.warn('[Encryption] Electron salt save failed:', (err as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] Electron salt save failed:', (err as Error).message);
         }
     }
 
@@ -771,7 +771,7 @@ async function saveSalt(salt: ArrayBuffer): Promise<void> {
         localStorage.setItem(LS_KEY_SALT, saltBase64);
         logEncryption('\[Encryption\] Salt saved to localStorage');
     } catch (lsErr) {
-        console.warn('[Encryption] localStorage salt save failed:', (lsErr as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] localStorage salt save failed:', (lsErr as Error).message);
     }
 }
 
@@ -793,7 +793,7 @@ async function storeSessionPassword(password: string): Promise<void> {
         sessionStorage.setItem(LS_KEY_SESSION_PW, password);
         logEncryption('\[Encryption\] Password stored in sessionStorage');
     } catch (e) {
-        console.warn('[Encryption] sessionStorage password store failed:', (e as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] sessionStorage password store failed:', (e as Error).message);
     }
 }
 
@@ -816,7 +816,7 @@ async function getStoredSessionPassword(): Promise<string | null> {
             return pw;
         }
     } catch (e) {
-        console.warn('[Encryption] sessionStorage password read failed:', (e as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] sessionStorage password read failed:', (e as Error).message);
     }
 
     return null;
@@ -896,10 +896,10 @@ async function verifyKeyWithData(key: CryptoKey): Promise<KeyVerificationResult>
             logEncryption('\[Encryption\] Key verification: SUCCESS');
             return { verified: true, skipped: false };
         }
-        console.warn('[Encryption] Key verification: decrypt returned null (wrong key)');
+        (window.logger?.warn || console.warn)('[Encryption] Key verification: decrypt returned null (wrong key)');
         return { verified: false, skipped: false };
     } catch (err) {
-        console.warn('[Encryption] Key verification FAILED:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Key verification FAILED:', (err as Error).message);
         return { verified: false, skipped: false };
     }
 }
@@ -998,7 +998,7 @@ async function createAndStoreRecoveryBlob(masterKey: CryptoKey): Promise<string 
                 logEncryption(`\[Encryption\] Recovery blob (v2.0) stored in ${systemCollection}/recoveryBlob`);
                 stored = true;
             } catch (err) {
-                console.error('[Encryption] Failed to store recovery blob in Firebase:', (err as Error).message);
+                (window.logger?.error || console.error)('[Encryption] Failed to store recovery blob in Firebase:', (err as Error).message);
             }
         }
     }
@@ -1012,7 +1012,7 @@ async function createAndStoreRecoveryBlob(masterKey: CryptoKey): Promise<string 
                 stored = true;
             }
         } catch (localErr) {
-            console.error('[Encryption] Failed to store recovery blob locally:', (localErr as Error).message);
+            (window.logger?.error || console.error)('[Encryption] Failed to store recovery blob locally:', (localErr as Error).message);
         }
     }
 
@@ -1022,7 +1022,7 @@ async function createAndStoreRecoveryBlob(masterKey: CryptoKey): Promise<string 
             logEncryption('\[Encryption\] Recovery blob stored in localStorage');
             stored = true;
         } catch (lsErr) {
-            console.error('[Encryption] Failed to store recovery blob in localStorage:', (lsErr as Error).message);
+            (window.logger?.error || console.error)('[Encryption] Failed to store recovery blob in localStorage:', (lsErr as Error).message);
         }
     }
 
@@ -1041,7 +1041,7 @@ async function checkRecoveryBlobExists(): Promise<boolean> {
                 const doc = await db.collection(systemCollection).doc('recoveryBlob').get();
                 if (doc.exists && !!(doc.data() as RecoveryBlob | undefined)?.ct) return true;
             } catch (err) {
-                console.warn('[Encryption] Recovery blob check (Firebase) failed:', (err as Error).message);
+                (window.logger?.warn || console.warn)('[Encryption] Recovery blob check (Firebase) failed:', (err as Error).message);
             }
         }
     }
@@ -1055,7 +1055,7 @@ async function checkRecoveryBlobExists(): Promise<boolean> {
                 if (parsed?.ct) return true;
             }
         } catch (err) {
-            console.warn('[Encryption] Recovery blob check (local) failed:', (err as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] Recovery blob check (local) failed:', (err as Error).message);
         }
     }
 
@@ -1066,7 +1066,7 @@ async function checkRecoveryBlobExists(): Promise<boolean> {
             if (parsed?.ct) return true;
         }
     } catch (lsErr) {
-        console.warn('[Encryption] Recovery blob check (localStorage) failed:', (lsErr as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Recovery blob check (localStorage) failed:', (lsErr as Error).message);
     }
 
     return false;
@@ -1087,7 +1087,7 @@ async function ensureRecoveryBlob(masterKey: CryptoKey): Promise<void> {
             }
         }
     } catch (err) {
-        console.warn('[Encryption] ensureRecoveryBlob failed:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] ensureRecoveryBlob failed:', (err as Error).message);
     }
 }
 
@@ -1110,7 +1110,7 @@ async function decryptMasterKeyFromBlob(recoveryKeyInput: string): Promise<Crypt
                     blob = doc.data() as RecoveryBlob;
                 }
             } catch (err) {
-                console.warn('[Encryption] Recovery blob load (Firebase) failed:', (err as Error).message);
+                (window.logger?.warn || console.warn)('[Encryption] Recovery blob load (Firebase) failed:', (err as Error).message);
             }
         }
     }
@@ -1124,7 +1124,7 @@ async function decryptMasterKeyFromBlob(recoveryKeyInput: string): Promise<Crypt
                     blob = JSON.parse(localBlob) as RecoveryBlob;
                 }
             } catch (err) {
-                console.warn('[Encryption] Recovery blob load (local) failed:', (err as Error).message);
+                (window.logger?.warn || console.warn)('[Encryption] Recovery blob load (local) failed:', (err as Error).message);
             }
         }
     }
@@ -1137,22 +1137,22 @@ async function decryptMasterKeyFromBlob(recoveryKeyInput: string): Promise<Crypt
                 logEncryption('\[Encryption\] Recovery blob loaded from localStorage');
             }
         } catch (lsErr) {
-            console.warn('[Encryption] Recovery blob load (localStorage) failed:', (lsErr as Error).message);
+            (window.logger?.warn || console.warn)('[Encryption] Recovery blob load (localStorage) failed:', (lsErr as Error).message);
         }
     }
 
     if (!blob) {
-        console.warn('[Encryption] Recovery blob not found');
+        (window.logger?.warn || console.warn)('[Encryption] Recovery blob not found');
         return null;
     }
 
     try {
         if (!blob.version || !['1.0', '2.0'].includes(blob.version)) {
-            console.warn('[Encryption] Unknown recovery blob version:', blob.version);
+            (window.logger?.warn || console.warn)('[Encryption] Unknown recovery blob version:', blob.version);
             return null;
         }
         if (!blob.iv || !blob.ct || !blob.salt) {
-            console.warn('[Encryption] Invalid recovery blob format');
+            (window.logger?.warn || console.warn)('[Encryption] Invalid recovery blob format');
             return null;
         }
 
@@ -1181,7 +1181,7 @@ async function decryptMasterKeyFromBlob(recoveryKeyInput: string): Promise<Crypt
             return result.key;
         }
     } catch (err) {
-        console.warn('[Encryption] Recovery decryption failed:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Recovery decryption failed:', (err as Error).message);
         return null;
     }
 }
@@ -1276,7 +1276,7 @@ function showRecoveryKeyModal(recoveryKey: string): Promise<void> {
                         }
                     }, 30000);
                 } catch (err) {
-                    console.warn('Clipboard write failed:', err);
+                    (window.logger?.warn || console.warn)('Clipboard write failed:', err);
                 }
             });
         }
@@ -1497,7 +1497,7 @@ async function checkAndIncrementRecoveryAttempts(): Promise<RecoveryAttemptResul
         });
         return result;
     } catch (err) {
-        console.warn('[Encryption] Recovery attempts check failed:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Recovery attempts check failed:', (err as Error).message);
         return { allowed: true, remaining: MAX_ATTEMPTS };
     }
 }
@@ -1513,7 +1513,7 @@ async function resetRecoveryAttempts(): Promise<void> {
     try {
         await db.collection(systemCollection).doc('recoveryAttempts').delete();
     } catch (err) {
-        console.warn('[Encryption] Failed to reset recovery attempts:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Failed to reset recovery attempts:', (err as Error).message);
     }
 }
 
@@ -1572,7 +1572,7 @@ async function reEncryptCollection(
                 }
             } catch (docErr) {
                 failedDocs.push(id);
-                console.error(`[ReEncrypt] ${collectionName}/${id}: re-encrypt failed -`, (docErr as Error).message);
+                (window.logger?.error || console.error)(`[ReEncrypt] ${collectionName}/${id}: re-encrypt failed -`, (docErr as Error).message);
             }
         }
 
@@ -1585,7 +1585,7 @@ async function reEncryptCollection(
         }
     }
 
-    console.log(`[ReEncrypt] ${collectionName}: re-encrypted ${docs.length} docs`);
+    (window.logger?.debug || console.log)(`[ReEncrypt] ${collectionName}: re-encrypted ${docs.length} docs`);
 }
 
 // ========================================
@@ -1809,7 +1809,7 @@ function showPasswordPrompt(
                 recoverLink.style.display = 'block';
             }
         }).catch(err => {
-            console.debug('[Encryption] Recovery blob check for link display failed:', (err as Error).message);
+            (window.logger?.debug || console.debug)('[Encryption] Recovery blob check for link display failed:', (err as Error).message);
         });
 
         const recoverBtn = document.getElementById('enc-recover-btn');
@@ -2035,7 +2035,7 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
 
     const password = await showFirstTimePasswordPrompt();
     if (!password) {
-        console.warn('[Encryption] First-time setup skipped by user');
+        (window.logger?.warn || console.warn)('[Encryption] First-time setup skipped by user');
         _keyFileContent = null;
         return false;
     }
@@ -2061,7 +2061,7 @@ async function handleFirstTimeSetup(isNewSalt: boolean): Promise<boolean> {
             await showRecoveryKeyModal(recoveryKey);
         }
     } catch (recErr) {
-        console.warn('[Encryption] Recovery key generation failed:', (recErr as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Recovery key generation failed:', (recErr as Error).message);
     }
 
     // 비밀번호 설정 완료 후 키 파일 백업 안내 표시
@@ -2104,7 +2104,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
             return true;
         }
 
-        console.warn('[Encryption] Stored session password is invalid - clearing');
+        (window.logger?.warn || console.warn)('[Encryption] Stored session password is invalid - clearing');
         _cryptoKey = null;
         if (window.electronAPI?.clearSessionPassword) {
             await window.electronAPI.clearSessionPassword();
@@ -2137,7 +2137,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
 
         retryCount++;
         _cryptoKey = null;
-        console.warn(`[Encryption] Key verification failed (attempt ${retryCount}/${MAX_PASSWORD_RETRIES})`);
+        (window.logger?.warn || console.warn)(`[Encryption] Key verification failed (attempt ${retryCount}/${MAX_PASSWORD_RETRIES})`);
 
         if (retryCount >= MAX_PASSWORD_RETRIES) {
             return { valid: false, error: `비밀번호 시도 횟수를 초과했습니다. (${MAX_PASSWORD_RETRIES}회)`, exhausted: true };
@@ -2150,7 +2150,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
         const password = await showPasswordPrompt(errorMsg, validatePassword);
 
         if (!password) {
-            console.warn('[Encryption] Password skipped - encryption disabled');
+            (window.logger?.warn || console.warn)('[Encryption] Password skipped - encryption disabled');
             _keyFileContent = null;
             return false;
         }
@@ -2165,7 +2165,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
                 }
                 errorMsg = recoverResult?.error === 'Cancelled' ? null : '비밀번호 복구에 실패했습니다. 다시 시도해주세요.';
             } catch (recoverErr) {
-                console.error('[Encryption] Recovery error:', recoverErr);
+                (window.logger?.error || console.error)('[Encryption] Recovery error:', recoverErr);
                 errorMsg = '비밀번호 복구 중 오류: ' + ((recoverErr as Error).message || '알 수 없는 오류');
             }
             continue;
@@ -2178,7 +2178,7 @@ async function handleNormalLogin(isNewSalt: boolean): Promise<boolean> {
         return true;
     }
 
-    console.error('[Encryption] All password attempts exhausted');
+    (window.logger?.error || console.error)('[Encryption] All password attempts exhausted');
     _keyFileContent = null;
     _cryptoKey = null;
     return false;
@@ -2203,7 +2203,7 @@ async function _doInitEncryption(): Promise<boolean> {
     const CryptoUtils = window.CryptoUtils as CryptoUtilsExtended | undefined;
 
     if (!CryptoUtils) {
-        console.warn('[Encryption] CryptoUtils not loaded');
+        (window.logger?.warn || console.warn)('[Encryption] CryptoUtils not loaded');
         _initInProgress = false;
         return false;
     }
@@ -2225,12 +2225,12 @@ async function _doInitEncryption(): Promise<boolean> {
 
             _keyFileContent = await generateAndStoreKeyFile();
             if (!_keyFileContent) {
-                console.error('[Encryption] Failed to generate key file');
+                (window.logger?.error || console.error)('[Encryption] Failed to generate key file');
                 return false;
             }
         }
 
-        console.debug(`[Encryption] Key ready (source: ${_keySource})`);
+        (window.logger?.debug || console.debug)(`[Encryption] Key ready (source: ${_keySource})`);
 
         if (_keySource === 'local') {
             logEncryption('\[Encryption\] Key loaded from local - syncing to Firebase...');
@@ -2260,8 +2260,8 @@ async function _doInitEncryption(): Promise<boolean> {
         return success;
 
     } catch (error) {
-        console.error('[Encryption] Init FAILED:', (error as Error).message);
-        console.error('[Encryption] Stack:', (error as Error).stack);
+        (window.logger?.error || console.error)('[Encryption] Init FAILED:', (error as Error).message);
+        (window.logger?.error || console.error)('[Encryption] Stack:', (error as Error).stack);
         _keyFileContent = null;
         _initInProgress = false;
         return false;
@@ -2322,7 +2322,7 @@ async function initSilent(): Promise<boolean> {
         _initInProgress = false;
         return false;
     } catch (err) {
-        console.warn('[Encryption] Silent init failed:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] Silent init failed:', (err as Error).message);
         _keyFileContent = null;
         _initInProgress = false;
         return false;
@@ -2457,7 +2457,7 @@ async function recoverPassword(): Promise<OperationResult> {
                     }
                 }
             } catch (reEncryptErr) {
-                console.error('[Encryption] Recovery re-encryption failed, rolling back...', reEncryptErr);
+                (window.logger?.error || console.error)('[Encryption] Recovery re-encryption failed, rolling back...', reEncryptErr);
 
                 const failedRollbacks: string[] = [];
                 if (completedCollections.length > 0 && window.firebaseConfig?.isEnabled()) {
@@ -2467,7 +2467,7 @@ async function recoverPassword(): Promise<OperationResult> {
                             try {
                                 await reEncryptCollection(db, collName, newKey, oldKey);
                             } catch (rollbackErr) {
-                                console.error(`[Encryption] Rollback FAILED: ${collName}`, (rollbackErr as Error).message);
+                                (window.logger?.error || console.error)(`[Encryption] Rollback FAILED: ${collName}`, (rollbackErr as Error).message);
                                 failedRollbacks.push(collName);
                             }
                         }
@@ -2512,7 +2512,7 @@ async function recoverPassword(): Promise<OperationResult> {
 
         } catch (err) {
             hideProgressOverlay();
-            console.error('[Encryption] Password recovery failed:', err);
+            (window.logger?.error || console.error)('[Encryption] Password recovery failed:', err);
             if (window.showToast) {
                 window.showToast('비밀번호 복구 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
             }
@@ -2565,7 +2565,7 @@ async function verifyPassword(password: string): Promise<boolean> {
         const vr = await verifyKeyWithData(result.key);
         return vr.verified;
     } catch (err) {
-        console.warn('[Encryption] verifyPassword failed:', (err as Error).message);
+        (window.logger?.warn || console.warn)('[Encryption] verifyPassword failed:', (err as Error).message);
         return false;
     }
 }
@@ -2576,7 +2576,7 @@ async function verifyPassword(password: string): Promise<boolean> {
 async function verifyPasswordForExport(): Promise<boolean> {
     // Abbreviated implementation
     if (!_cryptoKey) {
-        console.warn('[Encryption] verifyPasswordForExport: no active key');
+        (window.logger?.warn || console.warn)('[Encryption] verifyPasswordForExport: no active key');
         return false;
     }
     // Full implementation would show export password prompt
@@ -2598,7 +2598,7 @@ async function regenerateRecoveryKey(): Promise<OperationResult> {
         }
         return { success: false, message: '복구 키 생성에 실패했습니다.' };
     } catch (err) {
-        console.error('[Encryption] regenerateRecoveryKey error:', err);
+        (window.logger?.error || console.error)('[Encryption] regenerateRecoveryKey error:', err);
         return { success: false, message: (err as Error).message };
     }
 }
@@ -2673,7 +2673,7 @@ async function regenerateKey(): Promise<boolean> {
                 await db.collection(systemCollection).doc('encryptionKey').delete();
                 logEncryption(`\[Encryption\] Deleted ${systemCollection}/encryptionKey from Firebase`);
             } catch (err) {
-                console.warn('[Encryption] Firebase key delete failed:', (err as Error).message);
+                (window.logger?.warn || console.warn)('[Encryption] Firebase key delete failed:', (err as Error).message);
             }
         }
     }

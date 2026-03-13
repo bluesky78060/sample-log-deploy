@@ -359,18 +359,18 @@ class FirebaseDiagnostics {
      * 자동 복구 시도
      */
     async attemptAutoRecovery(): Promise<RecoveryResult> {
-        console.log('[Firebase Diagnostics] 자동 복구 시작...');
+        (window.logger?.debug || console.log)('[Firebase Diagnostics] 자동 복구 시작...');
 
         const diagnosis = await this.diagnose();
 
         if (diagnosis.overallStatus === 'healthy') {
-            console.log('[Firebase Diagnostics] 연결 상태 정상');
+            (window.logger?.debug || console.log)('[Firebase Diagnostics] 연결 상태 정상');
             return { success: true, message: '연결 정상' };
         }
 
         // 네트워크 문제
         if (diagnosis.overallStatus === 'offline') {
-            console.log('[Firebase Diagnostics] 오프라인 상태 - 큐 사용 중');
+            (window.logger?.debug || console.log)('[Firebase Diagnostics] 오프라인 상태 - 큐 사용 중');
             return {
                 success: false,
                 message: '오프라인 상태입니다. 온라인 복귀 시 자동 동기화됩니다.',
@@ -381,13 +381,13 @@ class FirebaseDiagnostics {
         // Firebase 재초기화 시도
         if (!diagnosis.checks.initialized?.passed) {
             try {
-                console.log('[Firebase Diagnostics] Firebase 재초기화 시도...');
+                (window.logger?.debug || console.log)('[Firebase Diagnostics] Firebase 재초기화 시도...');
                 if (window.firebaseConfig?.initialize) {
                     await window.firebaseConfig.initialize();
                     return { success: true, message: 'Firebase 재초기화 성공' };
                 }
             } catch (error) {
-                console.error('[Firebase Diagnostics] 재초기화 실패:', error);
+                (window.logger?.error || console.error)('[Firebase Diagnostics] 재초기화 실패:', error);
             }
         }
 
@@ -410,7 +410,7 @@ class FirebaseDiagnostics {
             const diagnosis = await this.diagnose();
 
             if (diagnosis.overallStatus !== 'healthy') {
-                console.warn('[Firebase Diagnostics] 연결 문제 감지:', diagnosis);
+                (window.logger?.warn || console.warn)('[Firebase Diagnostics] 연결 문제 감지:', diagnosis);
 
                 if (typeof window.showToast === 'function') {
                     window.showToast('Firebase 연결 문제가 감지되었습니다.', 'warning', {
@@ -439,9 +439,9 @@ class FirebaseDiagnostics {
         // 콘솔에 진단 결과 출력
         this.diagnose().then(result => {
             console.group('🔍 Firebase 진단 결과');
-            console.log('전체 상태:', result.overallStatus);
-            console.log('검사 항목:', result.checks);
-            console.log('권장 사항:', result.recommendations);
+            (window.logger?.debug || console.log)('전체 상태:', result.overallStatus);
+            (window.logger?.debug || console.log)('검사 항목:', result.checks);
+            (window.logger?.debug || console.log)('권장 사항:', result.recommendations);
             console.groupEnd();
 
             // 토스트로도 표시

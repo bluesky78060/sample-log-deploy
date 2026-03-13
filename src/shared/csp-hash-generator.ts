@@ -80,8 +80,8 @@ function extractInlineContentHashes(htmlPath: string): ExtractedHashes {
     const eventHandlerRegex = /on\w+\s*=\s*["']([^"']+)["']/g;
     let eventMatch: RegExpExecArray | null;
     while ((eventMatch = eventHandlerRegex.exec(html)) !== null) {
-        console.warn(`경고: 인라인 이벤트 핸들러 발견 - ${eventMatch[0]}`);
-        console.warn('보안을 위해 addEventListener로 대체하는 것을 권장합니다.');
+        (window.logger?.warn || console.warn)(`경고: 인라인 이벤트 핸들러 발견 - ${eventMatch[0]}`);
+        (window.logger?.warn || console.warn)('보안을 위해 addEventListener로 대체하는 것을 권장합니다.');
     }
 
     return hashes;
@@ -153,39 +153,39 @@ function buildCSPWithHashes(hashResults: ProjectHashResults): CSPConfig {
 // CLI 사용을 위한 메인 함수
 if (require.main === module) {
     const projectRoot = process.argv[2] || path.join(__dirname, '..');
-    console.log('CSP 해시 생성 중...\n');
+    (window.logger?.info || console.log)('CSP 해시 생성 중...\n');
 
     const results = generateProjectCSPHashes(projectRoot);
 
-    console.log('=== 인라인 콘텐츠 발견 ===\n');
+    (window.logger?.info || console.log)('=== 인라인 콘텐츠 발견 ===\n');
     for (const file in results) {
-        console.log(`파일: ${file}`);
+        (window.logger?.info || console.log)(`파일: ${file}`);
         if (results[file].scripts.length > 0) {
-            console.log('  스크립트:');
+            (window.logger?.info || console.log)('  스크립트:');
             results[file].scripts.forEach(s => {
-                console.log(`    - ${s.content}`);
-                console.log(`      해시: ${s.hash}`);
+                (window.logger?.info || console.log)(`    - ${s.content}`);
+                (window.logger?.info || console.log)(`      해시: ${s.hash}`);
             });
         }
         if (results[file].styles.length > 0) {
-            console.log('  스타일:');
+            (window.logger?.info || console.log)('  스타일:');
             results[file].styles.forEach(s => {
-                console.log(`    - ${s.content}`);
-                console.log(`      해시: ${s.hash}`);
+                (window.logger?.info || console.log)(`    - ${s.content}`);
+                (window.logger?.info || console.log)(`      해시: ${s.hash}`);
             });
         }
-        console.log('');
+        (window.logger?.info || console.log)('');
     }
 
     const cspConfig = buildCSPWithHashes(results);
-    console.log('=== 권장 CSP 설정 ===\n');
-    console.log(`script-src: ${cspConfig.scriptSrc}\n`);
-    console.log(`style-src: ${cspConfig.styleSrc}\n`);
+    (window.logger?.info || console.log)('=== 권장 CSP 설정 ===\n');
+    (window.logger?.info || console.log)(`script-src: ${cspConfig.scriptSrc}\n`);
+    (window.logger?.info || console.log)(`style-src: ${cspConfig.styleSrc}\n`);
 
     // 파일로 저장
     const outputPath = path.join(projectRoot, 'csp-hashes.json');
     fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
-    console.log(`\n해시 목록이 ${outputPath}에 저장되었습니다.`);
+    (window.logger?.info || console.log)(`\n해시 목록이 ${outputPath}에 저장되었습니다.`);
 }
 
 export {

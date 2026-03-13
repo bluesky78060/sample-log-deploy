@@ -365,7 +365,7 @@ class ExcelImportManager {
                 this._els.modal?.classList.remove('hidden');
 
             } catch (err) {
-                console.error('엑셀 파싱 오류:', err);
+                (window.logger?.error || console.error)('엑셀 파싱 오류:', err);
                 showToast('엑셀 파일을 읽을 수 없습니다.', 'error');
             }
         };

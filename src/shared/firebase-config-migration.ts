@@ -40,21 +40,21 @@ export async function migrateFirebaseConfig(): Promise<boolean> {
     try {
         // 이미 마이그레이션했는지 확인
         if (localStorage.getItem(MIGRATION_FLAG) === 'true') {
-            (window.logger?.info || console.log)('[Firebase Migration] 이미 마이그레이션 완료됨');
+            (window.logger?.info || (window.logger?.info || console.log))('[Firebase Migration] 이미 마이그레이션 완료됨');
             return true;
         }
 
         // 기존 설정 로드
         const oldConfig = loadOldConfig();
         if (!oldConfig) {
-            (window.logger?.info || console.log)('[Firebase Migration] 마이그레이션할 설정이 없음');
+            (window.logger?.info || (window.logger?.info || console.log))('[Firebase Migration] 마이그레이션할 설정이 없음');
             return false;
         }
 
         // 보안 스토리지에 저장
         const success = await secureStorage.setItem(SECURE_CONFIG_KEY, oldConfig);
         if (!success) {
-            (window.logger?.error || console.error)('[Firebase Migration] 보안 스토리지 저장 실패');
+            (window.logger?.error || (window.logger?.error || console.error))('[Firebase Migration] 보안 스토리지 저장 실패');
             return false;
         }
 
@@ -62,11 +62,11 @@ export async function migrateFirebaseConfig(): Promise<boolean> {
         localStorage.setItem(MIGRATION_FLAG, 'true');
 
         // 기존 평문/Base64 설정은 유지 (롤백 가능)
-        (window.logger?.info || console.log)('[Firebase Migration] 마이그레이션 완료');
+        (window.logger?.info || (window.logger?.info || console.log))('[Firebase Migration] 마이그레이션 완료');
         return true;
 
     } catch (error) {
-        (window.logger?.error || console.error)('[Firebase Migration] 마이그레이션 실패:', error);
+        (window.logger?.error || (window.logger?.error || console.error))('[Firebase Migration] 마이그레이션 실패:', error);
         return false;
     }
 }
@@ -104,7 +104,7 @@ function loadOldConfig(): FirebaseConfig | null {
         }
 
     } catch (error) {
-        (window.logger?.error || console.error)('[Firebase Migration] 기존 설정 로드 실패:', error);
+        (window.logger?.error || (window.logger?.error || console.error))('[Firebase Migration] 기존 설정 로드 실패:', error);
     }
 
     return null;
@@ -133,7 +133,7 @@ export async function loadFirebaseConfig(): Promise<FirebaseConfig | null> {
         return loadOldConfig();
 
     } catch (error) {
-        (window.logger?.error || console.error)('[Firebase Config] 설정 로드 실패:', error);
+        (window.logger?.error || (window.logger?.error || console.error))('[Firebase Config] 설정 로드 실패:', error);
         return null;
     }
 }
@@ -159,7 +159,7 @@ export async function saveFirebaseConfig(config: FirebaseConfig): Promise<boolea
         return success;
 
     } catch (error) {
-        (window.logger?.error || console.error)('[Firebase Config] 설정 저장 실패:', error);
+        (window.logger?.error || (window.logger?.error || console.error))('[Firebase Config] 설정 저장 실패:', error);
         return false;
     }
 }
@@ -193,11 +193,11 @@ export async function rollbackMigration(): Promise<boolean> {
         // 마이그레이션 플래그 제거
         localStorage.removeItem(MIGRATION_FLAG);
 
-        (window.logger?.info || console.log)('[Firebase Migration] 롤백 완료');
+        (window.logger?.info || (window.logger?.info || console.log))('[Firebase Migration] 롤백 완료');
         return true;
 
     } catch (error) {
-        (window.logger?.error || console.error)('[Firebase Migration] 롤백 실패:', error);
+        (window.logger?.error || (window.logger?.error || console.error))('[Firebase Migration] 롤백 실패:', error);
         return false;
     }
 }
@@ -207,7 +207,7 @@ if (typeof window !== 'undefined') {
     window.addEventListener('load', async () => {
         const status = await getSecurityStatus();
         if (!status.migrated && status.hasOldConfig) {
-            (window.logger?.info || console.log)('[Firebase Migration] 자동 마이그레이션 시작...');
+            (window.logger?.info || (window.logger?.info || console.log))('[Firebase Migration] 자동 마이그레이션 시작...');
             await migrateFirebaseConfig();
         }
     });

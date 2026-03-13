@@ -224,11 +224,11 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         const row = document.createElement('tr');
         row.dataset.id = log.id;
 
-        // 주소에서 우편번호 분리
-        const addressFull = log.address || '';
-        const zipMatch = addressFull.match(/^\((\d{5})\)\s*/);
-        const zipcode = zipMatch ? zipMatch[1] : (log.addressPostcode || '');
-        const addressOnly = zipMatch ? addressFull.replace(zipMatch[0], '') : addressFull;
+        // 주소: addressRoad 우선, 없으면 address 폴백 + addressDetail 추가
+        const zipcode = log.addressPostcode || (log.address?.match(/^\((\d{5})\)/)?.[1] ?? '');
+        const addressOnly = log.addressRoad
+            ? [log.addressRoad, log.addressDetail].filter(Boolean).join(' ')
+            : (log.address?.replace(/^\(\d{5}\)\s*/, '') || '');
 
         // 뷰용 주소: 시도 패턴이 있을 때만 제거
         const displayAddress = addressOnly && addressOnly !== '-' && SIDO_PATTERN.test(addressOnly)
@@ -504,6 +504,16 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             if (this.addressRoad) this.addressRoad.value = log.addressRoad || '';
             if (this.addressDetail) this.addressDetail.value = log.addressDetail || '';
             if (this.addressHidden) this.addressHidden.value = log.address || '';
+            // 레거시 데이터 폴백: addressRoad가 없으면 address 파싱
+            if (!log.addressRoad && log.address) {
+                const m = log.address.match(/^\((\d{5})\)\s*(.+)$/);
+                if (m) {
+                    if (this.addressPostcode && !this.addressPostcode.value) this.addressPostcode.value = m[1];
+                    if (this.addressRoad) this.addressRoad.value = m[2];
+                } else {
+                    if (this.addressRoad) this.addressRoad.value = log.address;
+                }
+            }
             if (sampleNameEl) sampleNameEl.value = log.sampleName || '';
             if (sampleCountEl) sampleCountEl.value = String(log.sampleCount || 1);
             if (noteEl) noteEl.value = log.note || '';
@@ -1824,7 +1834,14 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
                     this.showToast(`선택한 ${logsToExport.length}건을 내보냅니다.`, 'info');
                 }
 
-                const exportData = logsToExport.map(log => {
+                const sortedLogs = [...logsToExport].sort((a, b) => {
+                    const aNum = parseInt(String(a.receptionNumber).replace(/\D/g, ''), 10) || 0;
+                    const bNum = parseInt(String(b.receptionNumber).replace(/\D/g, ''), 10) || 0;
+                    return aNum - bNum;
+                });
+
+                const sanitizeCell = (window as any).SampleUtils?.sanitizeExcelCell ?? ((v: string) => v);
+                const exportData = sortedLogs.map(log => {
                     const addressParts = parseAddressParts(log.addressRoad || log.address || '');
                     const fullAddress = [log.addressRoad, log.addressDetail].filter(Boolean).join(' ') || '-';
                     const applicantType = log.applicantType || '개인';
@@ -1835,22 +1852,22 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
                         '접수일자': log.date || '-',
                         '법인여부': applicantType,
                         '생년월일/법인번호': birthOrCorp,
-                        '성명': log.name || '-',
+                        '성명': sanitizeCell(log.name || '-'),
                         '연락처': log.phoneNumber || '-',
                         '시도': addressParts.sido || '-',
                         '시군구': addressParts.sigungu || '-',
                         '읍면동': addressParts.eupmyeondong || '-',
-                        '나머지주소': (addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-',
-                        '전체주소': fullAddress,
+                        '나머지주소': sanitizeCell((addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-'),
+                        '전체주소': sanitizeCell(fullAddress),
                         '우편번호': log.addressPostcode || '-',
-                        '채취장소': log.samplingLocation || '-',
-                        '시료명': log.sampleName || '-',
+                        '채취장소': sanitizeCell(log.samplingLocation || '-'),
+                        '시료명': sanitizeCell(log.sampleName || '-'),
                         '시료수': log.sampleCount || '-',
-                        '주작목': log.mainCrop || '-',
+                        '주작목': sanitizeCell(log.mainCrop || '-'),
                         '목적': log.purpose || '-',
                         '검사항목': log.testItems || '-',
                         '통보방법': log.receptionMethod || '-',
-                        '비고': log.note || '-',
+                        '비고': sanitizeCell(log.note || '-'),
                         '완료여부': log.isComplete ? '완료' : '미완료',
                         '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
                     };

@@ -16,12 +16,12 @@ type InsertPosition = 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
  */
 export function setInnerHTML(element: HTMLElement | null, html: string): void {
     if (!element) {
-        console.warn('[DOM Utils] setInnerHTML: element가 null입니다.');
+        (window.logger?.warn || console.warn)('[DOM Utils] setInnerHTML: element가 null입니다.');
         return;
     }
 
     if (typeof html !== 'string') {
-        console.warn('[DOM Utils] setInnerHTML: html이 문자열이 아닙니다:', typeof html);
+        (window.logger?.warn || console.warn)('[DOM Utils] setInnerHTML: html이 문자열이 아닙니다:', typeof html);
         html = String(html);
     }
 
@@ -37,7 +37,7 @@ export function setInnerHTML(element: HTMLElement | null, html: string): void {
  */
 export function setTextContent(element: HTMLElement | null, text: string): void {
     if (!element) {
-        console.warn('[DOM Utils] setTextContent: element가 null입니다.');
+        (window.logger?.warn || console.warn)('[DOM Utils] setTextContent: element가 null입니다.');
         return;
     }
 
@@ -63,7 +63,7 @@ export function parseHTML(html: string): DocumentFragment {
  */
 export function insertHTML(element: HTMLElement | null, position: InsertPosition, html: string): void {
     if (!element) {
-        console.warn('[DOM Utils] insertHTML: element가 null입니다.');
+        (window.logger?.warn || console.warn)('[DOM Utils] insertHTML: element가 null입니다.');
         return;
     }
 
@@ -77,7 +77,7 @@ export function insertHTML(element: HTMLElement | null, position: InsertPosition
  */
 export function replaceHTML(element: HTMLElement | null, html: string): void {
     if (!element) {
-        console.warn('[DOM Utils] replaceHTML: element가 null입니다.');
+        (window.logger?.warn || console.warn)('[DOM Utils] replaceHTML: element가 null입니다.');
         return;
     }
 
@@ -144,7 +144,7 @@ export function enableInnerHTMLWarning(enable: boolean = true): void {
             // dom-utils.js 내부 호출은 무시
             const stack = new Error().stack || '';
             if (!stack.includes('dom-utils.js') && !stack.includes('sanitize.js')) {
-                console.warn(
+                (window.logger?.warn || console.warn)(
                     '[DOM Utils] innerHTML 직접 사용 감지! setInnerHTML()을 사용하세요.',
                     '\n위치:', stack.split('\n')[2],
                     '\n값:', value.substring(0, 100) + '...'

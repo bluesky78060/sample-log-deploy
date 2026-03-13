@@ -183,7 +183,7 @@ const CacheManager: CacheManagerAPI = (function(): CacheManagerAPI {
             alert(message);
         }
 
-        (window.logger?.info || console.log)('캐시 클리어 완료:', result);
+        (window.logger?.info || console.info)('캐시 클리어 완료:', result);
 
         return result;
     }
@@ -194,16 +194,16 @@ const CacheManager: CacheManagerAPI = (function(): CacheManagerAPI {
      */
     function checkAndAutoClean(): void {
         if (!isFriday()) {
-            (window.logger?.debug || console.log)('금요일이 아님 - 자동 클리어 스킵');
+            (window.logger?.debug || console.debug)('금요일이 아님 - 자동 클리어 스킵');
             return;
         }
 
         if (wasAlreadyClearedThisWeek()) {
-            (window.logger?.debug || console.log)('이번 주 이미 클리어됨 - 스킵');
+            (window.logger?.debug || console.debug)('이번 주 이미 클리어됨 - 스킵');
             return;
         }
 
-        (window.logger?.info || console.log)('금요일 자동 캐시 클리어 실행');
+        (window.logger?.info || console.info)('금요일 자동 캐시 클리어 실행');
 
         const result: ClearCacheResult = clearCache(false); // 자동 클리어는 알림 없이
 

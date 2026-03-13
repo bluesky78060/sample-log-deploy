@@ -80,13 +80,9 @@ const NetworkAccess: NetworkAccessManager = {
     saveGateway(ip: string): void {
         try {
             localStorage.setItem(this.GATEWAY_STORAGE_KEY, ip);
-            if (window.logger) {
-                window.logger.info('[NetworkAccess] 게이트웨이 저장됨:', ip);
-            }
+            (window.logger?.info || console.info)('[NetworkAccess] 게이트웨이 저장됨:', ip);
         } catch (e) {
-            if (window.logger) {
-                window.logger.error('[NetworkAccess] 게이트웨이 저장 실패:', e);
-            }
+            (window.logger?.error || console.error)('[NetworkAccess] 게이트웨이 저장 실패:', e);
         }
     },
 
@@ -96,9 +92,7 @@ const NetworkAccess: NetworkAccessManager = {
     removeGateway(): void {
         try {
             localStorage.removeItem(this.GATEWAY_STORAGE_KEY);
-            if (window.logger) {
-                window.logger.info('[NetworkAccess] 게이트웨이 삭제됨');
-            }
+            (window.logger?.info || console.info)('[NetworkAccess] 게이트웨이 삭제됨');
         } catch (e) { /* ignore */ }
     },
 
@@ -125,9 +119,7 @@ const NetworkAccess: NetworkAccessManager = {
                 return { ...this.defaultConfig, ...JSON.parse(saved) };
             }
         } catch (e) {
-            if (window.logger) {
-                window.logger.error('[NetworkAccess] 설정 로드 실패:', e);
-            }
+            (window.logger?.error || console.error)('[NetworkAccess] 설정 로드 실패:', e);
         }
         return { ...this.defaultConfig };
     },
@@ -138,13 +130,9 @@ const NetworkAccess: NetworkAccessManager = {
     saveConfig(config: NetworkConfig): void {
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
-            if (window.logger) {
-                window.logger.info('[NetworkAccess] 설정 저장됨:', config);
-            }
+            (window.logger?.info || console.info)('[NetworkAccess] 설정 저장됨:', config);
         } catch (e) {
-            if (window.logger) {
-                window.logger.error('[NetworkAccess] 설정 저장 실패:', e);
-            }
+            (window.logger?.error || console.error)('[NetworkAccess] 설정 저장 실패:', e);
         }
     },
 
@@ -176,15 +164,11 @@ const NetworkAccess: NetworkAccessManager = {
             this._currentIP = data.ip;
             this._lastCheck = Date.now();
 
-            if (window.logger) {
-                window.logger.info('[NetworkAccess] 현재 IP:', this._currentIP);
-            }
+            (window.logger?.info || console.info)('[NetworkAccess] 현재 IP:', this._currentIP);
             return this._currentIP;
 
         } catch (error) {
-            if (window.logger) {
-                window.logger.warn('[NetworkAccess] IP 조회 실패:', (error as Error).message);
-            }
+            (window.logger?.warn || console.warn)('[NetworkAccess] IP 조회 실패:', (error as Error).message);
             return null;
         }
     },
@@ -222,9 +206,7 @@ const NetworkAccess: NetworkAccessManager = {
 
         // 게이트웨이 설정이 없으면 입력 모달 표시
         if (!allowedGateway) {
-            if (window.logger) {
-                window.logger.warn('[NetworkAccess] 게이트웨이 설정 없음 - 입력 필요');
-            }
+            (window.logger?.warn || console.warn)('[NetworkAccess] 게이트웨이 설정 없음 - 입력 필요');
             return { allowed: false, reason: '게이트웨이 미설정', ip: null, needsSetup: true };
         }
 
@@ -232,17 +214,13 @@ const NetworkAccess: NetworkAccessManager = {
         const currentIP = await this.getCurrentIP();
 
         if (!currentIP) {
-            if (window.logger) {
-                window.logger.warn('[NetworkAccess] IP 확인 불가 - 접근 거부');
-            }
+            (window.logger?.warn || console.warn)('[NetworkAccess] IP 확인 불가 - 접근 거부');
             return { allowed: false, reason: 'IP 확인 불가', ip: null };
         }
 
         // 공인 IP가 허용된 서브넷인지 확인
         if (currentIP.startsWith(allowedSubnet)) {
-            if (window.logger) {
-                window.logger.info('[NetworkAccess] 허용된 네트워크:', currentIP);
-            }
+            (window.logger?.info || console.info)('[NetworkAccess] 허용된 네트워크:', currentIP);
             return { allowed: true, reason: `허용된 네트워크 (${allowedGateway})`, ip: currentIP };
         }
 
@@ -252,9 +230,7 @@ const NetworkAccess: NetworkAccessManager = {
             return { allowed: true, reason: '관리자 IP', ip: currentIP };
         }
 
-        if (window.logger) {
-            window.logger.warn('[NetworkAccess] 허용되지 않은 네트워크:', currentIP);
-        }
+        (window.logger?.warn || console.warn)('[NetworkAccess] 허용되지 않은 네트워크:', currentIP);
         return { allowed: false, reason: `허용되지 않은 네트워크 (허용: ${allowedSubnet}x)`, ip: currentIP };
     },
 
@@ -310,9 +286,7 @@ const NetworkAccess: NetworkAccessManager = {
         localStorage.removeItem(this.GATEWAY_STORAGE_KEY);
         this._currentIP = null;
         this._lastCheck = null;
-        if (window.logger) {
-            window.logger.info('[NetworkAccess] 설정 초기화됨');
-        }
+        (window.logger?.info || console.info)('[NetworkAccess] 설정 초기화됨');
     },
 
     /**
@@ -325,18 +299,16 @@ const NetworkAccess: NetworkAccessManager = {
         const isElectron = window.electronAPI?.isElectron === true || window.location.protocol === 'file:';
         const allowedGateway = this.getAllowedGateway();
 
-        console.log('========================================');
-        if (window.logger) {
-            window.logger.info('[NetworkAccess] 현재 상태');
-        }
-        console.log('========================================');
-        console.log('환경:', isElectron ? 'Electron (네트워크 체크 안함)' : '웹 (네트워크 체크 활성화)');
-        console.log('허용된 게이트웨이:', allowedGateway || '설정 없음');
-        console.log('허용된 서브넷:', allowedGateway ? this.getSubnetPrefix(allowedGateway) + 'x' : '없음');
-        console.log('현재 공인 IP:', currentIP || '확인 불가');
-        console.log('접근 허용:', access.allowed, `(${access.reason})`);
-        console.log('관리자 IP (예외):', config.adminIPs || []);
-        console.log('========================================');
+        (window.logger?.info || console.info)('========================================');
+        (window.logger?.info || console.info)('[NetworkAccess] 현재 상태');
+        (window.logger?.info || console.info)('========================================');
+        (window.logger?.info || console.info)('환경:', isElectron ? 'Electron (네트워크 체크 안함)' : '웹 (네트워크 체크 활성화)');
+        (window.logger?.info || console.info)('허용된 게이트웨이:', allowedGateway || '설정 없음');
+        (window.logger?.info || console.info)('허용된 서브넷:', allowedGateway ? this.getSubnetPrefix(allowedGateway) + 'x' : '없음');
+        (window.logger?.info || console.info)('현재 공인 IP:', currentIP || '확인 불가');
+        (window.logger?.info || console.info)('접근 허용:', access.allowed, `(${access.reason})`);
+        (window.logger?.info || console.info)('관리자 IP (예외):', config.adminIPs || []);
+        (window.logger?.info || console.info)('========================================');
 
         return { config, currentIP, access, isElectron, allowedGateway };
     },
@@ -493,17 +465,13 @@ const NetworkAccess: NetworkAccessManager = {
 
 // 환경별 안내 메시지
 if (window.electronAPI?.isElectron === true || window.location.protocol === 'file:') {
-    if (window.logger) {
-        window.logger.info('[NetworkAccess] Electron 환경 - 네트워크 체크 비활성화 (항상 허용)');
-    }
+    (window.logger?.info || console.info)('[NetworkAccess] Electron 환경 - 네트워크 체크 비활성화 (항상 허용)');
 } else {
     const gateway = NetworkAccess.getAllowedGateway();
-    if (window.logger) {
-        window.logger.info('[NetworkAccess] 웹 환경 - 네트워크 체크 활성화');
-        if (gateway) {
-            window.logger.info(`[NetworkAccess] 허용된 게이트웨이: ${gateway}`);
-        } else {
-            window.logger.warn('[NetworkAccess] 게이트웨이 미설정 - 최초 접속 시 입력 필요');
-        }
+    (window.logger?.info || console.info)('[NetworkAccess] 웹 환경 - 네트워크 체크 활성화');
+    if (gateway) {
+        (window.logger?.info || console.info)(`[NetworkAccess] 허용된 게이트웨이: ${gateway}`);
+    } else {
+        (window.logger?.warn || console.warn)('[NetworkAccess] 게이트웨이 미설정 - 최초 접속 시 입력 필요');
     }
 }

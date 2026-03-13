@@ -263,7 +263,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
 
       this.log('초기화 완료');
     } catch (error) {
-      (window.logger?.error ?? console.error)('매니저 초기화 실패:', error);
+      (window.logger?.error || console.error)('매니저 초기화 실패:', error);
     }
   }
 
@@ -276,7 +276,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
         window.firebaseInitialized = await window.firebaseConfig.initialize();
         this.log('Firebase 초기화 결과:', window.firebaseInitialized);
       } catch (err) {
-        (window.logger?.error ?? console.error)('Firebase 초기화 에러:', err);
+        (window.logger?.error || console.error)('Firebase 초기화 에러:', err);
       }
     }
 
@@ -285,7 +285,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
         window.firestoreInitialized = await window.firestoreDb.init();
         this.log('Firestore 초기화 결과:', window.firestoreInitialized);
       } catch (err) {
-        (window.logger?.error ?? console.error)('Firestore 초기화 에러:', err);
+        (window.logger?.error || console.error)('Firestore 초기화 에러:', err);
       }
     }
   }
@@ -385,7 +385,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
         localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
         this.log(' localStorage에 캐싱 완료');
       } catch (err) {
-        (window.logger?.error ?? console.error)('Firebase 저장 실패:', err);
+        (window.logger?.error || console.error)('Firebase 저장 실패:', err);
         this.showToast('Firebase 저장 실패', 'error');
 
         // Firebase 저장 실패 시에만 localStorage를 primary로 사용
@@ -437,7 +437,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
 
         this.showToast('삭제되었습니다.', 'success');
       } catch (err) {
-        (window.logger?.error ?? console.error)('Firebase 삭제 실패:', err);
+        (window.logger?.error || console.error)('Firebase 삭제 실패:', err);
         this.showToast('Firebase 삭제 실패', 'error');
       }
     } else {
@@ -491,7 +491,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
             this.sampleLogs = this.loadFromLocalStorage(yearStorageKey);
           }
         } catch (error) {
-          (window.logger?.error ?? console.error)('Firebase 로드 실패:', error);
+          (window.logger?.error || console.error)('Firebase 로드 실패:', error);
           // Firebase 로드 실패 시 localStorage 폴백
           this.sampleLogs = this.loadFromLocalStorage(yearStorageKey);
         }
@@ -540,7 +540,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
 
       this.log(`✅ ${year}년 데이터 로드 완료:`, this.sampleLogs.length, '건');
     } catch (error) {
-      (window.logger?.error ?? console.error)('데이터 로드 실패:', error);
+      (window.logger?.error || console.error)('데이터 로드 실패:', error);
       this.showToast('데이터 로드 실패', 'error');
     }
   }
@@ -626,8 +626,8 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
       this.log(' Firebase 데이터 샘플:', data && data.length > 0 ? data[0] : 'No data');
       return (data as T[]) || [];
     } catch (error) {
-      console.error(`[${this.moduleName}] Firebase 로드 오류 상세:`, error);
-      (window.logger?.error ?? console.error)('Firebase 로드 실패:', error);
+      (window.logger?.error || console.error)(`[${this.moduleName}] Firebase 로드 오류 상세:`, error);
+      (window.logger?.error || console.error)('Firebase 로드 실패:', error);
       return [];
     }
   }
@@ -1051,7 +1051,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
    */
   protected log(...args: unknown[]): void {
     if (this.debug) {
-      (window.logger?.debug ?? console.log)(`[${this.moduleName}]`, ...args);
+      (window.logger?.debug || console.log)(`[${this.moduleName}]`, ...args);
     }
   }
 

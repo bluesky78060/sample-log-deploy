@@ -543,6 +543,71 @@ interface SampleSearchFilter {
 }
 
 // ========================================
+// Soil-specific Type Aliases
+// ========================================
+
+/**
+ * Soil log (same as SoilSample)
+ */
+type SoilLog = SoilSample;
+
+/**
+ * Soil crop (same as CropArea)
+ */
+type SoilCrop = CropArea;
+
+/**
+ * Soil sub-lot (same as SubLot)
+ */
+type SoilSubLot = SubLot;
+
+/**
+ * Soil flat row (same as SoilTableRow)
+ */
+type SoilFlatRow = SoilTableRow;
+
+/**
+ * Soil search filter (same as SampleSearchFilter)
+ */
+type SoilSearchFilter = SampleSearchFilter;
+
+/**
+ * Soil statistics (same as SampleStatistics)
+ */
+type SoilStatistics = SampleStatistics;
+
+/**
+ * Parsed parcel address from user input
+ */
+interface ParsedParcelAddress {
+  /** Region (읍/면/동) */
+  읍면동: string;
+
+  /** Village (리/마을) */
+  리: string;
+
+  /** Lot number (지번) */
+  지번: string;
+}
+
+/**
+ * Region selection modal data
+ */
+interface RegionSelectionModalData {
+  /** Selected region */
+  region: string;
+
+  /** Selected village */
+  village: string;
+
+  /** Parcel ID being edited */
+  parcelId?: string | number;
+
+  /** Callback function */
+  callback?: (region: string, village: string) => void;
+}
+
+// ========================================
 // Table Row Types (for rendering)
 // ========================================
 
@@ -631,6 +696,16 @@ export {
   SoilParcel,
   SoilSample,
   SoilTableRow,
+
+  // Soil-specific type aliases
+  SoilLog,
+  SoilCrop,
+  SoilSubLot,
+  SoilFlatRow,
+  SoilSearchFilter,
+  SoilStatistics,
+  ParsedParcelAddress,
+  RegionSelectionModalData,
 
   // Water types
   WaterTestItem,

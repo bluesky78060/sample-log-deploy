@@ -9,15 +9,12 @@
  * - heavyMetalSamples: 토양 중금속 시료
  * - pesticideSamples: 잔류농약 시료
  */
-// @ts-ignore - Firebase compat import
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
 
 // Type definitions for Firebase compat
-// @ts-ignore
-type FirestoreDocumentSnapshot = firebase.firestore.DocumentSnapshot;
-// @ts-ignore
-type FirestoreQuerySnapshot = firebase.firestore.QuerySnapshot;
+type FirestoreDocumentSnapshot = any;
+type FirestoreQuerySnapshot = any;
 
 /**
  * 디버그 모드 - 개발 환경에서만 활성화
@@ -40,7 +37,7 @@ const DEBUG_FIRESTORE = (() => {
 /** 조건부 로깅 */
 const logFirestore = (...args: unknown[]): void => {
     if (DEBUG_FIRESTORE) {
-        console.log('[Firestore]', ...args);
+        (window.logger?.info || console.log)('[Firestore]', ...args);
     }
 };
 
@@ -127,13 +124,13 @@ function getCollectionName(sampleType: string, year: number): string {
 
     // 디버그 로깅 (개발 모드에서만)
     if (DEBUG_FIRESTORE) {
-        console.log(`[Firestore] Collection name: ${collectionName} (prefix: "${COLLECTION_PREFIX}", base: ${baseName}, year: ${year})`);
+        (window.logger?.debug || console.log)(`[Firestore] Collection name: ${collectionName} (prefix: "${COLLECTION_PREFIX}", base: ${baseName}, year: ${year})`);
     }
 
     // 안전 체크: test_ 접두사가 없으면 경고 및 강제 추가
     if (!collectionName.startsWith('test_')) {
-        console.warn(`[Firestore] WARNING: Collection name missing 'test_' prefix: ${collectionName}`);
-        console.warn('[Firestore] Forcing test_ prefix...');
+        (window.logger?.warn || console.warn)(`[Firestore] WARNING: Collection name missing 'test_' prefix: ${collectionName}`);
+        (window.logger?.warn || console.warn)('[Firestore] Forcing test_ prefix...');
         return `test_${baseName}_${year}`;
     }
 
@@ -210,13 +207,11 @@ async function saveDocument(
             const docData: Record<string, unknown> = {
                 ...data,
                 id: normalizedId,
-                // @ts-ignore - Firebase compat FieldValue
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: (firebase as any).firestore.FieldValue.serverTimestamp()
             };
 
             if (!docData.createdAt) {
-                // @ts-ignore - Firebase compat FieldValue
-                docData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                docData.createdAt = (firebase as any).firestore.FieldValue.serverTimestamp();
             }
 
             await db.collection(collectionName).doc(normalizedId).set(docData, { merge: true });
@@ -513,13 +508,11 @@ async function batchSave(
                     const docData: Record<string, unknown> = {
                         ...doc,
                         id: normalizedId,
-                        // @ts-ignore - Firebase compat FieldValue
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        updatedAt: (firebase as any).firestore.FieldValue.serverTimestamp()
                     };
 
                     if (!docData.createdAt) {
-                        // @ts-ignore - Firebase compat FieldValue
-                        docData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        docData.createdAt = (firebase as any).firestore.FieldValue.serverTimestamp();
                     }
 
                     batch.set(docRef, docData, { merge: true });

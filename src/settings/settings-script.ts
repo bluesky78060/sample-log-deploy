@@ -104,15 +104,15 @@ function sanitizeHTML(html: string): string {
  * Check auth file status and update UI
  */
 async function checkAuthFileStatus(): Promise<void> {
-  console.log('[checkAuthFileStatus] Starting...');
+  (window.logger?.debug || console.log)('[checkAuthFileStatus] Starting...');
   const statusEl = getElement<HTMLElement>('authFileStatus');
   const uploadArea = getElement<HTMLElement>('authFileUploadArea');
   const infoArea = getElement<HTMLElement>('authFileInfo');
 
-  console.log('[checkAuthFileStatus] Elements:', { statusEl, uploadArea, infoArea });
+  (window.logger?.debug || console.log)('[checkAuthFileStatus] Elements:', { statusEl, uploadArea, infoArea });
 
   if (!statusEl || !uploadArea || !infoArea) {
-    console.warn('[checkAuthFileStatus] Missing elements!');
+    (window.logger?.warn || console.warn)('[checkAuthFileStatus] Missing elements!');
     return;
   }
 
@@ -146,16 +146,16 @@ async function checkAuthFileStatus(): Promise<void> {
   }
 
   try {
-    console.log('[checkAuthFileStatus] Reading auth file...');
+    (window.logger?.debug || console.log)('[checkAuthFileStatus] Reading auth file...');
     const result = await window.electronAPI!.readAuthFile();
-    console.log('[checkAuthFileStatus] Read result:', result);
+    (window.logger?.debug || console.log)('[checkAuthFileStatus] Read result:', result);
 
     if (result.exists && result.content) {
       try {
         const config = JSON.parse(result.content) as FirebaseConfig;
-        console.log('[checkAuthFileStatus] Parsed config:', config);
+        (window.logger?.debug || console.log)('[checkAuthFileStatus] Parsed config:', config);
         if (config.projectId) {
-          console.log('[checkAuthFileStatus] Updating UI to connected state');
+          (window.logger?.debug || console.log)('[checkAuthFileStatus] Updating UI to connected state');
           statusEl.className = 'status-badge connected';
           statusEl.textContent = '● 등록됨';
           uploadArea.style.display = 'none';
@@ -164,21 +164,21 @@ async function checkAuthFileStatus(): Promise<void> {
           if (projectIdEl) {
             projectIdEl.textContent = `프로젝트: ${config.projectId}`;
           }
-          console.log('[checkAuthFileStatus] UI updated successfully');
+          (window.logger?.debug || console.log)('[checkAuthFileStatus] UI updated successfully');
           return;
         }
       } catch (e) {
-        console.error('[checkAuthFileStatus] 인증 파일 파싱 오류:', e);
+        (window.logger?.error || console.error)('[checkAuthFileStatus] 인증 파일 파싱 오류:', e);
       }
     }
 
-    console.log('[checkAuthFileStatus] Updating UI to disconnected state');
+    (window.logger?.debug || console.log)('[checkAuthFileStatus] Updating UI to disconnected state');
     statusEl.className = 'status-badge disconnected';
     statusEl.textContent = '● 미등록';
     uploadArea.style.display = 'block';
     infoArea.style.display = 'none';
   } catch (error) {
-    console.error('[checkAuthFileStatus] 인증 파일 확인 오류:', error);
+    (window.logger?.error || console.error)('[checkAuthFileStatus] 인증 파일 확인 오류:', error);
   }
 }
 
@@ -301,7 +301,7 @@ function loadSavedConfig(): void {
       if (messagingSenderIdEl) messagingSenderIdEl.value = config.messagingSenderId || '';
       if (appIdEl) appIdEl.value = config.appId || '';
     } catch (e) {
-      console.error('Firebase 설정 파싱 오류:', e);
+      (window.logger?.error || console.error)('Firebase 설정 파싱 오류:', e);
       localStorage.removeItem(SETTINGS_FIREBASE_KEY);
     }
   }
@@ -321,9 +321,9 @@ function updateConnectionStatus(): void {
   const isFirebaseEnabled = window.firebaseConfig?.isEnabled?.() || false;
 
   // Debug logging
-  console.log('[updateConnectionStatus] Firebase enabled:', isFirebaseEnabled);
-  console.log('[updateConnectionStatus] firebaseConfig exists:', !!window.firebaseConfig);
-  console.log('[updateConnectionStatus] isEnabled function exists:', !!window.firebaseConfig?.isEnabled);
+  (window.logger?.debug || console.log)('[updateConnectionStatus] Firebase enabled:', isFirebaseEnabled);
+  (window.logger?.debug || console.log)('[updateConnectionStatus] firebaseConfig exists:', !!window.firebaseConfig);
+  (window.logger?.debug || console.log)('[updateConnectionStatus] isEnabled function exists:', !!window.firebaseConfig?.isEnabled);
 
   // Firebase 설정이 있고 초기화되었으면 "연결됨" (저장 모드와 무관)
   if (isFirebaseEnabled) {
@@ -357,6 +357,55 @@ function toggleManualSettings(): void {
 }
 
 /**
+ * 안전한 Firebase 설정 파서
+ * eval() 없이 정규식으로만 각 필드를 추출
+ *
+ * @param configStr - Firebase config 객체 문자열
+ * @returns 파싱된 Firebase 설정 또는 null
+ */
+function safeParseFirebaseConfig(configStr: string): FirebaseConfig | null {
+  try {
+    const config: Partial<FirebaseConfig> = {};
+
+    // 주석 제거
+    const cleaned = configStr
+      .replace(/\/\/.*$/gm, '')           // 한 줄 주석 제거
+      .replace(/\/\*[\s\S]*?\*\//g, '');  // 여러 줄 주석 제거
+
+    // Firebase 설정의 각 필드를 개별적으로 추출
+    const fields: Array<keyof FirebaseConfig> = [
+      'apiKey',
+      'authDomain',
+      'projectId',
+      'storageBucket',
+      'messagingSenderId',
+      'appId',
+      'measurementId'
+    ];
+
+    for (const field of fields) {
+      // 패턴: fieldName: "value" 또는 fieldName: 'value'
+      // 함수 호출이나 다른 표현식은 무시하고 오직 문자열 리터럴만 추출
+      const pattern = new RegExp(`${field}\\s*:\\s*["']([^"']+)["']`);
+      const match = cleaned.match(pattern);
+      if (match && match[1]) {
+        config[field] = match[1];
+      }
+    }
+
+    // 필수 필드 확인
+    if (config.apiKey && config.projectId) {
+      return config as FirebaseConfig;
+    }
+
+    return null;
+  } catch (error) {
+    (window.logger?.error || console.error)('[safeParseFirebaseConfig] 파싱 실패:', error);
+    return null;
+  }
+}
+
+/**
  * Parse quick setup code (Firebase config) from textarea
  * Supports both JavaScript object and JSON format
  */
@@ -376,9 +425,8 @@ function parseQuickSetup(): void {
     // Try to extract firebaseConfig object from JavaScript code
     const jsMatch = code.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
     if (jsMatch) {
-      // Remove comments and eval
-      const cleaned = jsMatch[1].replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-      config = eval(`(${cleaned})`);
+      // 안전한 파서: eval() 대신 정규식으로 각 필드를 개별 추출
+      config = safeParseFirebaseConfig(jsMatch[1]);
     } else {
       // Try JSON parse
       const jsonMatch = code.match(/({[\s\S]*})/);
@@ -424,7 +472,7 @@ function parseQuickSetup(): void {
     }
 
   } catch (error) {
-    console.error('[QuickSetup] Parse error:', error);
+    (window.logger?.error || console.error)('[QuickSetup] Parse error:', error);
     alert('설정 코드를 파싱하는 중 오류가 발생했습니다.\n\nFirebase Console에서 다음 형식으로 복사해주세요:\n\nconst firebaseConfig = {\n  apiKey: "...",\n  authDomain: "...",\n  projectId: "...",\n  storageBucket: "...",\n  messagingSenderId: "...",\n  appId: "..."\n};');
   }
 }
@@ -458,7 +506,7 @@ function renderMigrationList(): void {
         try {
           count = JSON.parse(data).length;
         } catch (e) {
-          console.error(`${storageKey} 파싱 오류:`, e);
+          (window.logger?.error || console.error)(`${storageKey} 파싱 오류:`, e);
         }
       }
       if (count > 0) {
@@ -1032,7 +1080,7 @@ function showSettingsPasswordPrompt(): Promise<boolean> {
           submitBtn.textContent = '확인 중...';
           verified = await window.encryptionManager.verifyPassword(pw);
         } catch (e) {
-          console.warn('[Settings] Password verification failed:', (e as Error).message);
+          (window.logger?.warn || console.warn)('[Settings] Password verification failed:', (e as Error).message);
           verified = false;
         } finally {
           submitBtn.disabled = false;
@@ -1205,7 +1253,7 @@ function initFileUploadListeners(): void {
         statusEl.style.color = '#dc2626';
         statusEl.textContent = '● 연결 실패';
       }
-      console.error('연결 테스트 실패:', error);
+      (window.logger?.error || console.error)('연결 테스트 실패:', error);
       showToast('연결 실패: ' + (error as Error).message);
     }
   });
@@ -1327,7 +1375,7 @@ async function scanPlaintextData(): Promise<void> {
                 });
               }
             } catch (err) {
-              console.warn(`[Migration] ${collectionName} 스캔 실패:`, (err as Error).message);
+              (window.logger?.warn || console.warn)(`[Migration] ${collectionName} 스캔 실패:`, (err as Error).message);
             }
           }
         }
@@ -1460,7 +1508,7 @@ async function scanPlaintextData(): Promise<void> {
       }
     }
   } catch (err) {
-    console.error('[Migration] 스캔 오류:', err);
+    (window.logger?.error || console.error)('[Migration] 스캔 오류:', err);
     if (statusBadge) {
       statusBadge.className = 'status-badge error';
       statusBadge.textContent = '● 스캔 실패';
@@ -1686,7 +1734,7 @@ async function encryptPlaintextInCollection(collectionName: string, expectedCoun
           batch.set(ref, saveData, { merge: true });
           batchHasOps = true;
         } catch (docErr) {
-          console.warn(`[Migration] ${collectionName}/${id}: 암호화 실패 -`, (docErr as Error).message);
+          (window.logger?.warn || console.warn)(`[Migration] ${collectionName}/${id}: 암호화 실패 -`, (docErr as Error).message);
         }
 
         processed++;
@@ -1706,9 +1754,9 @@ async function encryptPlaintextInCollection(collectionName: string, expectedCoun
     }
     if (progressText) progressText.textContent = `${collectionName}: ${processed}건 암호화 완료!`;
 
-    console.log(`[Migration] ${collectionName}: ${processed}건 암호화 완료`);
+    (window.logger?.debug || console.log)(`[Migration] ${collectionName}: ${processed}건 암호화 완료`);
   } catch (err) {
-    console.error(`[Migration] ${collectionName} 암호화 오류:`, err);
+    (window.logger?.error || console.error)(`[Migration] ${collectionName} 암호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -1756,13 +1804,13 @@ async function encryptAutoSaveFile(filePath: string, typeName: string, year: num
         progressBar.style.background = '#22c55e';
       }
       if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 완료!`;
-      console.log(`[Migration] ${typeName} ${year}년 autosave 암호화 완료`);
+      (window.logger?.debug || console.log)(`[Migration] ${typeName} ${year}년 autosave 암호화 완료`);
     } else {
       if (progressBar) progressBar.style.background = '#dc2626';
       if (progressText) progressText.textContent = '파일 저장 실패';
     }
   } catch (err) {
-    console.error(`[Migration] autosave 암호화 오류:`, err);
+    (window.logger?.error || console.error)(`[Migration] autosave 암호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -1832,9 +1880,9 @@ async function encryptWebAutoSaveFile(fileName: string, typeName: string, year: 
       progressBar.style.background = '#22c55e';
     }
     if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 암호화 완료!`;
-    console.log(`[Migration] ${fileName} 웹 autosave 암호화 완료`);
+    (window.logger?.debug || console.log)(`[Migration] ${fileName} 웹 autosave 암호화 완료`);
   } catch (err) {
-    console.error(`[Migration] ${fileName} 웹 autosave 암호화 오류:`, err);
+    (window.logger?.error || console.error)(`[Migration] ${fileName} 웹 autosave 암호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -1885,7 +1933,7 @@ async function encryptLocalStorageData(storageKey: string, typeName: string, yea
           encryptedData.push(encrypted);
         }
       } catch (itemErr) {
-        console.warn(`[Migration] ${storageKey}: 항목 암호화 실패 -`, (itemErr as Error).message);
+        (window.logger?.warn || console.warn)(`[Migration] ${storageKey}: 항목 암호화 실패 -`, (itemErr as Error).message);
         encryptedData.push(item); // Keep original on failure
       }
 
@@ -1903,9 +1951,9 @@ async function encryptLocalStorageData(storageKey: string, typeName: string, yea
       progressBar.style.background = '#22c55e';
     }
     if (progressText) progressText.textContent = `${typeName} ${year}년 로컬 데이터 ${processed}건 암호화 완료!`;
-    console.log(`[Migration] ${storageKey}: ${processed}건 암호화 완료`);
+    (window.logger?.debug || console.log)(`[Migration] ${storageKey}: ${processed}건 암호화 완료`);
   } catch (err) {
-    console.error(`[Migration] ${storageKey} 암호화 오류:`, err);
+    (window.logger?.error || console.error)(`[Migration] ${storageKey} 암호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -2054,7 +2102,7 @@ async function scanEncryptedData(): Promise<void> {
                 });
               }
             } catch (err) {
-              console.warn(`[DecMigration] ${collectionName} 스캔 실패:`, (err as Error).message);
+              (window.logger?.warn || console.warn)(`[DecMigration] ${collectionName} 스캔 실패:`, (err as Error).message);
             }
           }
         }
@@ -2245,7 +2293,7 @@ async function scanEncryptedData(): Promise<void> {
       }
     }
   } catch (err) {
-    console.error('[DecMigration] 스캔 오류:', err);
+    (window.logger?.error || console.error)('[DecMigration] 스캔 오류:', err);
     if (statusBadge) {
       statusBadge.className = 'status-badge error';
       statusBadge.textContent = '● 스캔 실패';
@@ -2550,7 +2598,7 @@ async function decryptFirebaseCollection(collectionName: string, expectedCount: 
           batch.set(ref, saveData, { merge: true });
           batchHasOps = true;
         } catch (docErr) {
-          console.warn(`[DecMigration] ${collectionName}/${id}: 복호화 실패 -`, (docErr as Error).message);
+          (window.logger?.warn || console.warn)(`[DecMigration] ${collectionName}/${id}: 복호화 실패 -`, (docErr as Error).message);
         }
 
         processed++;
@@ -2570,9 +2618,9 @@ async function decryptFirebaseCollection(collectionName: string, expectedCount: 
     }
     if (progressText) progressText.textContent = `${collectionName}: ${processed}건 평문 변환 완료!`;
 
-    console.log(`[DecMigration] ${collectionName}: ${processed}건 복호화 완료`);
+    (window.logger?.debug || console.log)(`[DecMigration] ${collectionName}: ${processed}건 복호화 완료`);
   } catch (err) {
-    console.error(`[DecMigration] ${collectionName} 복호화 오류:`, err);
+    (window.logger?.error || console.error)(`[DecMigration] ${collectionName} 복호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -2623,13 +2671,13 @@ async function decryptAutoSaveFile(filePath: string, typeName: string, year: num
         progressBar.style.background = '#22c55e';
       }
       if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 평문 변환 완료!`;
-      console.log(`[DecMigration] ${typeName} ${year}년 autosave 복호화 완료`);
+      (window.logger?.debug || console.log)(`[DecMigration] ${typeName} ${year}년 autosave 복호화 완료`);
     } else {
       if (progressBar) progressBar.style.background = '#dc2626';
       if (progressText) progressText.textContent = '파일 저장 실패';
     }
   } catch (err) {
-    console.error(`[DecMigration] autosave 복호화 오류:`, err);
+    (window.logger?.error || console.error)(`[DecMigration] autosave 복호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -2700,9 +2748,9 @@ async function decryptWebAutoSaveFile(fileName: string, typeName: string, year: 
       progressBar.style.background = '#22c55e';
     }
     if (progressText) progressText.textContent = `${typeName} ${year}년 자동저장 파일 평문 변환 완료!`;
-    console.log(`[DecMigration] ${fileName} 웹 autosave 복호화 완료`);
+    (window.logger?.debug || console.log)(`[DecMigration] ${fileName} 웹 autosave 복호화 완료`);
   } catch (err) {
-    console.error(`[DecMigration] ${fileName} 웹 autosave 복호화 오류:`, err);
+    (window.logger?.error || console.error)(`[DecMigration] ${fileName} 웹 autosave 복호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }
@@ -2755,7 +2803,7 @@ async function decryptLocalStorageData(storageKey: string, typeName: string, yea
           decryptedData.push(item);
         }
       } catch (itemErr) {
-        console.warn(`[DecMigration] ${storageKey}: 항목 복호화 실패 -`, (itemErr as Error).message);
+        (window.logger?.warn || console.warn)(`[DecMigration] ${storageKey}: 항목 복호화 실패 -`, (itemErr as Error).message);
         decryptedData.push(item); // Keep original on failure
       }
 
@@ -2773,9 +2821,9 @@ async function decryptLocalStorageData(storageKey: string, typeName: string, yea
       progressBar.style.background = '#22c55e';
     }
     if (progressText) progressText.textContent = `${typeName} ${year}년 로컬 데이터 ${processed}건 평문 변환 완료!`;
-    console.log(`[DecMigration] ${storageKey}: ${processed}건 복호화 완료`);
+    (window.logger?.debug || console.log)(`[DecMigration] ${storageKey}: ${processed}건 복호화 완료`);
   } catch (err) {
-    console.error(`[DecMigration] ${storageKey} 복호화 오류:`, err);
+    (window.logger?.error || console.error)(`[DecMigration] ${storageKey} 복호화 오류:`, err);
     if (progressBar) progressBar.style.background = '#dc2626';
     if (progressText) progressText.textContent = `오류: ${(err as Error).message}`;
   }

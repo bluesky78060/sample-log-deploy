@@ -27,7 +27,7 @@ import '../shared/theme.ts';
 import '../shared/cache-manager.ts';
 
 // Main script
-import * as SettingsScript from './settings-script.ts';
+import * as SettingsScript from './settings-script';
 
 // Make functions globally available for HTML onclick handlers
 declare global {
@@ -55,15 +55,15 @@ if (false) {
  * Initialize settings page
  */
 async function initSettingsPage(): Promise<void> {
-  console.log('[Settings] Initializing settings page...');
+  (window.logger?.debug || console.log)('[Settings] Initializing settings page...');
 
   // Initialize encryption manager silently (no modal)
   if ((window as any).encryptionManager?.initSilent) {
     try {
       await (window as any).encryptionManager.initSilent();
-      console.log('[Settings] Encryption manager initialized');
+      (window.logger?.debug || console.log)('[Settings] Encryption manager initialized');
     } catch (err) {
-      console.warn('[Settings] Encryption manager init failed:', err);
+      (window.logger?.warn || console.warn)('[Settings] Encryption manager init failed:', err);
     }
   }
 
@@ -71,12 +71,12 @@ async function initSettingsPage(): Promise<void> {
   const passwordVerified = await SettingsScript.showSettingsPasswordPrompt();
 
   if (!passwordVerified) {
-    console.error('[Settings] Password verification failed - redirecting to main page');
+    (window.logger?.error || console.error)('[Settings] Password verification failed - redirecting to main page');
     window.location.href = '../index.html';
     return;
   }
 
-  console.log('[Settings] Password verified, loading settings...');
+  (window.logger?.debug || console.log)('[Settings] Password verified, loading settings...');
 
   // Check auth file status first
   await SettingsScript.checkAuthFileStatus();
@@ -91,9 +91,9 @@ async function initSettingsPage(): Promise<void> {
   if ((window as any).firebaseConfig?.initialize) {
     try {
       const initialized = await (window as any).firebaseConfig.initialize();
-      console.log('[Settings] Firebase initialization result:', initialized);
+      (window.logger?.debug || console.log)('[Settings] Firebase initialization result:', initialized);
     } catch (err) {
-      console.warn('[Settings] Firebase initialization failed:', err);
+      (window.logger?.warn || console.warn)('[Settings] Firebase initialization failed:', err);
     }
   }
 
@@ -101,9 +101,9 @@ async function initSettingsPage(): Promise<void> {
   if ((window as any).storageManager?.init) {
     try {
       await (window as any).storageManager.init();
-      console.log('[Settings] Storage manager initialized');
+      (window.logger?.debug || console.log)('[Settings] Storage manager initialized');
     } catch (err) {
-      console.warn('[Settings] Storage manager init failed:', err);
+      (window.logger?.warn || console.warn)('[Settings] Storage manager init failed:', err);
     }
   }
 
@@ -118,7 +118,7 @@ async function initSettingsPage(): Promise<void> {
   // Update UI after all initialization
   SettingsScript.updateConnectionStatus();
 
-  console.log('[Settings] Settings page initialized');
+  (window.logger?.debug || console.log)('[Settings] Settings page initialized');
 }
 
 // Initialize when DOM is ready

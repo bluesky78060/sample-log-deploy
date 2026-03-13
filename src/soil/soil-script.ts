@@ -627,12 +627,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     getReceptionNumber() {
         if (!this.receptionNumberInput) {
-            console.warn('접수번호 입력란을 찾을 수 없습니다');
+            (window.logger?.warn || console.warn)('접수번호 입력란을 찾을 수 없습니다');
             return '';
         }
         const value = this.receptionNumberInput.value.trim();
         if (!value) {
-            console.warn('접수번호가 비어있습니다');
+            (window.logger?.warn || console.warn)('접수번호가 비어있습니다');
             return '';
         }
         const parts = value.split('-');
@@ -885,12 +885,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 </div>
                 <div class="parcel-note-row">
                     <div class="parcel-form-group parcel-note-group">
-                        <label for="parcel-note-${parcel.id}">비고</label>
+                        <label for="parcel-note-${parcel.id}">기타주소</label>
                         <input type="text" class="parcel-note-input"
                                id="parcel-note-${parcel.id}"
                                name="parcel-note-${parcel.id}"
                                data-id="${parcel.id}"
-                               placeholder="필지 관련 메모"
+                               placeholder="예: 1동, 2동"
                                value="${escapeHTML(parcel.note || '')}">
                     </div>
                 </div>
@@ -1674,6 +1674,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 name: formData.get('name'),
                 phoneNumber: formData.get('phoneNumber'),
                 address: formData.get('address'),
+                addressPostcode: formData.get('addressPostcode') as string || '',
+                addressRoad: formData.get('addressRoad') as string || '',
+                addressDetail: formData.get('addressDetail') as string || '',
                 subCategory: formData.get('subCategory') || '-',
                 purpose: formData.get('purpose'),
                 receptionMethod: formData.get('receptionMethod') || '-',
@@ -1766,6 +1769,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 name: formData.get('name'),
                 phoneNumber: formData.get('phoneNumber'),
                 address: formData.get('address'),
+                addressPostcode: formData.get('addressPostcode') as string || '',
+                addressRoad: formData.get('addressRoad') as string || '',
+                addressDetail: formData.get('addressDetail') as string || '',
                 subCategory: effectiveSubCategory,
                 purpose: effectivePurpose,
                 receptionMethod: formData.get('receptionMethod') || '-',
@@ -1837,6 +1843,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             name: formData.get('name'),
             phoneNumber: formData.get('phoneNumber'),
             address: formData.get('address'),
+            addressPostcode: formData.get('addressPostcode') as string || '',
+            addressRoad: formData.get('addressRoad') as string || '',
+            addressDetail: formData.get('addressDetail') as string || '',
             subCategory: formData.get('subCategory') || '-',
             purpose: formData.get('purpose'),
             receptionMethod: formData.get('receptionMethod') || '-',
@@ -1990,23 +1999,21 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         document.getElementById('name').value = log.name || '';
         document.getElementById('phoneNumber').value = log.phoneNumber || '';
 
-        if (log.address) {
+        if (this.addressPostcode) this.addressPostcode.value = log.addressPostcode || '';
+        if (this.addressRoad) this.addressRoad.value = log.addressRoad || '';
+        if (this.addressDetail) this.addressDetail.value = log.addressDetail || '';
+        if (this.addressHidden) this.addressHidden.value = log.address || '';
+        // 레거시 데이터 폴백: addressRoad가 없으면 address 문자열 파싱
+        // Note: 레거시 데이터의 경우 전체 주소가 addressRoad에 들어가며,
+        // 사용자가 편집 시 다음 주소 API로 재입력하면 신규 포맷으로 저장됨
+        if (!log.addressRoad && log.address) {
             const addressMatch = log.address.match(/^\((\d{5})\)\s*(.+)$/);
             if (addressMatch) {
-                if (this.addressPostcode) this.addressPostcode.value = addressMatch[1];
-                const roadAndDetail = addressMatch[2];
-                const detailMatch = roadAndDetail.match(/^(.+?\))\s*(.*)$/);
-                if (detailMatch) {
-                    if (this.addressRoad) this.addressRoad.value = detailMatch[1];
-                    if (this.addressDetail) this.addressDetail.value = detailMatch[2];
-                } else {
-                    if (this.addressRoad) this.addressRoad.value = roadAndDetail;
-                    if (this.addressDetail) this.addressDetail.value = '';
-                }
+                if (this.addressPostcode && !this.addressPostcode.value) this.addressPostcode.value = addressMatch[1];
+                if (this.addressRoad) this.addressRoad.value = addressMatch[2];
             } else {
                 if (this.addressRoad) this.addressRoad.value = log.address;
             }
-            if (this.addressHidden) this.addressHidden.value = log.address;
         }
 
         const subCategorySelect = document.getElementById('subCategory');
@@ -2102,24 +2109,19 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         document.getElementById('name').value = firstLog.name || '';
         document.getElementById('phoneNumber').value = firstLog.phoneNumber || '';
 
-        // 주소 파싱 (기존 populateFormForEdit과 동일)
-        if (firstLog.address) {
+        // 주소 필드 (신규 데이터: 직접 사용, 레거시 데이터: address 파싱 폴백)
+        if (this.addressPostcode) this.addressPostcode.value = firstLog.addressPostcode || '';
+        if (this.addressRoad) this.addressRoad.value = firstLog.addressRoad || '';
+        if (this.addressDetail) this.addressDetail.value = firstLog.addressDetail || '';
+        if (this.addressHidden) this.addressHidden.value = firstLog.address || '';
+        if (!firstLog.addressRoad && firstLog.address) {
             const addressMatch = firstLog.address.match(/^\((\d{5})\)\s*(.+)$/);
             if (addressMatch) {
-                if (this.addressPostcode) this.addressPostcode.value = addressMatch[1];
-                const roadAndDetail = addressMatch[2];
-                const detailMatch = roadAndDetail.match(/^(.+?\))\s*(.*)$/);
-                if (detailMatch) {
-                    if (this.addressRoad) this.addressRoad.value = detailMatch[1];
-                    if (this.addressDetail) this.addressDetail.value = detailMatch[2];
-                } else {
-                    if (this.addressRoad) this.addressRoad.value = roadAndDetail;
-                    if (this.addressDetail) this.addressDetail.value = '';
-                }
+                if (this.addressPostcode && !this.addressPostcode.value) this.addressPostcode.value = addressMatch[1];
+                if (this.addressRoad) this.addressRoad.value = addressMatch[2];
             } else {
                 if (this.addressRoad) this.addressRoad.value = firstLog.address;
             }
-            if (this.addressHidden) this.addressHidden.value = firstLog.address;
         }
 
         const subCategorySelect = document.getElementById('subCategory');
@@ -2596,10 +2598,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     openLabelPrintWithData(logs) {
         const labelData = logs.map(log => {
-            const addressFull = log.address || '';
-            const zipMatch = addressFull.match(/^\((\d{5})\)\s*/);
-            const postalCode = zipMatch ? zipMatch[1] : '';
-            const address = zipMatch ? addressFull.replace(zipMatch[0], '') : addressFull;
+            const postalCode = log.addressPostcode || (log.address?.match(/^\((\d{5})\)/)?.[1] ?? '');
+            const address = log.addressRoad
+                ? [log.addressRoad, log.addressDetail].filter(Boolean).join(' ')
+                : (log.address?.replace(/^\(\d{5}\)\s*/, '') || '');
             return { name: log.name || '', address: address, postalCode: postalCode };
         });
 
@@ -2669,6 +2671,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                     ).join(', ');
                     parcelDiv.appendChild(subLotsDiv);
                 }
+
+                const noteDiv = document.createElement('div');
+                noteDiv.className = 'text-sm';
+                noteDiv.textContent = '기타주소: ' + (parcel.note || '-');
+                parcelDiv.appendChild(noteDiv);
 
                 if (parcel.crops && parcel.crops.length > 0) {
                     const cropList = document.createElement('div');
@@ -2867,7 +2874,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 const separatorTr = document.createElement('tr');
                 separatorTr.className = 'farm-separator';
                 const separatorTd = document.createElement('td');
-                separatorTd.colSpan = 17;
+                separatorTd.colSpan = 18;
                 separatorTr.appendChild(separatorTd);
                 fragment.appendChild(separatorTr);
             }
@@ -2878,10 +2885,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             tr.className = isComplete ? 'row-completed' : '';
             const methodText = row.receptionMethod || '-';
 
-            const addressFull = row.address || '';
-            const zipMatch = addressFull.match(/^\((\d{5})\)\s*/);
-            const zipcode = zipMatch ? zipMatch[1] : '';
-            const addressOnly = zipMatch ? addressFull.replace(zipMatch[0], '') : addressFull;
+            const zipcode = row.addressPostcode || (row.address?.match(/^\((\d{5})\)/)?.[1] ?? '');
+            const addressOnly = row.addressRoad
+                ? [row.addressRoad, row.addressDetail].filter(Boolean).join(' ')
+                : (row.address?.replace(/^\(\d{5}\)\s*/, '') || '');
             const displayAddress = addressOnly && addressOnly !== '-' && typeof SIDO_PATTERN !== 'undefined' && SIDO_PATTERN.test(addressOnly)
                 ? addressOnly.replace(SIDO_PATTERN, '') : (addressOnly || '-');
 
@@ -2955,6 +2962,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const tdLotAddress = document.createElement('td');
             tdLotAddress.textContent = row._lotAddress;
             tr.appendChild(tdLotAddress);
+
+            // 기타주소
+            const tdEtcAddress = document.createElement('td');
+            tdEtcAddress.textContent = parcelNote || '-';
+            tr.appendChild(tdEtcAddress);
 
             // 작물
             const tdCrops = document.createElement('td');
@@ -3666,6 +3678,35 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             this.exportToExcel();
         });
 
+        // 흙토람 내보내기 버튼
+        const heuktoramBtn = document.getElementById('heuktoramBtn') as HTMLButtonElement | null;
+        if (heuktoramBtn) {
+            heuktoramBtn.addEventListener('click', () => {
+                if (heuktoramBtn.disabled) return;
+                heuktoramBtn.disabled = true;
+                setTimeout(() => { heuktoramBtn.disabled = false; }, 3000);
+
+                const selectedIds = this.getSelectedIds();
+                localStorage.setItem('heuktoram_year', this.selectedYear ?? new Date().getFullYear().toString());
+                if (selectedIds && selectedIds.length > 0) {
+                    localStorage.setItem('heuktoram_selected_ids', JSON.stringify(selectedIds));
+                }
+                const electronAPI = (window as Window & { electronAPI?: { isElectron?: boolean; openHeuktoram?: () => Promise<boolean> } }).electronAPI;
+                if (electronAPI?.isElectron === true) {
+                    electronAPI.openHeuktoram?.().finally(() => { heuktoramBtn.disabled = false; });
+                } else {
+                    const popup = window.open('../heuktoram/index.html', '_blank', 'noopener,noreferrer');
+                    if (!popup) {
+                        if (confirm('팝업이 차단되었습니다. 현재 페이지를 떠나 흙토람 페이지로 이동하시겠습니까?')) {
+                            window.location.href = '../heuktoram/index.html';
+                        } else {
+                            heuktoramBtn.disabled = false;
+                        }
+                    }
+                }
+            });
+        }
+
         // JSON 저장/불러오기
         const saveJsonBtn = document.getElementById('saveJsonBtn');
         const loadJsonInput = document.getElementById('loadJsonInput');
@@ -3785,10 +3826,15 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             ? this.sampleLogs.filter(log => selectedIds.includes(log.id)) : this.sampleLogs;
         if (selectedIds.length > 0) this.showToast(`선택한 ${logsToExport.length}건을 내보냅니다.`, 'info');
 
-        const reversedLogs = [...logsToExport].reverse();
+        const sortedLogs = [...logsToExport].sort((a, b) => {
+            const aNum = parseInt(String(a.receptionNumber).replace(/\D/g, ''), 10) || 0;
+            const bNum = parseInt(String(b.receptionNumber).replace(/\D/g, ''), 10) || 0;
+            return aNum - bNum;
+        });
+        const sanitizeCell = (window as any).SampleUtils?.sanitizeExcelCell ?? ((v: string) => v);
         const excelData = [];
 
-        reversedLogs.forEach(log => {
+        sortedLogs.forEach(log => {
             const addressParts = parseAddressParts(log.address || '');
             const fullAddress = log.address || '-';
             if (log.parcels && log.parcels.length > 0) {
@@ -3799,12 +3845,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                     const excelLotAddress = parcel.lotAddress ? (parcel.isMountain ? `${parcel.lotAddress} (산)` : parcel.lotAddress) : '-';
                     excelData.push({
                         '접수번호': log.receptionNumber, '접수일자': log.date, '구분': log.subCategory || '-',
-                        '목적(용도)': parcel.purpose || log.purpose || '-', '성명': log.name, '전화번호': log.phoneNumber,
+                        '목적(용도)': parcel.purpose || log.purpose || '-', '성명': sanitizeCell(log.name), '전화번호': log.phoneNumber,
                         '시도': addressParts.sido || '-', '시군구': addressParts.sigungu || '-',
-                        '읍면동': addressParts.eupmyeondong || '-', '나머지주소': addressParts.rest || '-',
-                        '전체주소': fullAddress, '필지 주소': excelLotAddress, '작물': cropsDisplay,
+                        '읍면동': addressParts.eupmyeondong || '-', '나머지주소': sanitizeCell(addressParts.rest || '-'),
+                        '전체주소': sanitizeCell(fullAddress), '필지 주소': sanitizeCell(excelLotAddress), '작물': cropsDisplay,
                         '면적(m²)': totalArea > 0 ? totalArea : '-', '수령 방법': log.receptionMethod || '-',
-                        '비고': log.note || '-', '완료여부': log.isComplete ? '완료' : '미완료',
+                        '비고': sanitizeCell(log.note || '-'), '완료여부': log.isComplete ? '완료' : '미완료',
                         '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
                     });
                     if (parcel.subLots && parcel.subLots.length > 0) {
@@ -3816,12 +3862,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                             excelData.push({
                                 '접수번호': `${log.receptionNumber}-${sIdx + 1}`, '접수일자': log.date,
                                 '구분': log.subCategory || '-', '목적(용도)': parcel.purpose || log.purpose || '-',
-                                '성명': log.name, '전화번호': log.phoneNumber, '시도': addressParts.sido || '-',
+                                '성명': sanitizeCell(log.name), '전화번호': log.phoneNumber, '시도': addressParts.sido || '-',
                                 '시군구': addressParts.sigungu || '-', '읍면동': addressParts.eupmyeondong || '-',
-                                '나머지주소': addressParts.rest || '-', '전체주소': fullAddress,
-                                '필지 주소': subLotAddress, '작물': subLotCropsDisplay,
+                                '나머지주소': sanitizeCell(addressParts.rest || '-'), '전체주소': sanitizeCell(fullAddress),
+                                '필지 주소': sanitizeCell(subLotAddress), '작물': subLotCropsDisplay,
                                 '면적(m²)': subLotTotalArea > 0 ? subLotTotalArea : '-',
-                                '수령 방법': log.receptionMethod || '-', '비고': log.note || '-',
+                                '수령 방법': log.receptionMethod || '-', '비고': sanitizeCell(log.note || '-'),
                                 '완료여부': log.isComplete ? '완료' : '미완료',
                                 '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
                             });
@@ -3831,12 +3877,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             } else {
                 excelData.push({
                     '접수번호': log.receptionNumber, '접수일자': log.date, '구분': log.subCategory || '-',
-                    '목적(용도)': log.purpose || '-', '성명': log.name, '전화번호': log.phoneNumber,
+                    '목적(용도)': log.purpose || '-', '성명': sanitizeCell(log.name), '전화번호': log.phoneNumber,
                     '시도': addressParts.sido || '-', '시군구': addressParts.sigungu || '-',
-                    '읍면동': addressParts.eupmyeondong || '-', '나머지주소': addressParts.rest || '-',
-                    '전체주소': fullAddress, '필지 주소': log.lotAddress || '-',
+                    '읍면동': addressParts.eupmyeondong || '-', '나머지주소': sanitizeCell(addressParts.rest || '-'),
+                    '전체주소': sanitizeCell(fullAddress), '필지 주소': log.lotAddress || '-',
                     '작물': log.cropsDisplay || '-', '면적(m²)': log.area || '-',
-                    '수령 방법': log.receptionMethod || '-', '비고': log.note || '-',
+                    '수령 방법': log.receptionMethod || '-', '비고': sanitizeCell(log.note || '-'),
                     '완료여부': log.isComplete ? '완료' : '미완료',
                     '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
                 });

@@ -3,7 +3,7 @@
  * @description 중금속 분석용 토양 시료 접수/관리 기능
  */
 
-// @ts-nocheck - Converted from JS, full typing in progress
+// TypeScript migration completed
 
 // Type declarations
 interface HeavyMetalSample {
@@ -40,7 +40,6 @@ interface HeavyMetalSample {
 // Type declarations - use `var` to avoid block-scope conflicts
 declare var SIDO_PATTERN: RegExp;
 declare var SampleUtils: any;
-declare var CROP_DATA: any;
 declare var XLSX: any;
 
 // Function declarations
@@ -222,11 +221,13 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
 
         const methodText = item.receptionMethod || '-';
 
-        // 뷰용 주소: 시도 패턴이 있을 때만 제거
-        const addressRoadVal = item.addressRoad || '-';
-        const displayAddress = addressRoadVal !== '-' && SIDO_PATTERN.test(addressRoadVal)
-            ? addressRoadVal.replace(SIDO_PATTERN, '')
-            : addressRoadVal;
+        // 뷰용 주소: addressRoad 우선, 없으면 address 폴백 + addressDetail 추가
+        const addressCombined = item.addressRoad
+            ? [item.addressRoad, item.addressDetail].filter(Boolean).join(' ')
+            : (item.address?.replace(/^\(\d{5}\)\s*/, '') || '-');
+        const displayAddress = addressCombined !== '-' && SIDO_PATTERN.test(addressCombined)
+            ? addressCombined.replace(SIDO_PATTERN, '')
+            : addressCombined;
 
         // XSS 방지
         const safeName = escapeHTML(item.name || '-');
@@ -388,7 +389,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     // 오버라이드: 폼 제출
     // ========================================
     submitForm(): void {
-        const showToast = window.showToast || ((msg: string, type: string) => console.log(msg, type));
+        const showToast = window.showToast || ((msg: string, type: string) => (window.logger?.debug || console.log)(msg, type));
 
         // 필수 필드 검증
         const name = getInput('name')?.value.trim();
@@ -482,6 +483,16 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (addressRoad) addressRoad.value = log.addressRoad || '';
         if (addressDetail) addressDetail.value = log.addressDetail || '';
         if (addressHidden) addressHidden.value = log.address || '';
+        // 레거시 데이터 폴백: addressRoad가 없으면 address 파싱
+        if (!log.addressRoad && log.address) {
+            const m = log.address.match(/^\((\d{5})\)\s*(.+)$/);
+            if (m) {
+                if (addressPostcode && !addressPostcode.value) addressPostcode.value = m[1];
+                if (addressRoad) addressRoad.value = m[2];
+            } else {
+                if (addressRoad) addressRoad.value = log.address;
+            }
+        }
 
         const samplingLocation = getInput('samplingLocation');
         const cropName = getInput('cropName');
@@ -687,7 +698,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     toggleResult(id: string): void {
         const log = this.sampleLogs.find(l => String(l.id) === String(id));
         if (!log) return;
-        if (!log.testResult || log.testResult === '') {
+        if (!log.testResult) {
             log.testResult = 'pass';
         } else if (log.testResult === 'pass') {
             log.testResult = 'fail';
@@ -725,7 +736,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         const checked = document.querySelectorAll('input[name="analysisItems"]:checked');
         const selectedItemsCount = document.getElementById('selectedItemsCount');
         if (selectedItemsCount) {
-            selectedItemsCount.textContent = checked.length;
+            selectedItemsCount.textContent = String(checked.length);
         }
     }
 
@@ -748,7 +759,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             moduleKey: 'heavyMetal',
             data: this.sampleLogs,
             webFileHandle: this.autoSaveFileHandle,
-            log: (...args) => this.log(...args)
+            log: (...args: any[]): void => this.log(...args)
         });
     }
 
@@ -764,7 +775,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             { label: '접수일자', value: logData.date },
             { label: '성명', value: logData.name },
             { label: '전화번호', value: logData.phoneNumber },
-            { label: '주소', value: logData.address || '-' },
+            { label: '주소', value: [logData.addressRoad, logData.addressDetail].filter(Boolean).join(' ') || logData.address || '-' },
             { label: '채취장소', value: logData.samplingLocation || '-' },
             { label: '재배작물', value: logData.cropName || '-' },
             { label: '수령', value: logData.treeAge ? `${logData.treeAge}년` : '-' },
@@ -776,7 +787,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             { label: '비고', value: logData.note || '-' }
         ];
 
-        BaseSampleManager.buildResultTable(resultTableBody, rows);
+        BaseSampleManager.buildResultTable(resultTableBody!, rows);
 
         const registrationResultModal = document.getElementById('registrationResultModal');
         if (registrationResultModal) {
@@ -796,14 +807,17 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     // 통계
     // ========================================
     updateStatistics(): void {
-        document.getElementById('statTotalCount').textContent = this.sampleLogs.length;
+        const statTotal = document.getElementById('statTotalCount');
+        const statCompleted = document.getElementById('statCompletedCount');
+        const statPending = document.getElementById('statPendingCount');
 
         const completed = this.sampleLogs.filter(l => l.isComplete).length;
-        document.getElementById('statCompletedCount').textContent = completed;
-        document.getElementById('statPendingCount').textContent = this.sampleLogs.length - completed;
+        if (statTotal) statTotal.textContent = String(this.sampleLogs.length);
+        if (statCompleted) statCompleted.textContent = String(completed);
+        if (statPending) statPending.textContent = String(this.sampleLogs.length - completed);
 
         // 분석항목별 통계
-        const byAnalysisItem = {};
+        const byAnalysisItem: Record<string, number> = {};
         this.ANALYSIS_ITEMS.forEach(item => byAnalysisItem[item] = 0);
         this.sampleLogs.forEach(log => {
             (log.analysisItems || []).forEach(item => {
@@ -813,7 +827,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         this.renderBarChart('statsByAnalysisItem', byAnalysisItem);
 
         // 목적별 통계
-        const byPurpose = {};
+        const byPurpose: Record<string, number> = {};
         this.sampleLogs.forEach(log => {
             const p = log.purpose || '미지정';
             byPurpose[p] = (byPurpose[p] || 0) + 1;
@@ -821,7 +835,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         this.renderBarChart('statsByPurpose', byPurpose);
 
         // 월별 집계
-        const byMonth = {};
+        const byMonth: Record<string, any> = {};
         const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
         for (let i = 1; i <= 12; i++) {
             const monthKey = String(i).padStart(2, '0');
@@ -843,7 +857,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         });
 
         // 분기별 집계
-        const byQuarter = {
+        const byQuarter: Record<string, any> = {
             Q1: { count: 0, completed: 0, pending: 0, label: '1분기 (1~3월)' },
             Q2: { count: 0, completed: 0, pending: 0, label: '2분기 (4~6월)' },
             Q3: { count: 0, completed: 0, pending: 0, label: '3분기 (7~9월)' },
@@ -858,16 +872,16 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             else if (monthNum <= 9) quarter = 'Q3';
             else quarter = 'Q4';
 
-            byQuarter[quarter].count += data.count;
-            byQuarter[quarter].completed += data.completed;
-            byQuarter[quarter].pending += data.pending;
+            byQuarter[quarter].count += (data as any).count;
+            byQuarter[quarter].completed += (data as any).completed;
+            byQuarter[quarter].pending += (data as any).pending;
         });
 
         this.renderMonthlyChart('statsByMonth', byMonth);
         this.renderQuarterlySummary('statsQuarterly', byQuarter);
 
         // 수령방법별 통계
-        const byMethod = {};
+        const byMethod: Record<string, number> = {};
         this.sampleLogs.forEach(log => {
             const m = log.receptionMethod || '미지정';
             byMethod[m] = (byMethod[m] || 0) + 1;
@@ -880,8 +894,8 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (!container) return;
 
         const entries = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0]));
-        const maxCount = Math.max(...entries.map(([, v]) => v.count), 1);
-        const totalCount = entries.reduce((sum, [, v]) => sum + v.count, 0);
+        const maxCount = Math.max(...entries.map(([, v]) => (v as any).count), 1);
+        const totalCount = entries.reduce((sum, [, v]) => sum + (v as any).count, 0);
 
         if (totalCount === 0) {
             container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
@@ -892,18 +906,19 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             <div class="monthly-chart">
                 <div class="monthly-bars">
                     ${entries.map(([key, value]) => {
-                        const heightPercent = maxCount > 0 ? (value.count / maxCount) * 100 : 0;
-                        const completedPercent = value.count > 0 ? (value.completed / value.count) * 100 : 0;
+                        const val = value as any;
+                        const heightPercent = maxCount > 0 ? (val.count / maxCount) * 100 : 0;
+                        const completedPercent = val.count > 0 ? (val.completed / val.count) * 100 : 0;
                         return `
                             <div class="monthly-bar-group">
                                 <div class="monthly-bar-container">
                                     <div class="monthly-bar-stack" style="height: ${heightPercent}%">
-                                        <div class="monthly-bar-completed" style="height: ${completedPercent}%" title="완료: ${value.completed}건"></div>
-                                        <div class="monthly-bar-pending" style="height: ${100 - completedPercent}%" title="미완료: ${value.pending}건"></div>
+                                        <div class="monthly-bar-completed" style="height: ${completedPercent}%" title="완료: ${val.completed}건"></div>
+                                        <div class="monthly-bar-pending" style="height: ${100 - completedPercent}%" title="미완료: ${val.pending}건"></div>
                                     </div>
-                                    ${value.count > 0 ? `<span class="monthly-bar-value">${value.count}</span>` : ''}
+                                    ${val.count > 0 ? `<span class="monthly-bar-value">${val.count}</span>` : ''}
                                 </div>
-                                <span class="monthly-bar-label">${value.label}</span>
+                                <span class="monthly-bar-label">${val.label}</span>
                             </div>
                         `;
                     }).join('')}
@@ -921,7 +936,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (!container) return;
 
         const entries = Object.entries(byQuarter).sort((a, b) => a[0].localeCompare(b[0]));
-        const totalCount = entries.reduce((sum, [, v]) => sum + v.count, 0);
+        const totalCount = entries.reduce((sum, [, v]) => sum + (v as any).count, 0);
 
         if (totalCount === 0) {
             container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
@@ -930,16 +945,18 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
 
         container.innerHTML = sanitizeHTML(`
             <div class="quarterly-summary">
-                ${entries.map(([key, data]) => `
+                ${entries.map(([key, data]) => {
+                    const d = data as any;
+                    return `
                     <div class="quarterly-card">
-                        <div class="quarterly-header">${data.label}</div>
-                        <div class="quarterly-count">${data.count}<span>건</span></div>
+                        <div class="quarterly-header">${d.label}</div>
+                        <div class="quarterly-count">${d.count}<span>건</span></div>
                         <div class="quarterly-details">
-                            <span class="detail-completed">완료 ${data.completed}</span>
-                            <span class="detail-pending">미완료 ${data.pending}</span>
+                            <span class="detail-completed">완료 ${d.completed}</span>
+                            <span class="detail-pending">미완료 ${d.pending}</span>
                         </div>
                     </div>
-                `).join('')}
+                `;}).join('')}
             </div>
         `);
     }
@@ -949,19 +966,19 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (!container) return;
 
         const entries = Object.entries(data);
-        const maxVal = Math.max(...entries.map(([, v]) => v), 1);
+        const maxVal = Math.max(...entries.map(([, v]) => Number(v)), 1);
 
-        const analysisClassMap = {
+        const analysisClassMap: Record<string, string> = {
             '납(Pb)': 'analysis-pb', '카드뮴(Cd)': 'analysis-cd',
             '비소(As)': 'analysis-as', '수은(Hg)': 'analysis-hg',
             '크롬(Cr)': 'analysis-cr', '구리(Cu)': 'analysis-cu',
             '니켈(Ni)': 'analysis-ni', '아연(Zn)': 'analysis-zn'
         };
-        const purposeClassMap = {
+        const purposeClassMap: Record<string, string> = {
             '농경지': 'purpose-farm', '공장부지': 'purpose-factory',
             '주거지역': 'purpose-residential', '기타': 'purpose-other'
         };
-        const methodClassMap = {
+        const methodClassMap: Record<string, string> = {
             '우편': 'method-mail', '이메일': 'method-email',
             '팩스': 'method-fax', '직접방문': 'method-visit'
         };
@@ -972,7 +989,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 <div class="stat-bar-row">
                     <span class="stat-bar-label">${label}</span>
                     <div class="stat-bar-track">
-                        <div class="stat-bar-fill ${barClass}" style="width: ${(value / maxVal) * 100}%"></div>
+                        <div class="stat-bar-fill ${barClass}" style="width: ${(Number(value) / maxVal) * 100}%"></div>
                     </div>
                     <span class="stat-bar-value">${value}</span>
                 </div>
@@ -1046,7 +1063,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     openMailDateModal(indices: string[]): void {
         this.pendingMailDateIndices = indices;
         const today = new Date().toISOString().split('T')[0];
-        const mailDateInput = document.getElementById('mailDateInput');
+        const mailDateInput = document.getElementById('mailDateInput') as HTMLInputElement;
         const mailDateInfo = document.getElementById('mailDateInfo');
         const mailDateModal = document.getElementById('mailDateModal');
         if (mailDateInput) mailDateInput.value = today;
@@ -1065,14 +1082,14 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     // ========================================
     setupReceptionMethod(): void {
         const methodBtns = document.querySelectorAll('.reception-method-btn');
-        const methodInput = document.getElementById('receptionMethod');
+        const methodInput = document.getElementById('receptionMethod') as HTMLInputElement;
 
         methodBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 methodBtns.forEach(b => b.classList.remove('active', 'selected'));
                 btn.classList.add('active', 'selected');
                 if (methodInput) {
-                    methodInput.value = btn.dataset.method;
+                    methodInput.value = (btn as HTMLElement).dataset.method || '';
                 }
             });
         });
@@ -1086,8 +1103,8 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
 
         // 오늘 날짜 설정
         const today = new Date().toISOString().split('T')[0];
-        const dateInput = document.getElementById('date');
-        const samplingDateInput = document.getElementById('samplingDate');
+        const dateInput = document.getElementById('date') as HTMLInputElement;
+        const samplingDateInput = document.getElementById('samplingDate') as HTMLInputElement;
         if (dateInput && !dateInput.value) dateInput.value = today;
         if (samplingDateInput && !samplingDateInput.value) samplingDateInput.value = today;
 
@@ -1126,7 +1143,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (selectAllItemsBtn) {
             selectAllItemsBtn.addEventListener('click', () => {
                 this.isAllSelected = !this.isAllSelected;
-                analysisCheckboxes.forEach(cb => cb.checked = this.isAllSelected);
+                analysisCheckboxes.forEach(cb => (cb as HTMLInputElement).checked = this.isAllSelected);
                 selectAllItemsBtn.textContent = this.isAllSelected ? '전체 해제' : '전체 선택';
                 this.updateSelectedItemsCount();
             });
@@ -1140,12 +1157,12 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
 
         purposeRadios.forEach(radio => {
             radio.addEventListener('change', () => {
-                const isCertification = ['무농약', '유기농', 'GAP', '저탄소'].includes(radio.value);
+                const isCertification = ['무농약', '유기농', 'GAP', '저탄소'].includes((radio as HTMLInputElement).value);
                 if (certificationNotice) {
                     certificationNotice.classList.toggle('hidden', !isCertification);
                 }
                 if (isCertification) {
-                    analysisCheckboxes.forEach(cb => cb.checked = true);
+                    analysisCheckboxes.forEach(cb => (cb as HTMLInputElement).checked = true);
                     this.isAllSelected = true;
                     if (selectAllItemsBtn) selectAllItemsBtn.textContent = '전체 해제';
                     this.updateSelectedItemsCount();
@@ -1156,11 +1173,11 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         // ========================================
         // 법인여부 선택
         // ========================================
-        const applicantTypeSelect = document.getElementById('applicantType');
+        const applicantTypeSelect = document.getElementById('applicantType') as HTMLSelectElement;
         const birthDateField = document.getElementById('birthDateField');
         const corpNumberField = document.getElementById('corpNumberField');
-        const birthDateInput = document.getElementById('birthDate');
-        const corpNumberInput = document.getElementById('corpNumber');
+        const birthDateInput = document.getElementById('birthDate') as HTMLInputElement;
+        const corpNumberInput = document.getElementById('corpNumber') as HTMLInputElement;
 
         if (applicantTypeSelect) {
             applicantTypeSelect.addEventListener('change', () => {
@@ -1216,12 +1233,12 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         // 선택 삭제
         // ========================================
         const btnBulkDelete = document.getElementById('btnBulkDelete');
-        const selectAllCheckbox = document.getElementById('selectAll');
+        const selectAllCheckbox = document.getElementById('selectAll') as HTMLInputElement;
 
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', () => {
                 const checkboxes = document.querySelectorAll('.row-checkbox');
-                checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+                checkboxes.forEach(cb => (cb as HTMLInputElement).checked = selectAllCheckbox.checked);
             });
         }
 
@@ -1229,17 +1246,17 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         const tableBody = document.getElementById('tableBody') || document.querySelector('tbody');
         if (tableBody) {
             tableBody.addEventListener('click', (e) => {
-                const nameCell = e.target.closest('.col-name');
+                const nameCell = (e.target as HTMLElement)?.closest('.col-name') as HTMLElement;
                 if (nameCell && nameCell.dataset.name) {
                     const targetName = nameCell.dataset.name;
                     const rowCheckboxes = tableBody.querySelectorAll('.row-checkbox');
-                    const targetCheckboxes = [];
+                    const targetCheckboxes: HTMLInputElement[] = [];
 
                     rowCheckboxes.forEach(cb => {
                         const tr = cb.closest('tr');
-                        const nc = tr?.querySelector('.col-name');
+                        const nc = tr?.querySelector('.col-name') as HTMLElement;
                         if (nc && nc.dataset.name === targetName) {
-                            targetCheckboxes.push(cb);
+                            targetCheckboxes.push(cb as HTMLInputElement);
                         }
                     });
 
@@ -1259,7 +1276,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
 
             // 개별 체크박스 변경 시 전체 선택 상태 갱신
             tableBody.addEventListener('change', (e) => {
-                if (e.target.classList.contains('row-checkbox')) {
+                if ((e.target as HTMLElement)?.classList.contains('row-checkbox')) {
                     const allBoxes = tableBody.querySelectorAll('.row-checkbox');
                     const checkedBoxes = tableBody.querySelectorAll('.row-checkbox:checked');
                     if (selectAllCheckbox) {
@@ -1279,7 +1296,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 }
 
                 if (confirm(`${checked.length}건의 데이터를 삭제하시겠습니까?`)) {
-                    const selectedIds = Array.from(checked).map(cb => cb.dataset.id).filter(id => id);
+                    const selectedIds = Array.from(checked).map(cb => (cb as HTMLElement).dataset.id).filter(id => id);
 
                     this.sampleLogs = this.sampleLogs.filter(l => !selectedIds.includes(String(l.id)));
                     this.listViewStale = true;
@@ -1290,7 +1307,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                     // Firebase에서도 삭제
                     if (selectedIds.length > 0 && window.firestoreDb?.isEnabled()) {
                         Promise.all(selectedIds.map(id =>
-                            window.firestoreDb.delete('heavyMetal', parseInt(this.selectedYear), id)
+                            (window.firestoreDb as any).delete('heavyMetal', this.selectedYear, String(id))
                         ))
                             .then(() => this.log('Firebase 일괄 삭제 완료:', selectedIds.length, '건'))
                             .catch(err => (window.logger?.error || console.error)('Firebase 일괄 삭제 실패:', err));
@@ -1316,7 +1333,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
 
         if (confirmMailDateBtn) {
             confirmMailDateBtn.addEventListener('click', () => {
-                const mailDateInput = document.getElementById('mailDateInput');
+                const mailDateInput = document.getElementById('mailDateInput') as HTMLInputElement;
                 const inputDate = mailDateInput?.value;
 
                 if (!inputDate) {
@@ -1353,7 +1370,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                     showToast('발송일자를 입력할 항목을 선택해주세요.', 'warning');
                     return;
                 }
-                const ids = Array.from(checked).map(cb => cb.dataset.id).filter(id => id);
+                const ids = Array.from(checked).map(cb => (cb as HTMLElement).dataset.id).filter((id): id is string => !!id);
                 this.openMailDateModal(ids);
             });
         }
@@ -1379,7 +1396,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         }
 
         [closeStatisticsModal, closeStatisticsBtn].forEach(btn => {
-            btn?.addEventListener('click', () => statisticsModal.classList.add('hidden'));
+            btn?.addEventListener('click', () => statisticsModal?.classList.add('hidden'));
         });
         statisticsModal?.querySelector('.modal-overlay')?.addEventListener('click', () => {
             statisticsModal.classList.add('hidden');
@@ -1398,7 +1415,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 }
 
                 const selectedData = Array.from(checked).map(cb => {
-                    const id = cb.dataset.id;
+                    const id = (cb as HTMLElement).dataset.id;
                     return this.sampleLogs.find(l => String(l.id) === String(id));
                 }).filter(Boolean);
 
@@ -1454,7 +1471,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                     '접수일자': d.date,
                     '성명': d.name,
                     '전화번호': d.phoneNumber,
-                    '주소': d.address || '-',
+                    '주소': [d.addressRoad, d.addressDetail].filter(Boolean).join(' ') || d.address || '-',
                     '채취장소': d.samplingLocation || '-',
                     '재배작물': d.cropName || '-',
                     '수령': d.treeAge ? `${d.treeAge}년` : '-',
@@ -1483,7 +1500,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (exportBtn) {
             exportBtn.addEventListener('click', async () => {
                 if (window.encryptionManager?.isReady()) {
-                    const verified = await window.encryptionManager.verifyPasswordForExport();
+                    const verified = await (window.encryptionManager as any).verifyPasswordForExport();
                     if (!verified) return;
                 }
                 this.exportToExcel();
@@ -1505,7 +1522,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         SampleUtils.setupJSONLoadHandler({
             inputElement: document.getElementById('loadJsonInput'),
             getData: () => this.sampleLogs,
-            setData: (data) => { this.sampleLogs = data; },
+            setData: (data: any) => { this.sampleLogs = data; },
             saveData: () => this.saveLogs(),
             renderData: () => this.filterAndRenderLogs(),
             showToast: showToast
@@ -1519,7 +1536,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             FileAPI: this.FileAPI,
             selectedYear: this.selectedYear,
             getWebFileHandle: () => this.autoSaveFileHandle,
-            setWebFileHandle: (handle) => { this.autoSaveFileHandle = handle; },
+            setWebFileHandle: (handle: any) => { this.autoSaveFileHandle = handle; },
             autoSaveCallback: () => this.autoSaveToFile(),
             showToast: showToast
         });
@@ -1528,10 +1545,10 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             moduleKey: 'heavyMetal',
             FileAPI: this.FileAPI,
             getWebFileHandle: () => this.autoSaveFileHandle,
-            setWebFileHandle: (handle) => { this.autoSaveFileHandle = handle; },
+            setWebFileHandle: (handle: any) => { this.autoSaveFileHandle = handle; },
             autoSaveCallback: () => this.autoSaveToFile(),
             showToast: showToast,
-            log: (...args) => this.log(...args)
+            log: (...args: any[]): void => this.log(...args)
         });
 
         // ========================================
@@ -1554,7 +1571,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (!samplingLocationInput || !samplingLocationAutocomplete) return;
 
         samplingLocationInput.addEventListener('input', (e) => {
-            const value = e.target.value.trim();
+            const value = (e.target as HTMLInputElement)?.value.trim();
             samplingLocationAutocomplete.innerHTML = '';
             samplingLocationAutocomplete.classList.remove('show');
 
@@ -1565,7 +1582,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             if (typeof suggestRegionVillages === 'function') {
                 const suggestions = suggestRegionVillages(value, null, true);
                 if (suggestions.length > 0) {
-                    samplingLocationAutocomplete.innerHTML = sanitizeHTML(suggestions.slice(0, 20).map(suggestion => `
+                    samplingLocationAutocomplete.innerHTML = sanitizeHTML(suggestions.slice(0, 20).map((suggestion: any) => `
                         <li data-village="${suggestion.village}" data-district="${suggestion.district}" data-region-key="${suggestion.regionKey}" data-region="${suggestion.region || ''}" data-is-mountain="${suggestion.isMountain}">
                             ${suggestion.displayText}
                         </li>
@@ -1578,7 +1595,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         samplingLocationInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const value = samplingLocationInput.value.trim();
+                const value = (samplingLocationInput as HTMLInputElement).value.trim();
 
                 if (this.GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) {
                     samplingLocationAutocomplete.innerHTML = '';
@@ -1590,14 +1607,14 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                     const result = parseParcelAddress(value);
                     if (result) {
                         if (result.isDuplicate && result.locations) {
-                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.locations.map(loc => `
+                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.locations.map((loc: any) => `
                                 <li data-village="${result.villageName}" data-district="${loc.district}" data-region-key="${loc.regionKey}" data-lot="${result.lotNumber || ''}">
                                     ${loc.fullAddress} ${result.lotNumber || ''}
                                 </li>
                             `).join(''));
                             samplingLocationAutocomplete.classList.add('show');
                         } else if (result.alternatives && result.alternatives.length > 1) {
-                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.alternatives.map(district => `
+                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.alternatives.map((district: any) => `
                                 <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber || ''}" data-region-key="${result.regionKey}">
                                     ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
                                 </li>
@@ -1606,7 +1623,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                         } else if (result.fullAddress) {
                             samplingLocationAutocomplete.innerHTML = '';
                             samplingLocationAutocomplete.classList.remove('show');
-                            samplingLocationInput.value = result.fullAddress;
+                            (samplingLocationInput as HTMLInputElement).value = result.fullAddress;
                         }
                     }
                 }
@@ -1614,19 +1631,20 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         });
 
         samplingLocationAutocomplete.addEventListener('click', (e) => {
-            if (e.target.tagName === 'LI') {
-                const village = e.target.dataset.village;
-                const district = e.target.dataset.district;
-                const regionKey = e.target.dataset.regionKey;
-                const isMountain = e.target.dataset.isMountain === 'true';
-                const lot = e.target.dataset.lot;
+            const target = e.target as HTMLElement;
+            if (target?.tagName === 'LI') {
+                const village = target.dataset.village;
+                const district = target.dataset.district;
+                const regionKey = target.dataset.regionKey || '';
+                const isMountain = target.dataset.isMountain === 'true';
+                const lot = target.dataset.lot;
 
-                const LOCAL_REGIONS = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
-                const region = e.target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
+                const LOCAL_REGIONS: Record<string, string> = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
+                const region = target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
 
                 const villageWithMountain = isMountain ? `${village} 산` : village;
 
-                const currentValue = samplingLocationInput.value.trim();
+                const currentValue = (samplingLocationInput as HTMLInputElement).value.trim();
                 const match = currentValue.match(/\d+(-\d+)?$/);
                 const lotNumber = lot || (match ? match[0] : '');
 
@@ -1634,7 +1652,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                     ? `${region} ${district} ${villageWithMountain} ${lotNumber}`
                     : `${region} ${district} ${villageWithMountain}`;
 
-                samplingLocationInput.value = fullAddress;
+                (samplingLocationInput as HTMLInputElement).value = fullAddress;
                 samplingLocationAutocomplete.innerHTML = '';
                 samplingLocationAutocomplete.classList.remove('show');
             }
@@ -1666,16 +1684,16 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         const cropCategoryFilter = document.getElementById('cropCategoryFilter');
         const cropResultCount = document.getElementById('cropResultCount');
 
-        let selectedCrop = null;
+        let selectedCrop: string | null = null;
 
         searchCropBtn.addEventListener('click', () => {
-            cropModal.classList.remove('hidden');
-            if (cropSearchInput) cropSearchInput.focus();
+            cropModal?.classList.remove('hidden');
+            if (cropSearchInput) (cropSearchInput as HTMLInputElement).focus();
             renderCropList();
         });
 
         function closeCropModalFn() {
-            cropModal.classList.add('hidden');
+            cropModal?.classList.add('hidden');
         }
 
         if (closeCropModal) closeCropModal.addEventListener('click', closeCropModalFn);
@@ -1683,13 +1701,14 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         cropModal.querySelector('.modal-overlay')?.addEventListener('click', closeCropModalFn);
 
         function renderCropList() {
-            if (!cropList || typeof CROP_DATA === 'undefined') return;
+            if (!cropList || typeof (window as any).CROP_DATA === 'undefined') return;
+            const CROP_DATA = (window as any).CROP_DATA;
 
-            const searchTerm = cropSearchInput?.value.toLowerCase() || '';
-            const category = cropCategoryFilter?.value || '전체';
-            let crops = [];
+            const searchTerm = (cropSearchInput as HTMLInputElement)?.value.toLowerCase() || '';
+            const category = (cropCategoryFilter as HTMLSelectElement)?.value || '전체';
+            let crops: string[] = [];
 
-            if (cropCategoryFilter && cropCategoryFilter.options.length === 1) {
+            if (cropCategoryFilter && (cropCategoryFilter as HTMLSelectElement).options.length === 1) {
                 Object.keys(CROP_DATA).forEach(cat => {
                     const option = document.createElement('option');
                     option.value = cat;
@@ -1699,7 +1718,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             }
 
             if (category === '전체') {
-                Object.values(CROP_DATA).forEach(arr => crops.push(...arr));
+                Object.values(CROP_DATA).forEach((arr: any) => crops.push(...arr));
             } else {
                 crops = CROP_DATA[category] || [];
             }
@@ -1731,7 +1750,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         if (confirmCropSelection) {
             confirmCropSelection.addEventListener('click', () => {
                 if (selectedCrop && cropNameInput) {
-                    cropNameInput.value = selectedCrop;
+                    (cropNameInput as HTMLInputElement).value = selectedCrop;
                 }
                 closeCropModalFn();
             });
@@ -1745,20 +1764,20 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         const listSearchModal = document.getElementById('listSearchModal');
         const openSearchModalBtn = document.getElementById('openSearchModalBtn');
         const closeSearchModal = document.getElementById('closeSearchModal');
-        const searchDateFromInput = document.getElementById('searchDateFromInput');
-        const searchDateToInput = document.getElementById('searchDateToInput');
-        const searchNameInput = document.getElementById('searchNameInput');
-        const searchReceptionFromInput = document.getElementById('searchReceptionFromInput');
-        const searchReceptionToInput = document.getElementById('searchReceptionToInput');
+        const searchDateFromInput = document.getElementById('searchDateFromInput') as HTMLInputElement;
+        const searchDateToInput = document.getElementById('searchDateToInput') as HTMLInputElement;
+        const searchNameInput = document.getElementById('searchNameInput') as HTMLInputElement;
+        const searchReceptionFromInput = document.getElementById('searchReceptionFromInput') as HTMLInputElement;
+        const searchReceptionToInput = document.getElementById('searchReceptionToInput') as HTMLInputElement;
         const clearSearchDate = document.getElementById('clearSearchDate');
         const clearSearchReception = document.getElementById('clearSearchReception');
         const applySearchBtn = document.getElementById('applySearchBtn');
         const resetSearchBtn = document.getElementById('resetSearchBtn');
-        const completedFilter = document.getElementById('completedFilter');
+        const completedFilter = document.getElementById('completedFilter') as HTMLSelectElement;
 
         if (completedFilter) {
             completedFilter.addEventListener('change', (e) => {
-                this.currentSearchFilter.completed = e.target.value;
+                this.currentSearchFilter.completed = (e.target as HTMLSelectElement)?.value as 'all' | 'completed' | 'incomplete';
                 this.filterAndRenderLogs();
             });
         }
@@ -1776,10 +1795,10 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         }
 
         if (closeSearchModal) {
-            closeSearchModal.addEventListener('click', () => listSearchModal.classList.add('hidden'));
+            closeSearchModal.addEventListener('click', () => listSearchModal?.classList.add('hidden'));
         }
         listSearchModal?.querySelector('.modal-overlay')?.addEventListener('click', () => {
-            listSearchModal.classList.add('hidden');
+            listSearchModal?.classList.add('hidden');
         });
 
         if (clearSearchDate) {
@@ -1804,7 +1823,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 this.currentSearchFilter.receptionFrom = searchReceptionFromInput ? searchReceptionFromInput.value : '';
                 this.currentSearchFilter.receptionTo = searchReceptionToInput ? searchReceptionToInput.value : '';
                 this.filterAndRenderLogs();
-                listSearchModal.classList.add('hidden');
+                listSearchModal?.classList.add('hidden');
             });
         }
 
@@ -1819,7 +1838,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', completed: 'incomplete' };
                 this.filterAndRenderLogs();
                 this.updateSearchButtonState();
-                listSearchModal.classList.add('hidden');
+                listSearchModal?.classList.add('hidden');
             });
         }
 
@@ -1844,7 +1863,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             return;
         }
 
-        const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.dataset.id);
+        const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => (cb as HTMLElement).dataset.id);
         const logsToExport = selectedIds.length > 0
             ? this.sampleLogs.filter(log => selectedIds.includes(String(log.id)))
             : this.sampleLogs;
@@ -1853,7 +1872,14 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             showToast(`선택한 ${logsToExport.length}건을 내보냅니다.`, 'info');
         }
 
-        const exportData = logsToExport.map(log => {
+        const sortedLogs = [...logsToExport].sort((a, b) => {
+            const aNum = parseInt(String(a.receptionNumber).replace(/\D/g, ''), 10) || 0;
+            const bNum = parseInt(String(b.receptionNumber).replace(/\D/g, ''), 10) || 0;
+            return aNum - bNum;
+        });
+
+        const sanitizeCell = (window as any).SampleUtils?.sanitizeExcelCell ?? ((v: string) => v);
+        const exportData = sortedLogs.map(log => {
             const isAllItems = log.analysisItems && log.analysisItems.length === this.ANALYSIS_ITEMS.length;
             const analysisDisplay = !log.analysisItems || log.analysisItems.length === 0
                 ? '-'
@@ -1868,7 +1894,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             return {
                 '접수번호': log.receptionNumber || '-',
                 '접수일자': log.date || '-',
-                '성명': log.name || '-',
+                '성명': sanitizeCell(log.name || '-'),
                 '법인여부': applicantType,
                 '생년월일/법인번호': birthOrCorp,
                 '연락처': log.phoneNumber || '-',
@@ -1876,17 +1902,17 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 '시도': addressParts.sido || '-',
                 '시군구': addressParts.sigungu || '-',
                 '읍면동': addressParts.eupmyeondong || '-',
-                '나머지주소': (addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-',
-                '전체주소': fullAddress,
-                '시료채취장소': log.samplingLocation || '-',
-                '재배작물': log.cropName || '-',
+                '나머지주소': sanitizeCell((addressParts.rest + (log.addressDetail ? ' ' + log.addressDetail : '')).trim() || '-'),
+                '전체주소': sanitizeCell(fullAddress),
+                '시료채취장소': sanitizeCell(log.samplingLocation || '-'),
+                '재배작물': sanitizeCell(log.cropName || '-'),
                 '과수년생': log.treeAge || '-',
                 '채취일': log.samplingDate || '-',
                 '시료수': log.sampleCount || '-',
                 '분석항목': analysisDisplay,
                 '목적': log.purpose || '-',
                 '수령방법': log.receptionMethod || '-',
-                '비고': log.note || '-',
+                '비고': sanitizeCell(log.note || '-'),
                 '완료여부': log.isComplete ? '완료' : '미완료',
                 '등록일시': log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'
             };
@@ -1916,11 +1942,11 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     setupExcelImport(): void {
         const ANALYSIS_ITEMS = this.ANALYSIS_ITEMS;
 
-        const parseAnalysisItems = (val) => {
+        const parseAnalysisItems = (val: any): string[] => {
             if (!val) return ANALYSIS_ITEMS.slice();
             const str = String(val).trim();
             if (str === '전항목' || str === '전체' || str === 'all') return ANALYSIS_ITEMS.slice();
-            return str.split(/[,\s]+/).filter(item => ANALYSIS_ITEMS.includes(item.trim())).map(item => item.trim());
+            return str.split(/[,\s]+/).filter((item: string) => ANALYSIS_ITEMS.includes(item.trim())).map((item: string) => item.trim());
         };
 
         const excelImporter = new ExcelImportManager({
@@ -1972,7 +1998,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 { key: 'purpose', label: '목적' },
                 { key: 'note', label: '비고' }
             ],
-            renderPreviewCell: (record, key) => {
+            renderPreviewCell: (record: any, key: string) => {
                 if (key === 'analysisItems') {
                     const items = record.analysisItems;
                     return escapeHTML(items.length === ANALYSIS_ITEMS.length ? '전항목' : items.join(', '));
@@ -1980,15 +2006,15 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                 return undefined;
             },
             getCommonData: () => ({
-                date: document.getElementById('importDate').value || new Date().toISOString().slice(0, 10),
-                name: document.getElementById('importName').value.trim(),
-                phone: document.getElementById('importPhone').value.trim(),
-                address: document.getElementById('importAddress').value.trim(),
-                method: document.getElementById('importMethod').value,
-                purpose: document.getElementById('importPurpose').value,
+                date: (document.getElementById('importDate') as HTMLInputElement)?.value || new Date().toISOString().slice(0, 10),
+                name: (document.getElementById('importName') as HTMLInputElement)?.value.trim(),
+                phone: (document.getElementById('importPhone') as HTMLInputElement)?.value.trim(),
+                address: (document.getElementById('importAddress') as HTMLInputElement)?.value.trim(),
+                method: (document.getElementById('importMethod') as HTMLSelectElement)?.value,
+                purpose: (document.getElementById('importPurpose') as HTMLSelectElement)?.value,
                 now: new Date().toISOString()
             }),
-            buildRecord: (getVal, parseExcelDate, common) => {
+            buildRecord: (getVal: any, parseExcelDate: any, common: any) => {
                 const receptionNumber = getVal('receptionNumber') || '';
                 const dateVal = getVal('date');
                 const date = parseExcelDate(dateVal) || common.date;
@@ -2014,15 +2040,15 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
                     isComplete: false, createdAt: common.now
                 };
             },
-            skipRowCheck: (record, rowIdx) => {
+            skipRowCheck: (record: any, rowIdx: number) => {
                 if (!record.samplingLocation && !record.cropName && !record.name) {
                     return `행 ${rowIdx + 2}: 채취지, 작물명, 성명이 모두 비어 있어 건너뜁니다.`;
                 }
                 return null;
             },
             getExistingLogs: () => this.sampleLogs,
-            onImportComplete: (records) => {
-                records.forEach(logEntry => {
+            onImportComplete: (records: any[]) => {
+                records.forEach((logEntry: any) => {
                     logEntry.id = SampleUtils.generateUUID();
                     this.sampleLogs.push(logEntry);
                 });

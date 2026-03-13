@@ -135,7 +135,7 @@ export const DEBUG: boolean = (() => {
 /**
  * 앱 버전
  */
-export const APP_VERSION: string = '1.8.0';
+export const APP_VERSION: string = '1.9.0';
 
 /**
  * 페이지네이션 관련 상수
@@ -261,27 +261,7 @@ export const APPLICANT_TYPE: ApplicantTypeConfig = {
 // Window 전역 할당
 // ========================================
 
-declare global {
-    interface Window {
-        APP_CONSTANTS: AppConstants;
-        DEBUG: boolean;
-        APP_VERSION: string;
-        PAGINATION: PaginationConfig;
-        TIMER: TimerConfig;
-        AUTOCOMPLETE: AutocompleteConfig;
-        STORAGE: StorageConfig;
-        FILE: FileConfig;
-        VALIDATION: ValidationConfig;
-        YEAR: YearConfig;
-        SAMPLE_TYPE_CODE: SampleTypeCodeConfig;
-        SAMPLE_TYPE_NAME: SampleTypeNameConfig;
-        STORAGE_KEY_PREFIX: StorageKeyPrefixConfig;
-        RECEPTION_METHOD: ReceptionMethodConfig;
-        APPLICANT_TYPE: ApplicantTypeConfig;
-    }
-}
-
-// 전역으로 내보내기
+// 전역으로 내보내기 (타입 충돌 방지를 위해 as any 사용)
 (window as any).APP_CONSTANTS = {
     DEBUG,
     APP_VERSION,

@@ -113,7 +113,7 @@ const DEBUG_STORAGE: boolean = false;
 /** 조건부 로깅 */
 const logStorage = (...args: unknown[]): void => {
     if (DEBUG_STORAGE) {
-        console.log('[Storage]', ...args);
+        (window.logger?.debug || console.log)('[Storage]', ...args);
     }
 };
 

@@ -70,7 +70,7 @@ class UpdateNotifier {
         if (window.electronAPI?.quitAndInstall) {
             window.electronAPI.quitAndInstall();
         } else {
-            console.log('자동 업데이트 API를 사용할 수 없습니다.');
+            (window.logger?.debug || console.log)('자동 업데이트 API를 사용할 수 없습니다.');
         }
     }
 

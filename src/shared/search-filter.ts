@@ -49,16 +49,6 @@ export interface SearchFilterNamespace {
     highlight: (text: unknown, searchTerm: string) => string;
 }
 
-// Window 전역 타입 확장
-declare global {
-    interface Window {
-        SearchFilter: SearchFilterNamespace;
-        TIMER?: {
-            DEBOUNCE_DELAY?: number;
-        };
-    }
-}
-
 /**
  * 검색 필터 생성기
  * @param options - 설정 옵션
@@ -285,8 +275,8 @@ function highlightSearchTerm(text: unknown, searchTerm: string): string {
     return String(text).replace(regex, '<mark class="search-highlight">$1</mark>');
 }
 
-// 전역으로 내보내기
-window.SearchFilter = {
+// 전역으로 내보내기 (타입 충돌 방지를 위해 as any 사용)
+(window as any).SearchFilter = {
     create: createSearchFilter,
     setupDebounce: setupSearchDebounce,
     setupReset: setupSearchReset,

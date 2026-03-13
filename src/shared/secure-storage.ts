@@ -11,7 +11,7 @@
 /**
  * 보안 수준 타입
  */
-type SecurityLevel = 'high' | 'medium' | 'low';
+type SecurityLevel = 'high' | 'low';
 
 /**
  * SecureStorage 인터페이스
@@ -47,7 +47,9 @@ class SecureStorage implements ISecureStorage {
         this.cryptoAvailable = typeof crypto !== 'undefined' && !!crypto.subtle;
 
         if (!this.cryptoAvailable) {
-            console.warn('[SecureStorage] Web Crypto API를 사용할 수 없습니다. 폴백 모드로 동작합니다.');
+            (window.logger?.error || console.error)('[SecureStorage] ⚠️ Web Crypto API를 사용할 수 없습니다.');
+            (window.logger?.error || console.error)('[SecureStorage] ⚠️ 민감한 데이터 암호화가 불가능합니다.');
+            (window.logger?.error || console.error)('[SecureStorage] ⚠️ 최신 브라우저를 사용하거나 HTTPS 환경에서 실행하세요.');
         }
     }
 
@@ -70,7 +72,7 @@ class SecureStorage implements ISecureStorage {
 
             return key;
         } catch (error) {
-            console.error('[SecureStorage] 키 생성/복원 실패:', error);
+            (window.logger?.error || console.error)('[SecureStorage] 키 생성/복원 실패:', error);
             // 메모리에만 존재하는 임시 키
             return this.generateRandomKey();
         }
@@ -161,37 +163,28 @@ class SecureStorage implements ISecureStorage {
     }
 
     /**
-     * 간단한 XOR 암호화 (폴백)
+     * 안전하지 않은 폴백 암호화 (더 이상 사용하지 않음)
+     * Web Crypto API가 없을 때는 민감한 데이터를 암호화하지 않습니다.
+     *
+     * @deprecated XOR 암호화는 암호학적으로 취약하므로 제거됨
      * @private
      */
-    private xorEncrypt(data: unknown, key: string): string {
-        const dataStr = JSON.stringify(data);
-        let encrypted = '';
-
-        for (let i = 0; i < dataStr.length; i++) {
-            encrypted += String.fromCharCode(
-                dataStr.charCodeAt(i) ^ key.charCodeAt(i % key.length)
-            );
-        }
-
-        return btoa(encrypted);
+    private unsafeFallbackEncrypt(data: unknown): string {
+        // 경고: 암호화 없이 Base64 인코딩만 수행
+        // 이것은 암호화가 아니며, 단순 난독화일 뿐입니다
+        (window.logger?.warn || console.warn)('[SecureStorage] ⚠️ 암호화 없이 데이터를 저장합니다 (보안 취약)');
+        return btoa(JSON.stringify(data));
     }
 
     /**
-     * 간단한 XOR 복호화 (폴백)
+     * 안전하지 않은 폴백 복호화
+     *
+     * @deprecated
      * @private
      */
-    private xorDecrypt<T = unknown>(encryptedData: string, key: string): T {
-        const encrypted = atob(encryptedData);
-        let decrypted = '';
-
-        for (let i = 0; i < encrypted.length; i++) {
-            decrypted += String.fromCharCode(
-                encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)
-            );
-        }
-
-        return JSON.parse(decrypted) as T;
+    private unsafeFallbackDecrypt<T = unknown>(encodedData: string): T {
+        (window.logger?.warn || console.warn)('[SecureStorage] ⚠️ 암호화되지 않은 데이터를 읽습니다');
+        return JSON.parse(atob(encodedData)) as T;
     }
 
     /**
@@ -207,13 +200,16 @@ class SecureStorage implements ISecureStorage {
             if (this.cryptoAvailable) {
                 encrypted = await this.encryptWithCrypto(data);
             } else {
-                encrypted = this.xorEncrypt(data, this.encryptionKey);
+                // Web Crypto API 없음 - 보안상 저장 거부
+                (window.logger?.error || console.error)('[SecureStorage] ❌ Web Crypto API 미지원 - 민감한 데이터 저장 거부');
+                (window as any).showToast?.('보안 기능을 사용할 수 없습니다. 브라우저를 업데이트해주세요.', 'error');
+                return false;
             }
 
             localStorage.setItem(`secure_${key}`, encrypted);
             return true;
         } catch (error) {
-            console.error('[SecureStorage] 저장 실패:', error);
+            (window.logger?.error || console.error)('[SecureStorage] 저장 실패:', error);
             return false;
         }
     }
@@ -234,10 +230,17 @@ class SecureStorage implements ISecureStorage {
             if (this.cryptoAvailable) {
                 return await this.decryptWithCrypto<T>(encrypted);
             } else {
-                return this.xorDecrypt<T>(encrypted, this.encryptionKey);
+                // Web Crypto API 없음 - 레거시 데이터 읽기 시도 (마이그레이션용)
+                (window.logger?.warn || console.warn)('[SecureStorage] ⚠️ Web Crypto API 미지원 - 레거시 데이터 읽기 시도');
+                try {
+                    return this.unsafeFallbackDecrypt<T>(encrypted);
+                } catch {
+                    (window.logger?.error || console.error)('[SecureStorage] ❌ 레거시 데이터 읽기 실패');
+                    return null;
+                }
             }
         } catch (error) {
-            console.error('[SecureStorage] 읽기 실패:', error);
+            (window.logger?.error || console.error)('[SecureStorage] 읽기 실패:', error);
             return null;
         }
     }
@@ -290,7 +293,7 @@ class SecureStorage implements ISecureStorage {
 
             return true;
         } catch (error) {
-            console.error('[SecureStorage] 키 회전 실패:', error);
+            (window.logger?.error || console.error)('[SecureStorage] 키 회전 실패:', error);
             return false;
         }
     }
@@ -301,11 +304,9 @@ class SecureStorage implements ISecureStorage {
      */
     getSecurityLevel(): SecurityLevel {
         if (this.cryptoAvailable) {
-            return 'high'; // Web Crypto API 사용
-        } else if (this.encryptionKey && this.encryptionKey.length > 20) {
-            return 'medium'; // XOR with strong key
+            return 'high'; // Web Crypto API 사용 (AES-GCM 암호화)
         } else {
-            return 'low'; // XOR with weak key
+            return 'low'; // Web Crypto API 없음 (암호화 없음, 보안 취약)
         }
     }
 }

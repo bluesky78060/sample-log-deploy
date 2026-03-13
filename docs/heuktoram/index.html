@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light" data-sample-type="heuktoram">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>흙토람 토양검정 내보내기</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+  <script type="module" crossorigin src="../assets/heuktoram-Cg4dNhH-.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/theme-CY3TWZmv.js">
+  <link rel="modulepreload" crossorigin href="../assets/bonghwaData-Ckmi6uJe.js">
+  <link rel="modulepreload" crossorigin href="../assets/toast-BwdSIJOp.js">
+  <link rel="stylesheet" crossorigin href="../assets/bonghwaData-D469hVo0.css">
+  <link rel="stylesheet" crossorigin href="../assets/heuktoram-CJAdsgLZ.css">
+  <link rel="stylesheet" crossorigin href="../assets/tailwind-output-uwpTj9PQ.css">
+</head>
+
+<body class="heuktoram-page">
+    <!-- 네비게이션 바 -->
+    <nav class="navbar heuktoram-navbar">
+        <!-- 뒤로가기 버튼 -->
+        <button type="button" class="back-btn" id="backBtn" title="이전 페이지로"><span class="material-icons-outlined">arrow_back</span></button>
+        <!-- 로고 -->
+        <div class="navbar-brand">
+            <span class="brand-icon">🌾</span>
+            <span class="brand-text">흙토람 내보내기</span>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 툴바: 연도, 채취년도, 시료채취자, 토양검정일, 용도구분 -->
+        <div class="navbar-actions heuktoram-toolbar">
+            <select id="yearSelect" class="toolbar-select" style="display:none;"></select>
+            <div class="toolbar-field">
+                <label for="collectYear">채취년도</label>
+                <input type="text" id="collectYear" class="toolbar-input" placeholder="2026" maxlength="4" style="width: 60px;">
+            </div>
+            <div class="toolbar-field">
+                <label for="collector">시료채취자</label>
+                <input type="text" id="collector" class="toolbar-input" placeholder="채취자명" style="width: 80px;">
+            </div>
+            <div class="toolbar-field">
+                <label for="bulkTestDate">토양검정일</label>
+                <input type="date" id="bulkTestDate" class="toolbar-input">
+                <button type="button" id="clearBulkTestDate" class="toolbar-clear-btn" title="초기화">✕</button>
+            </div>
+            <div class="toolbar-field">
+                <label for="bulkUsageCode">용도구분</label>
+                <select id="bulkUsageCode" class="toolbar-select">
+                    <option value="0">일반적인토양검정</option>
+                    <option value="1">토양개량제 규산</option>
+                    <option value="2">토양개량제 석회질</option>
+                    <option value="3">녹비작물</option>
+                </select>
+            </div>
+            <div class="toolbar-field">
+                <label for="bulkBeforeAfter">시행전후</label>
+                <select id="bulkBeforeAfter" class="toolbar-select">
+                    <option value="">해당없음</option>
+                    <option value="N">전(N)</option>
+                    <option value="Y">후(Y)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="navbar-spacer"></div>
+
+        <!-- 유틸리티 -->
+        <div class="navbar-utils">
+            <button type="button" id="selectAllBtn" class="util-btn" title="전체 선택/해제">
+                <span class="material-icons-outlined">select_all</span>
+                <span class="util-btn-label">전체선택</span>
+            </button>
+            <button type="button" id="applyBulkBtn" class="util-btn" title="일괄 적용">
+                <span class="material-icons-outlined">playlist_add_check</span>
+                <span class="util-btn-label">일괄적용</span>
+            </button>
+            <button type="button" id="toggleColumnsBtn" class="util-btn" title="숨긴 컬럼 표시/숨김">
+                <span class="material-icons-outlined">visibility</span>
+                <span class="util-btn-label">전체보기</span>
+            </button>
+            <button type="button" id="exportBtn" class="util-btn export-btn" title="흙토람 서식 내보내기">
+                <span class="material-icons-outlined">download</span>
+                <span class="util-btn-label">내보내기</span>
+            </button>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 다크 모드 토글 -->
+        <div class="theme-toggle" id="themeToggleContainer">
+            <span class="theme-icon sun"><span class="material-icons-outlined">light_mode</span></span>
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="다크 모드 전환"></button>
+            <span class="theme-icon moon"><span class="material-icons-outlined">dark_mode</span></span>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="heuktoram-info-bar">
+            <span class="info-text">
+                <span class="material-icons-outlined" style="font-size: 16px; vertical-align: middle;">info</span>
+                토양 접수 데이터를 기반으로 검정 결과를 입력하고 흙토람 일괄입력 서식(.xlsx)으로 내보냅니다. 300건 이하 권장.
+            </span>
+            <span class="record-count" id="recordCount">0건</span>
+        </div>
+
+        <div class="table-wrapper" id="tableWrapper">
+            <table class="heuktoram-table" id="heuktoramTable">
+                <thead>
+                    <tr class="header-group">
+                        <th colspan="9" class="header-group-label group-info">접수 정보</th>
+                        <th colspan="16" class="header-group-label group-result">검정 결과</th>
+                    </tr>
+                    <tr>
+                        <th class="col-checkbox sticky-col"><input type="checkbox" id="selectAll" title="전체 선택"></th>
+                        <th class="col-num sticky-col">접수번호</th>
+                        <th class="col-name sticky-col">성명</th>
+                        <th class="col-address sticky-col">필지주소</th>
+                        <th class="col-crop sticky-col">작물</th>
+                        <th class="col-category sticky-col">경지구분</th>
+                        <th class="col-purpose sticky-col">용도</th>
+                        <th class="col-area sticky-col">면적(m2)</th>
+                        <th class="col-date sticky-col">접수일자</th>
+                        <!-- 검정 결과 -->
+                        <th class="col-testdate">검정일</th>
+                        <th class="col-soiling hideable-col">성토</th>
+                        <th class="col-clay hideable-col">점토함량</th>
+                        <th class="col-ph">pH</th>
+                        <th class="col-om">유기물</th>
+                        <th class="col-ap">유효인산</th>
+                        <th class="col-k">K</th>
+                        <th class="col-ca">Ca</th>
+                        <th class="col-mg">Mg</th>
+                        <th class="col-si">유효규산</th>
+                        <th class="col-ec">EC</th>
+                        <th class="col-lime">석회소요량</th>
+                        <th class="col-no3 hideable-col">NO3-N</th>
+                        <th class="col-cec">CEC</th>
+                        <th class="col-nh4 hideable-col">NH4-N</th>
+                        <th class="col-usage">용도구분</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- 데이터가 여기에 추가됩니다 -->
+                </tbody>
+            </table>
+
+            <div id="emptyState" class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p>토양 접수 데이터가 없습니다</p>
+                <p class="empty-sub">먼저 토양 시료 접수 페이지에서 데이터를 등록하세요.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- 토스트 메시지 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+</body>
+
+</html>

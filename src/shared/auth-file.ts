@@ -87,7 +87,7 @@ const AuthFile: IAuthFile = {
 
         // 웹 환경에서는 인증 파일 체크 불가 - 네트워크 체크로 대체
         if (!this.isElectron()) {
-            (window.logger?.info || console.log)('[AuthFile] 웹 환경 - 인증 파일 체크 건너뜀');
+            (window.logger?.info || console.info)('[AuthFile] 웹 환경 - 인증 파일 체크 건너뜀');
             return { valid: true, reason: '웹 환경 (네트워크 체크 사용)' };
         }
 
@@ -101,7 +101,7 @@ const AuthFile: IAuthFile = {
             const result = await window.electronAPI.readAuthFile();
 
             if (!result.exists) {
-                (window.logger?.info || console.log)('[AuthFile] 인증 파일 없음');
+                (window.logger?.info || console.info)('[AuthFile] 인증 파일 없음');
                 this._isAuthenticated = false;
                 this._authChecked = true;
                 return { valid: false, reason: '인증 파일 없음' };
@@ -230,9 +230,9 @@ const AuthFile: IAuthFile = {
      * 인증 파일 형식 안내 (관리자용)
      */
     showAuthFileFormat(): void {
-        (window.logger?.info || console.log)('Firebase 인증 파일은 다음 JSON 형식이어야 합니다:');
-        (window.logger?.info || console.log)('{ "apiKey": "...", "projectId": "...", "authDomain": "..." }');
-        (window.logger?.info || console.log)('설정 페이지에서 파일을 업로드하세요.');
+        (window.logger?.info || console.info)('Firebase 인증 파일은 다음 JSON 형식이어야 합니다:');
+        (window.logger?.info || console.info)('{ "apiKey": "...", "projectId": "...", "authDomain": "..." }');
+        (window.logger?.info || console.info)('설정 페이지에서 파일을 업로드하세요.');
     }
 } as IAuthFile & { _isAuthenticated: boolean | null; _authChecked: boolean };
 

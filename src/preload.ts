@@ -68,6 +68,9 @@ interface ElectronAPI {
     getSessionPassword: () => Promise<string | null>;
     clearSessionPassword: () => Promise<void>;
 
+    // 흙토람 팝업 창 열기
+    openHeuktoram: () => Promise<boolean>;
+
     isElectron: true;
 }
 
@@ -164,6 +167,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 세션 비밀번호 삭제
     clearSessionPassword: () => ipcRenderer.invoke('clear-session-password'),
+
+    // 흙토람 팝업 창 열기
+    openHeuktoram: () => ipcRenderer.invoke('open-heuktoram'),
 
     // Electron 환경 여부
     isElectron: true as const

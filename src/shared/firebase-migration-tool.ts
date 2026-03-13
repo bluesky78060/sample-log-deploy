@@ -2,12 +2,11 @@
  * @fileoverview Firebase 컬렉션 마이그레이션 도구
  * @description soilSamples_2026 → test_soilSamples_2026 데이터 복사
  */
-// @ts-ignore - Firebase compat import
 import firebase from 'firebase/compat/app';
 
 // Type definitions for Firebase compat
-// @ts-ignore
-type FirestoreDocumentSnapshot = firebase.firestore.DocumentSnapshot;
+type FirestoreDocumentSnapshot = any;
+type FirebaseFirestore = any;
 
 interface SampleTypeInfo {
     key: string;
@@ -74,8 +73,7 @@ interface MigrationLogEntry {
  * 원본 컬렉션 → test_ 컬렉션으로 데이터 복사
  */
 class FirebaseMigrationToolImpl {
-    // @ts-ignore - Firebase compat
-    private db: FirebaseFirestore.Firestore | null = null;
+    private db: FirebaseFirestore | null = null;
     private migrationLog: MigrationLogEntry[] = [];
 
     /**
@@ -91,7 +89,7 @@ class FirebaseMigrationToolImpl {
             throw new Error('Firebase DB 인스턴스를 가져올 수 없습니다.');
         }
 
-        console.log('[Migration] Firebase 초기화 완료');
+        (window.logger?.debug || (window.logger?.debug || console.log))('[Migration] Firebase 초기화 완료');
     }
 
     /**
@@ -102,7 +100,7 @@ class FirebaseMigrationToolImpl {
             const snapshot = await this.db!.collection(collectionName).get();
             return snapshot.size;
         } catch (error) {
-            console.error(`[Migration] ${collectionName} 조회 실패:`, error);
+            (window.logger?.error || console.error)(`[Migration] ${collectionName} 조회 실패:`, error);
             return 0;
         }
     }
@@ -153,14 +151,14 @@ class FirebaseMigrationToolImpl {
             onProgress = null
         } = options;
 
-        console.log(`[Migration] ${sourceCollection} → ${targetCollection} 시작 (dryRun: ${dryRun})`);
+        (window.logger?.debug || (window.logger?.debug || console.log))(`[Migration] ${sourceCollection} → ${targetCollection} 시작 (dryRun: ${dryRun})`);
 
         try {
             // 1. 원본 데이터 읽기
             const sourceSnapshot = await this.db!.collection(sourceCollection).get();
             const totalDocs = sourceSnapshot.size;
 
-            console.log(`[Migration] 원본 문서: ${totalDocs}건`);
+            (window.logger?.debug || (window.logger?.debug || console.log))(`[Migration] 원본 문서: ${totalDocs}건`);
 
             if (totalDocs === 0) {
                 return {
@@ -176,7 +174,7 @@ class FirebaseMigrationToolImpl {
             const targetSnapshot = await this.db!.collection(targetCollection).get();
             const existingDocs = targetSnapshot.size;
 
-            console.log(`[Migration] 대상 문서: ${existingDocs}건 (기존)`);
+            (window.logger?.debug || (window.logger?.debug || console.log))(`[Migration] 대상 문서: ${existingDocs}건 (기존)`);
 
             if (existingDocs > 0 && !options.overwrite) {
                 return {
@@ -223,7 +221,7 @@ class FirebaseMigrationToolImpl {
                     });
                 }
 
-                console.log(`[Migration] 진행: ${copiedCount}/${totalDocs} (${Math.round((copiedCount / totalDocs) * 100)}%)`);
+                (window.logger?.debug || (window.logger?.debug || console.log))(`[Migration] 진행: ${copiedCount}/${totalDocs} (${Math.round((copiedCount / totalDocs) * 100)}%)`);
             }
 
             return {
@@ -235,7 +233,7 @@ class FirebaseMigrationToolImpl {
             };
 
         } catch (error) {
-            console.error('[Migration] 마이그레이션 실패:', error);
+            (window.logger?.error || console.error)('[Migration] 마이그레이션 실패:', error);
             return {
                 success: false,
                 source: sourceCollection,
@@ -255,7 +253,7 @@ class FirebaseMigrationToolImpl {
 
         for (const [key, info] of Object.entries(status)) {
             if (info.needsMigration || options.force) {
-                console.log(`\n[Migration] ${key} 마이그레이션 시작...`);
+                (window.logger?.debug || (window.logger?.debug || console.log))(`\n[Migration] ${key} 마이그레이션 시작...`);
 
                 const result = await this.migrateCollection(
                     info.original.name,
@@ -265,7 +263,7 @@ class FirebaseMigrationToolImpl {
 
                 results.push({ type: key, ...result });
             } else {
-                console.log(`[Migration] ${key} 스킵 (이미 마이그레이션됨)`);
+                (window.logger?.debug || (window.logger?.debug || console.log))(`[Migration] ${key} 스킵 (이미 마이그레이션됨)`);
                 results.push({
                     type: key,
                     success: true,
@@ -301,7 +299,7 @@ class FirebaseMigrationToolImpl {
         try {
             localStorage.setItem('firebase_migration_log', JSON.stringify(this.migrationLog));
         } catch (error) {
-            console.warn('[Migration] 로그 저장 실패:', error);
+            (window.logger?.warn || console.warn)('[Migration] 로그 저장 실패:', error);
         }
     }
 
@@ -313,7 +311,7 @@ class FirebaseMigrationToolImpl {
             const log = localStorage.getItem('firebase_migration_log');
             return log ? JSON.parse(log) : [];
         } catch (error) {
-            console.error('[Migration] 로그 조회 실패:', error);
+            (window.logger?.error || console.error)('[Migration] 로그 조회 실패:', error);
             return [];
         }
     }
@@ -337,7 +335,7 @@ window.runFirebaseMigration = async function(options: MigrationOptions = {}): Pr
     try {
         await tool.init();
 
-        console.log('=== Firebase 마이그레이션 상태 확인 ===\n');
+        (window.logger?.debug || (window.logger?.debug || console.log))('=== Firebase 마이그레이션 상태 확인 ===\n');
         const status = await tool.checkStatus();
         console.table(Object.entries(status).map(([type, info]) => ({
             타입: type,
@@ -347,14 +345,14 @@ window.runFirebaseMigration = async function(options: MigrationOptions = {}): Pr
         })));
 
         if (options.dryRun !== false) {
-            console.log('\n⚠️  DRY RUN 모드 (실제 복사 안 함)');
-            console.log('실제 마이그레이션: runFirebaseMigration({ dryRun: false })');
+            (window.logger?.debug || (window.logger?.debug || console.log))('\n⚠️  DRY RUN 모드 (실제 복사 안 함)');
+            (window.logger?.debug || (window.logger?.debug || console.log))('실제 마이그레이션: runFirebaseMigration({ dryRun: false })');
         }
 
-        console.log('\n=== 마이그레이션 시작 ===\n');
+        (window.logger?.debug || (window.logger?.debug || console.log))('\n=== 마이그레이션 시작 ===\n');
         const result = await tool.migrateAll(options);
 
-        console.log('\n=== 마이그레이션 완료 ===');
+        (window.logger?.debug || (window.logger?.debug || console.log))('\n=== 마이그레이션 완료 ===');
         console.table(result.results.map(r => ({
             타입: r.type,
             원본: r.source || '-',
@@ -364,25 +362,25 @@ window.runFirebaseMigration = async function(options: MigrationOptions = {}): Pr
             메시지: r.message || r.error || '-'
         })));
 
-        console.log(`\n총 ${result.summary.total}개 타입 중 ${result.summary.success}개 성공, ${result.summary.failed}개 실패, ${result.summary.skipped}개 스킵`);
+        (window.logger?.debug || (window.logger?.debug || console.log))(`\n총 ${result.summary.total}개 타입 중 ${result.summary.success}개 성공, ${result.summary.failed}개 실패, ${result.summary.skipped}개 스킵`);
 
         tool.saveLog(result);
         return result;
 
     } catch (error) {
-        console.error('마이그레이션 초기화 실패:', error);
+        (window.logger?.error || console.error)('마이그레이션 초기화 실패:', error);
         throw error;
     }
 };
 
-console.log('✅ Firebase 마이그레이션 도구 로드 완료');
-console.log('');
-console.log('사용법:');
-console.log('1. 상태 확인 (DRY RUN):');
-console.log('   await runFirebaseMigration()');
-console.log('');
-console.log('2. 실제 마이그레이션 실행:');
-console.log('   await runFirebaseMigration({ dryRun: false })');
-console.log('');
-console.log('3. 강제 덮어쓰기:');
-console.log('   await runFirebaseMigration({ dryRun: false, overwrite: true })');
+(window.logger?.debug || console.log)('✅ Firebase 마이그레이션 도구 로드 완료');
+(window.logger?.debug || console.log)('');
+(window.logger?.debug || console.log)('사용법:');
+(window.logger?.debug || console.log)('1. 상태 확인 (DRY RUN):');
+(window.logger?.debug || console.log)('   await runFirebaseMigration()');
+(window.logger?.debug || console.log)('');
+(window.logger?.debug || console.log)('2. 실제 마이그레이션 실행:');
+(window.logger?.debug || console.log)('   await runFirebaseMigration({ dryRun: false })');
+(window.logger?.debug || console.log)('');
+(window.logger?.debug || console.log)('3. 강제 덮어쓰기:');
+(window.logger?.debug || console.log)('   await runFirebaseMigration({ dryRun: false, overwrite: true })');
