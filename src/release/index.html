@@ -589,9 +589,40 @@
         <!-- 타임라인 -->
         <div class="timeline">
 
-            <!-- v1.9.0 (최신) -->
+            <!-- v1.7.75 (최신) -->
             <div class="version-entry">
                 <div class="version-dot latest"></div>
+                <div class="version-card">
+                    <div class="version-card-header">
+                        <div>
+                            <div class="version-meta">
+                                <span class="version-number">v1.7.75</span>
+                                <span class="version-date">2026-03-16</span>
+                            </div>
+                            <div class="version-title">흙토람 Tab 이동 개선 · 일괄 완료 기능 추가</div>
+                        </div>
+                        <div class="badge-row">
+                            <span class="badge badge-latest">★ 최신</span>
+                            <span class="badge badge-feature">기능</span>
+                            <span class="badge badge-fix">수정</span>
+                        </div>
+                    </div>
+                    <ul class="change-list">
+                        <li><strong>흙토람 Tab 이동 개선</strong> — Tab 시작 pH, 종료 cec, isSubLot 행 자동 건너뜀, Shift+Tab 역방향 동일 규칙 적용</li>
+                        <li><strong>흙토람 일괄 완료 버튼</strong> — 선택 항목 또는 전체를 한 번에 완료 처리, 완료 행 연초록 배경 표시</li>
+                        <li><strong>흙토람 개인정보 동의 컬럼 추가</strong> — 엑셀 서식 열 수 48 → 50 (AW: 개인정보 수집·이용 동의, AX: 제3자 제공동의 자동 입력)</li>
+                        <li><strong>토양 일괄 완료 버튼</strong> — 선택된 항목과 같은 접수번호의 연관 행을 한 번에 완료 처리</li>
+                        <li><strong>토양 그룹 삭제 기능</strong> — 같은 groupId 시료 묶음을 한 번에 삭제</li>
+                        <li><strong>토양 서브넘버 수정 버그 수정</strong> — 첫 작물은 기본번호, 두 번째부터 -1, -2 적용</li>
+                        <li><strong>자동완성 겹침 수정</strong> — 뷰 전환 시 열린 자동완성 리스트 자동 닫기</li>
+                        <li><strong>릴리즈 노트 페이지 빌드 등록</strong> — vite.config.js에 release 엔트리 추가</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- v1.9.0 -->
+            <div class="version-entry">
+                <div class="version-dot"></div>
                 <div class="version-card">
                     <div class="version-card-header">
                         <div>
@@ -602,7 +633,6 @@
                             <div class="version-title">TypeScript 마이그레이션 완료</div>
                         </div>
                         <div class="badge-row">
-                            <span class="badge badge-latest">★ 최신</span>
                             <span class="badge badge-feature">기능</span>
                             <span class="badge badge-fix">수정</span>
                         </div>
