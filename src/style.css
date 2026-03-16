@@ -3679,7 +3679,7 @@ input[type="number"] {
     display: flex;
     flex-direction: column;
     animation: modalIn 0.3s ease;
-    overflow: visible;
+    overflow: hidden;
 }
 
 @keyframes modalIn {
@@ -3746,8 +3746,9 @@ input[type="number"] {
 .modal-body {
     padding: 1.5rem;
     overflow-y: auto;
-    overflow-x: visible;
+    overflow-x: hidden;
     flex: 1;
+    min-height: 0;
 }
 
 .modal-footer {
@@ -3924,7 +3925,8 @@ input[type="number"] {
 .crop-list-wrapper {
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    max-height: 200px;
+    min-height: 120px;
+    max-height: 300px;
     overflow-y: auto;
     margin-bottom: 1rem;
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -4209,7 +4211,6 @@ input[type="number"] {
 /* Crop Autocomplete */
 .crop-autocomplete-wrapper {
     position: relative;
-    overflow: visible;
 }
 
 /* ShadCN Crop Search Input */
@@ -4234,13 +4235,16 @@ input[type="number"] {
 
 /* ShadCN Autocomplete List */
 .crop-autocomplete-list {
-    position: fixed;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
     background: white;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    max-height: 150px;
+    max-height: 200px;
     overflow-y: auto;
-    z-index: 200000;
+    z-index: 100000;
     display: none;
     box-shadow: var(--shadow-lg);
     min-width: 200px;

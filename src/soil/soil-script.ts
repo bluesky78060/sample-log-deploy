@@ -1216,10 +1216,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                     autocompleteList.innerHTML = sanitizeHTML(matches.map(crop => `
                         <li data-code="${crop.code}" data-name="${crop.name}">${crop.name} (${crop.category})</li>
                     `).join(''));
-                    const rect = cropInput.getBoundingClientRect();
-                    autocompleteList.style.left = `${rect.left}px`;
-                    autocompleteList.style.top = `${rect.bottom + 2}px`;
-                    autocompleteList.style.width = `${rect.width}px`;
                     autocompleteList.classList.add('show');
                 } else {
                     autocompleteList.classList.remove('show');
@@ -1555,10 +1551,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                         autocompleteList.innerHTML = sanitizeHTML(matches.map(crop => `
                             <li data-code="${crop.code}" data-name="${crop.name}">${crop.name} (${crop.category})</li>
                         `).join(''));
-                        const rect = e.target.getBoundingClientRect();
-                        autocompleteList.style.top = `${rect.bottom + 2}px`;
-                        autocompleteList.style.left = `${rect.left}px`;
-                        autocompleteList.style.width = `${rect.width}px`;
                         autocompleteList.classList.add('show');
                     } else {
                         autocompleteList.classList.remove('show');
@@ -3211,12 +3203,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     setupTypeSpecificEvents() {
         const self = this;
-
-        // 폼 영역 스크롤 시 자동완성 닫기 (fixed 위치 리스트가 남아있는 것 방지)
-        const formView = document.getElementById('formView');
-        if (formView) {
-            formView.addEventListener('scroll', () => this.closeAllAutocomplete(), true);
-        }
 
         // 시료 타입 네비게이션 선택
         const sampleTypeBtns = document.querySelectorAll('.type-btn');
