@@ -1216,6 +1216,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                     autocompleteList.innerHTML = sanitizeHTML(matches.map(crop => `
                         <li data-code="${crop.code}" data-name="${crop.name}">${crop.name} (${crop.category})</li>
                     `).join(''));
+                    const rect = cropInput.getBoundingClientRect();
+                    autocompleteList.style.left = `${rect.left}px`;
+                    autocompleteList.style.top = `${rect.bottom + 2}px`;
+                    autocompleteList.style.width = `${rect.width}px`;
                     autocompleteList.classList.add('show');
                 } else {
                     autocompleteList.classList.remove('show');
@@ -1551,6 +1555,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                         autocompleteList.innerHTML = sanitizeHTML(matches.map(crop => `
                             <li data-code="${crop.code}" data-name="${crop.name}">${crop.name} (${crop.category})</li>
                         `).join(''));
+                        const rect = (e.target as HTMLInputElement).getBoundingClientRect();
+                        autocompleteList.style.top = `${rect.bottom + 2}px`;
+                        autocompleteList.style.left = `${rect.left}px`;
+                        autocompleteList.style.width = `${rect.width}px`;
                         autocompleteList.classList.add('show');
                     } else {
                         autocompleteList.classList.remove('show');

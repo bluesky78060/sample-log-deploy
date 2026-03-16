@@ -4235,16 +4235,13 @@ input[type="number"] {
 
 /* ShadCN Autocomplete List */
 .crop-autocomplete-list {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
+    position: fixed;
     background: white;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     max-height: 200px;
     overflow-y: auto;
-    z-index: 100000;
+    z-index: 200000;
     display: none;
     box-shadow: var(--shadow-lg);
     min-width: 200px;
