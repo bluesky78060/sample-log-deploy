@@ -185,6 +185,7 @@ class HeuktoramManager {
   private readonly resultFields: (keyof SoilTestResult)[];
   private readonly hiddenFields: Set<string>;
   private showAllColumns: boolean;
+  private readonly fieldRanges: Record<string, { min: number; max: number; label: string; unit: string }>;
 
   // DOM refs
   private yearSelect: HTMLSelectElement | null;
@@ -201,6 +202,7 @@ class HeuktoramManager {
   private tableBody: HTMLElement | null;
   private emptyState: HTMLElement | null;
   private recordCount: HTMLElement | null;
+  private bulkCompleteBtn: HTMLButtonElement | null;
 
   constructor() {
     this.selectedYear = new Date().getFullYear().toString();
@@ -218,6 +220,18 @@ class HeuktoramManager {
     this.hiddenFields = new Set(['soiling', 'clay', 'NO3N', 'NH4N']);
     this.showAllColumns = false;
 
+    // 검정 결과 유효 범위 (흙토람 기준)
+    this.fieldRanges = {
+      pH:            { min: 3.5,  max: 9.5,   label: 'pH',           unit: '' },
+      organicMatter: { min: 1,    max: 300,   label: '유기물',        unit: 'g/kg' },
+      availableP:    { min: 1,    max: 9999,  label: '유효인산',      unit: 'mg/kg' },
+      exK:           { min: 0.01, max: 15,    label: '교환성 칼륨',   unit: 'cmol+/kg' },
+      exCa:          { min: 0.1,  max: 35,    label: '교환성 칼슘',   unit: 'cmol+/kg' },
+      exMg:          { min: 0.1,  max: 25,    label: '교환성 마그네슘', unit: 'cmol+/kg' },
+      silica:        { min: 5,    max: 2000,  label: '유효규산',      unit: 'mg/kg' },
+      ec:            { min: 0.01, max: 30,    label: '전기전도도',    unit: 'dS/m' }
+    };
+
     // DOM refs (초기화)
     this.yearSelect = null;
     this.collectYearInput = null;
@@ -233,6 +247,7 @@ class HeuktoramManager {
     this.tableBody = null;
     this.emptyState = null;
     this.recordCount = null;
+    this.bulkCompleteBtn = null;
 
     this.init();
   }
@@ -270,6 +285,7 @@ class HeuktoramManager {
     this.tableBody = document.getElementById('tableBody');
     this.emptyState = document.getElementById('emptyState');
     this.recordCount = document.getElementById('recordCount');
+    this.bulkCompleteBtn = document.getElementById('bulkCompleteBtn') as HTMLButtonElement | null;
   }
 
   /**
@@ -366,6 +382,7 @@ class HeuktoramManager {
     this.applyBulkBtn?.addEventListener('click', () => this.applyBulkValues());
     this.exportBtn?.addEventListener('click', () => this.exportToHeuktoram());
     this.toggleColumnsBtn?.addEventListener('click', () => this.toggleHiddenColumns());
+    this.bulkCompleteBtn?.addEventListener('click', () => this.bulkComplete());
     this.applyColumnVisibility();
 
     document.addEventListener('paste', (e: ClipboardEvent) => this.handlePaste(e));
@@ -529,6 +546,7 @@ class HeuktoramManager {
 
     this.tableBody.innerHTML = '';
     this.tableBody.appendChild(fragment);
+    this.validateAllRanges();
   }
 
   private createTableRow(row: HeuktoramRow, rowIdx: number): HTMLTableRowElement {
@@ -536,6 +554,7 @@ class HeuktoramManager {
     const result = this.testResults[row.key] ?? {};
 
     if (row.isSubLot) tr.classList.add('sublot-row');
+    if ((row.log as SoilLog & { isComplete?: boolean }).isComplete) tr.classList.add('row-completed');
 
     const isChecked = this.selectedKeys.has(row.key);
 
@@ -653,11 +672,15 @@ class HeuktoramManager {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           td.blur();
-          this.moveFocus(rowIdx + 1, ci);
+          this.moveFocus(rowIdx + 1, ci, 1);
         } else if (e.key === 'Tab') {
           e.preventDefault();
           td.blur();
-          this.moveFocus(rowIdx, e.shiftKey ? ci - 1 : ci + 1);
+          if (e.shiftKey) {
+            this.moveFocusResult(rowIdx, ci - 1, -1);
+          } else {
+            this.moveFocusResult(rowIdx, ci + 1, 1);
+          }
         }
       });
 
@@ -667,10 +690,70 @@ class HeuktoramManager {
     return tr;
   }
 
-  private moveFocus(rowIdx: number, colIdx: number): void {
+  private moveFocus(rowIdx: number, colIdx: number, direction = 1): void {
     if (colIdx >= this.resultFields.length) { colIdx = 0; rowIdx++; }
     if (colIdx < 0) { colIdx = this.resultFields.length - 1; rowIdx--; }
     if (rowIdx < 0 || rowIdx >= this.flatRows.length) return;
+
+    // 숨김 컬럼 건너뛰기 (전체보기 모드가 아닐 때)
+    if (!this.showAllColumns && this.hiddenFields.has(this.resultFields[colIdx] as string)) {
+      this.moveFocus(rowIdx, colIdx + direction, direction);
+      return;
+    }
+
+    const cell = this.tableBody?.querySelector(
+      `td[data-row="${rowIdx}"][data-col="${colIdx}"]`
+    ) as HTMLElement | null;
+    if (cell) {
+      cell.focus();
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  }
+
+  /**
+   * Tab 키 전용 포커스 이동 (pH~cec 범위, isSubLot 행 건너뜀)
+   * START_COL=3(pH), END_COL=13(cec)
+   */
+  private moveFocusResult(rowIdx: number, colIdx: number, direction = 1): void {
+    const START_COL = 3; // pH index
+    const END_COL = 13;  // cec index
+
+    if (direction >= 0) {
+      if (colIdx > END_COL) {
+        colIdx = START_COL;
+        rowIdx++;
+      }
+    } else {
+      if (colIdx < START_COL) {
+        colIdx = END_COL;
+        rowIdx--;
+      }
+    }
+
+    if (rowIdx < 0 || rowIdx >= this.flatRows.length) return;
+
+    // isSubLot 행 건너뜀 (무한루프 방지를 위한 while 루프)
+    let safety = 0;
+    while (rowIdx >= 0 && rowIdx < this.flatRows.length && this.flatRows[rowIdx].isSubLot) {
+      rowIdx += direction >= 0 ? 1 : -1;
+      safety++;
+      if (safety > this.flatRows.length) return;
+    }
+    if (rowIdx < 0 || rowIdx >= this.flatRows.length) return;
+
+    // 숨김 컬럼 건너뜀
+    let colSafety = 0;
+    while (!this.showAllColumns && this.hiddenFields.has(this.resultFields[colIdx] as string)) {
+      colIdx += direction >= 0 ? 1 : -1;
+      colSafety++;
+      if (colSafety > this.resultFields.length) return;
+      if (colIdx > END_COL) colIdx = START_COL;
+      if (colIdx < START_COL) colIdx = END_COL;
+    }
 
     const cell = this.tableBody?.querySelector(
       `td[data-row="${rowIdx}"][data-col="${colIdx}"]`
@@ -690,6 +773,51 @@ class HeuktoramManager {
     this.testResults[key][field] = value;
     this.syncToSiblings(key, field, value);
     this.saveTestResults();
+    this.validateFieldRange(key, field, value);
+  }
+
+  private validateFieldRange(key: string, field: string, value: string): void {
+    const range = this.fieldRanges[field];
+    if (!range) return;
+
+    const rowIdx = this.flatRows.findIndex(r => r.key === key);
+    const colIdx = this.resultFields.indexOf(field as keyof SoilTestResult);
+    const cell = this.tableBody?.querySelector(
+      `td[data-row="${rowIdx}"][data-col="${colIdx}"]`
+    ) as HTMLElement | null;
+
+    if (!value || value.trim() === '') {
+      cell?.classList.remove('out-of-range');
+      return;
+    }
+
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+      cell?.classList.remove('out-of-range');
+      return;
+    }
+
+    const unitText = range.unit ? ` ${range.unit}` : '';
+    if (num < range.min || num > range.max) {
+      cell?.classList.add('out-of-range');
+      if (window.showToast) {
+        window.showToast(
+          `⚠️ ${range.label}: ${num}${unitText} → 입력 범위 ${range.min} ~ ${range.max}${unitText}`,
+          'warning'
+        );
+      }
+    } else {
+      cell?.classList.remove('out-of-range');
+    }
+  }
+
+  private validateAllRanges(): void {
+    for (const [key, result] of Object.entries(this.testResults)) {
+      for (const field of Object.keys(this.fieldRanges)) {
+        const val = result[field as keyof SoilTestResult];
+        if (val) this.validateFieldRange(key, field, String(val));
+      }
+    }
   }
 
   /**
@@ -820,6 +948,45 @@ class HeuktoramManager {
       this.selectAllCheckbox.indeterminate =
         this.selectedKeys.size > 0 && this.selectedKeys.size < this.flatRows.length;
     }
+  }
+
+  /**
+   * 일괄 완료 처리
+   * 선택 있음: 선택된 flatRow의 log.id → isComplete=true
+   * 선택 없음: 전체 처리 (confirm 후)
+   */
+  private bulkComplete(): void {
+    const selectedFlatRows = this.flatRows.filter(r => this.selectedKeys.has(r.key));
+    const year = this.selectedYear;
+    const storageKey = `${STORAGE_PREFIX}soilSampleLogs_${year}`;
+
+    let logIds: Set<string>;
+    if (selectedFlatRows.length === 0) {
+      if (!confirm(`전체 ${this.flatRows.length}건을 완료 처리하시겠습니까?`)) return;
+      logIds = new Set(this.flatRows.map(r => r.log.id));
+    } else {
+      logIds = new Set(selectedFlatRows.map(r => r.log.id));
+    }
+
+    try {
+      const data = localStorage.getItem(storageKey);
+      const logs: SoilLog[] = data ? (JSON.parse(data) as SoilLog[]) : [];
+      for (const log of logs) {
+        if (logIds.has(log.id)) {
+          (log as SoilLog & { isComplete: boolean }).isComplete = true;
+        }
+      }
+      localStorage.setItem(storageKey, JSON.stringify(logs));
+      this.sampleLogs = this.sampleLogs.map(log =>
+        logIds.has(log.id) ? { ...log, isComplete: true } as SoilLog : log
+      );
+    } catch (e) {
+      (window.logger?.error ?? console.error)('일괄 완료 처리 실패:', e);
+      return;
+    }
+
+    this.render();
+    window.showToast?.(`${logIds.size}건이 완료 처리되었습니다.`, 'success');
   }
 
   private applyBulkValues(): void {
@@ -1065,7 +1232,7 @@ class HeuktoramManager {
   /** 48컬럼 데이터 배열 생성 (헤더 4행 + 데이터) */
   private buildWorksheetData(rows: HeuktoramRow[]): (string | number)[][] {
     const data: (string | number)[][] = [];
-    const COL = 48;
+    const COL = 50;
     const collectYear = this.collectYearInput?.value ?? this.selectedYear;
     const collector = this.collectorInput?.value ?? '';
 
@@ -1115,6 +1282,8 @@ class HeuktoramManager {
     row3[45] = '양이온 치환용량';
     row3[46] = '암모니아태 질소';
     row3[47] = '신청인 전화번호';
+    row3[48] = '개인정보\n수집·이용 동의';
+    row3[49] = '개인정보\n제3자 제공동의';
     data.push(row3);
 
     // 4행: 소분류 헤더
@@ -1227,6 +1396,8 @@ class HeuktoramManager {
       dataRow[45] = result.cec ?? '';
       dataRow[46] = result.NH4N ?? '';
       dataRow[47] = (row.log.phoneNumber ?? '').replace(/-/g, '');
+      dataRow[48] = 'Y'; // 개인정보 수집·이용 동의
+      dataRow[49] = 'Y'; // 개인정보 제3자 제공동의
 
       data.push(dataRow);
     }
@@ -1285,6 +1456,8 @@ class HeuktoramManager {
       { wch: 12 }, // AT: CEC
       { wch: 12 }, // AU: NH4-N
       { wch: 16 }, // AV: 전화번호
+      { wch: 16 }, // AW: 개인정보 수집·이용 동의
+      { wch: 16 }, // AX: 개인정보 제3자 제공동의
     ];
   }
 
@@ -1323,6 +1496,8 @@ class HeuktoramManager {
       { s: { r: 2, c: 45 }, e: { r: 3, c: 45 } }, // AT: CEC
       { s: { r: 2, c: 46 }, e: { r: 3, c: 46 } }, // AU: NH4-N
       { s: { r: 2, c: 47 }, e: { r: 3, c: 47 } }, // AV: 전화번호
+      { s: { r: 2, c: 48 }, e: { r: 3, c: 48 } }, // AW: 개인정보 수집·이용 동의
+      { s: { r: 2, c: 49 }, e: { r: 3, c: 49 } }, // AX: 개인정보 제3자 제공동의
       // 가로 병합 (3행 그룹 헤더)
       { s: { r: 2, c: 4  }, e: { r: 2, c: 5  } }, // E3:F3 경지구분
       { s: { r: 2, c: 6  }, e: { r: 2, c: 7  } }, // G3:H3 용도구분
@@ -1337,7 +1512,7 @@ class HeuktoramManager {
 
   /** 헤더 스타일 + 데이터 행 정렬/테두리 적용 (xlsx-js-style) */
   private applyHeaderStyles(ws: Record<string, unknown>, wsData: (string | number)[][]): void {
-    const COL = 48;
+    const COL = 50;
     const THIN_BORDER = {
       top:    { style: 'thin', color: { rgb: 'FF808080' } },
       bottom: { style: 'thin', color: { rgb: 'FF808080' } },

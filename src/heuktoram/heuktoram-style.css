@@ -583,3 +583,49 @@
         gap: 0.4rem;
     }
 }
+
+/* ========================================
+   일괄 완료 버튼 + 완료 행 스타일
+   ======================================== */
+
+.complete-btn {
+    background: #f0fdf4;
+    color: #16a34a;
+    border-color: #bbf7d0 !important;
+}
+
+.complete-btn:hover {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+    border-color: #86efac !important;
+    transform: translateY(-1px);
+}
+
+.heuktoram-table tbody tr.row-completed td {
+    background-color: #f0fdf4 !important;
+    color: #6b7280 !important;
+}
+
+.heuktoram-table tbody tr.row-completed td.sticky-col {
+    background-color: #f0fdf4 !important;
+}
+
+[data-theme="dark"] .complete-btn {
+    background: rgba(22, 163, 74, 0.15);
+    color: #4ade80;
+    border-color: rgba(22, 163, 74, 0.3) !important;
+}
+
+[data-theme="dark"] .complete-btn:hover {
+    background: rgba(22, 163, 74, 0.25) !important;
+    color: #86efac !important;
+}
+
+[data-theme="dark"] .heuktoram-table tbody tr.row-completed td {
+    background-color: rgba(22, 163, 74, 0.1) !important;
+    color: #6b7280 !important;
+}
+
+[data-theme="dark"] .heuktoram-table tbody tr.row-completed td.sticky-col {
+    background-color: rgba(22, 163, 74, 0.08) !important;
+}
