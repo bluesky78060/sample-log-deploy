@@ -23,6 +23,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create network-config with secrets
+        run: |
+          @"
+          (window as any).NETWORK_CONFIG = {
+              ALLOWED_GATEWAY: '${{ secrets.ALLOWED_GATEWAY }}',
+              VWORLD_API_KEY: '${{ secrets.VWORLD_API_KEY }}'
+          };
+          "@ | Out-File -FilePath "src/shared/network-config.ts" -Encoding utf8
+        shell: pwsh
+
       - name: Build Windows package
         run: npm run make
 
@@ -80,6 +90,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Create network-config with secrets
+        run: |
+          cat > src/shared/network-config.ts << 'NETEOF'
+          (window as any).NETWORK_CONFIG = {
+              ALLOWED_GATEWAY: '${{ secrets.ALLOWED_GATEWAY }}',
+              VWORLD_API_KEY: '${{ secrets.VWORLD_API_KEY }}'
+          };
+          NETEOF
 
       - name: Build macOS package
         run: npm run make -- --platform darwin

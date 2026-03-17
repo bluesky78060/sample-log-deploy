@@ -39,16 +39,16 @@
             color: #86efac !important;
         }
     </style>
-  <script type="module" crossorigin src="../assets/soil-DuG25G1q.js"></script>
+  <script type="module" crossorigin src="../assets/soil-pSwbvx0b.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/theme-CY3TWZmv.js">
-  <link rel="modulepreload" crossorigin href="../assets/bonghwaData-CmFsDDnN.js">
+  <link rel="modulepreload" crossorigin href="../assets/bonghwaData-BkM0F7aZ.js">
   <link rel="modulepreload" crossorigin href="../assets/xlsx-CY41JvjH.js">
   <link rel="modulepreload" crossorigin href="../assets/excel-import-manager-BoC4qy2p.js">
   <link rel="modulepreload" crossorigin href="../assets/toast-BwdSIJOp.js">
   <link rel="modulepreload" crossorigin href="../assets/loading-manager-8YTLSOMM.js">
   <link rel="modulepreload" crossorigin href="../assets/storage-manager-BlTvgDvO.js">
   <link rel="modulepreload" crossorigin href="../assets/cropData---HVh3r7.js">
-  <link rel="stylesheet" crossorigin href="../assets/bonghwaData-BkzdGfZj.css">
+  <link rel="stylesheet" crossorigin href="../assets/bonghwaData-BvFhESFD.css">
   <link rel="stylesheet" crossorigin href="../assets/soil-COH0U5Kf.css">
   <link rel="stylesheet" crossorigin href="../assets/tailwind-output-uwpTj9PQ.css">
 </head>
@@ -627,10 +627,16 @@
                     </table>
                 </div>
             </div>
+            <div id="addressVerifyStatus" class="address-verify-status" style="display:none;">
+                <div class="verify-spinner" id="verifySpinner">
+                    <span class="spinner-icon">&#8987;</span> 필지 주소 검증 중...
+                </div>
+                <div class="verify-result" id="verifyResult" style="display:none;"></div>
+            </div>
             <div class="modal-footer">
-                <button type="button" id="closeResultBtn" class="btn-cancel">닫기</button>
-                <button type="button" id="editResultBtn" class="btn-secondary">수정</button>
-                <button type="button" id="exportResultBtn" class="btn-confirm">엑셀로 내보내기</button>
+                <button type="button" id="closeResultBtn" class="btn-cancel" disabled>닫기</button>
+                <button type="button" id="editResultBtn" class="btn-secondary" style="display:none;">수정</button>
+                <button type="button" id="exportResultBtn" class="btn-confirm" disabled>엑셀로 내보내기</button>
             </div>
         </div>
     </div>

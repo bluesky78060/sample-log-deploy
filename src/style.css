@@ -6552,3 +6552,74 @@ select {
 [data-theme="dark"] .data-table td.address-invalid {
     color: #f87171;
 }
+
+/* 등록 완료 모달 주소 검증 상태 */
+.address-verify-status {
+    padding: 10px 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.verify-spinner {
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.spinner-icon {
+    display: inline-block;
+    animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.verify-result {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.verify-result.verify-pass {
+    color: #16a34a;
+}
+
+.verify-result.verify-fail {
+    color: #dc2626;
+}
+
+.verify-result.verify-skip {
+    color: #d97706;
+}
+
+.verify-result .verify-addresses {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+/* 다크모드 */
+[data-theme="dark"] .address-verify-status {
+    border-top-color: #374151;
+}
+
+[data-theme="dark"] .verify-spinner {
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .verify-result.verify-pass {
+    color: #4ade80;
+}
+
+[data-theme="dark"] .verify-result.verify-fail {
+    color: #f87171;
+}
+
+[data-theme="dark"] .verify-result.verify-skip {
+    color: #fbbf24;
+}
+
+[data-theme="dark"] .verify-result .verify-addresses {
+    color: #9ca3af;
+}

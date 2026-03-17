@@ -1949,8 +1949,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         this.saveLogs();
         this.firebaseSaveRecords(newLogs); // Firebase 개별 저장
         this.filterAndRenderLogs();
-        // 주소 검증 (백그라운드)
-        this.validateAndMarkLogs(newLogs);
         this.form.reset();
         if (this.dateInput) this.dateInput.valueAsDate = new Date();
 
@@ -1984,6 +1982,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         };
         this.showRegistrationResult(resultData);
         this.switchView('list');
+
+        // 주소 검증 실행 → 모달에 결과 반영
+        this.runVerificationForModal(newLogs);
     }
 
     // ========================================
@@ -2785,10 +2786,88 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             this.resultTableBody.appendChild(tr);
         }
 
+        // 주소 검증 상태 UI 초기화
+        const verifyStatus = document.getElementById('addressVerifyStatus');
+        const verifySpinner = document.getElementById('verifySpinner');
+        const verifyResult = document.getElementById('verifyResult');
+        const closeBtn = document.getElementById('closeResultBtn');
+        const exportBtn = document.getElementById('exportResultBtn');
+        const editBtn = document.getElementById('editResultBtn');
+
+        if (verifyStatus) verifyStatus.style.display = 'block';
+        if (verifySpinner) verifySpinner.style.display = 'flex';
+        if (verifyResult) { verifyResult.style.display = 'none'; verifyResult.innerHTML = ''; }
+        if (closeBtn) closeBtn.setAttribute('disabled', '');
+        if (exportBtn) exportBtn.setAttribute('disabled', '');
+        if (editBtn) editBtn.style.display = 'none';
+
         if (this.registrationResultModal) this.registrationResultModal.classList.remove('hidden');
     }
 
+    async runVerificationForModal(newLogs: SoilLog[]): Promise<void> {
+        (this as any)._verificationInProgress = true;
+        const verifySpinner = document.getElementById('verifySpinner');
+        const verifyResult = document.getElementById('verifyResult');
+        const closeBtn = document.getElementById('closeResultBtn');
+        const exportBtn = document.getElementById('exportResultBtn');
+        const editBtn = document.getElementById('editResultBtn');
+
+        try {
+            await this.validateAndMarkLogs(newLogs);
+        } catch (err) {
+            console.error('VWORLD 검증 오류:', err);
+        }
+
+        (this as any)._verificationInProgress = false;
+
+        // 검증 결과 확인
+        const invalidLogs = newLogs.filter(l => (l as any).addressVerified === false);
+        const validLogs = newLogs.filter(l => (l as any).addressVerified === true);
+        const skipLogs = newLogs.filter(l => (l as any).addressVerified === undefined);
+
+        // 스피너 숨기고 결과 표시
+        if (verifySpinner) verifySpinner.style.display = 'none';
+        if (verifyResult) {
+            verifyResult.style.display = 'block';
+            if (invalidLogs.length > 0) {
+                // 불일치 주소 목록 (필지 + 하위필지)
+                const invalidAddresses: string[] = [];
+                invalidLogs.forEach(log => {
+                    if (log.parcels) {
+                        log.parcels.forEach((p: any) => {
+                            if (p.lotAddress) invalidAddresses.push(p.lotAddress);
+                            if (p.subLots) p.subLots.forEach((s: any) => {
+                                const addr = typeof s === 'string' ? s : s.lotAddress;
+                                if (addr) invalidAddresses.push(addr);
+                            });
+                        });
+                    }
+                });
+                verifyResult.className = 'verify-result verify-fail';
+                verifyResult.innerHTML = `<span>&#10060; 필지 주소 ${invalidLogs.length}건 불일치</span>` +
+                    (invalidAddresses.length > 0 ? `<div class="verify-addresses">${invalidAddresses.join(', ')}</div>` : '');
+            } else if (skipLogs.length === newLogs.length) {
+                verifyResult.className = 'verify-result verify-skip';
+                verifyResult.innerHTML = '<span>&#9888; 주소 검증을 수행할 수 없습니다 (API 키 또는 네트워크 확인)</span>';
+            } else {
+                verifyResult.className = 'verify-result verify-pass';
+                verifyResult.innerHTML = `<span>&#9989; 필지 주소 ${validLogs.length}건 검증 완료</span>`;
+            }
+        }
+
+        // 버튼 활성화
+        if (closeBtn) closeBtn.removeAttribute('disabled');
+        if (exportBtn) exportBtn.removeAttribute('disabled');
+
+        // 불일치 시 수정 버튼 표시
+        if (invalidLogs.length > 0 && editBtn) {
+            editBtn.style.display = 'inline-block';
+            editBtn.textContent = '수정';
+        }
+    }
+
     closeRegistrationResultModal() {
+        if ((this as any)._verificationInProgress) return; // 검증 중 닫기 방지
         if (this.registrationResultModal) this.registrationResultModal.classList.add('hidden');
         this.currentRegistrationData = null;
     }
@@ -4275,10 +4354,21 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const batch = logs.slice(i, i + BATCH_SIZE);
             const results = await Promise.allSettled(
                 batch.map(async (log) => {
-                    // 모든 필지의 주소를 검증하여 하나라도 실패하면 false
-                    const addresses = log.parcels && log.parcels.length > 0
-                        ? log.parcels.map((p: any) => p.lotAddress).filter(Boolean)
-                        : [log.lotAddress].filter(Boolean);
+                    // 모든 필지 + 하위필지 주소를 검증하여 하나라도 실패하면 false
+                    const addresses: string[] = [];
+                    if (log.parcels && log.parcels.length > 0) {
+                        log.parcels.forEach((p: any) => {
+                            if (p.lotAddress) addresses.push(p.lotAddress);
+                            if (p.subLots && p.subLots.length > 0) {
+                                p.subLots.forEach((s: any) => {
+                                    const addr = typeof s === 'string' ? s : s.lotAddress;
+                                    if (addr) addresses.push(addr);
+                                });
+                            }
+                        });
+                    } else if (log.lotAddress) {
+                        addresses.push(log.lotAddress);
+                    }
                     if (addresses.length === 0) return null;
                     const verifications = await Promise.allSettled(
                         addresses.map((addr: string) => this.validateParcelAddress(addr))
