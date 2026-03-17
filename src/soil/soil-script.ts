@@ -3044,7 +3044,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const tdLotAddress = document.createElement('td');
             tdLotAddress.className = 'col-lot-address';
             tdLotAddress.textContent = row._lotAddress;
-            if ((log as any).addressVerified === false) {
+            if ((row as any).addressVerified === false) {
                 tdLotAddress.classList.add('address-invalid');
                 tdLotAddress.title = '지번 주소가 VWORLD에서 확인되지 않았습니다';
             }
