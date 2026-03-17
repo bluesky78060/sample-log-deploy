@@ -370,34 +370,9 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
       id: item.id || this.generateId(),
     }));
 
-    // Firebase가 활성화되어 있으면 Firebase에 먼저 저장
-    if (window.firebaseConfig?.isEnabled()) {
-      try {
-        this.log(' Firebase에 데이터 저장 중...');
-        await window.firestoreDb?.batchSave(
-          this.moduleKey,
-          parseInt(this.selectedYear),
-          this.sampleLogs as unknown as Record<string, unknown>[]
-        );
-        this.log('☁️ Firebase 저장 완료:', this.sampleLogs.length, '건');
-
-        // 성공 후 localStorage에 캐싱
-        localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
-        this.log(' localStorage에 캐싱 완료');
-      } catch (err) {
-        (window.logger?.error || console.error)('Firebase 저장 실패:', err);
-        this.showToast('Firebase 저장 실패', 'error');
-
-        // Firebase 저장 실패 시에만 localStorage를 primary로 사용
-        localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
-        this.log('💾 로컬 저장으로 폴백');
-      }
-    } else {
-      // Firebase가 비활성화된 경우에만 localStorage 사용
-      this.log(' Firebase 비활성화, localStorage에만 저장');
-      localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
-      this.log('💾 로컬 저장 완료:', this.sampleLogs.length, '건');
-    }
+    // 로컬 저장 (Firebase는 호출자에서 개별 변경분만 저장 — Quota 절감)
+    localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
+    this.log('💾 로컬 저장 완료:', this.sampleLogs.length, '건');
 
     // 자동 저장 트리거
     this.triggerAutoSave();
@@ -417,38 +392,20 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
     this.listViewStale = true; // PER-5
     this._firebaseCache.delete(this.selectedYear); // PER-9: 캐시 무효화
 
-    // Firebase가 활성화되어 있으면 Firebase에서 먼저 삭제
-    if (window.firebaseConfig?.isEnabled()) {
-      try {
-        this.log(' Firebase에서 데이터 삭제 중... ID:', id);
-        await window.firestoreDb?.delete(this.moduleKey, parseInt(this.selectedYear), id);
-        this.log('☁️ Firebase 삭제 완료:', id);
+    // 로컬 삭제 먼저 (UI 블로킹 방지)
+    this.sampleLogs = this.sampleLogs.filter((l) => String(l.id) !== String(id));
+    await this.saveLogs();
+    this.filterAndRenderLogs();
+    this.showToast('삭제되었습니다.', 'success');
 
-        // Firebase 삭제 성공 후 로컬 데이터도 업데이트
-        this.sampleLogs = this.sampleLogs.filter((l) => String(l.id) !== id);
-
-        // localStorage 캐시 업데이트
-        const yearStorageKey = this.getStorageKey(this.selectedYear);
-        localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
-
-        // UI 업데이트 (기본 필터 적용)
-        this.filterAndRenderLogs();
-        this.updateRecordCount();
-
-        this.showToast('삭제되었습니다.', 'success');
-      } catch (err) {
-        (window.logger?.error || console.error)('Firebase 삭제 실패:', err);
-        this.showToast('Firebase 삭제 실패', 'error');
-      }
-    } else {
-      // Firebase가 비활성화된 경우에만 로컬 삭제
-      this.log(' Firebase 비활성화, 로컬에서만 삭제');
-      this.sampleLogs = this.sampleLogs.filter((l) => String(l.id) !== id);
-      await this.saveLogs();
-      this.filterAndRenderLogs();
-      this.showToast('삭제되었습니다.', 'success');
+    // Firebase 삭제 (백그라운드)
+    if (window.firestoreDb?.isEnabled()) {
+      window.firestoreDb.delete(this.moduleKey, parseInt(this.selectedYear), String(id))
+        .then(() => this.log('Firebase 삭제 완료:', id))
+        .catch((err: unknown) => (window.logger?.error || console.error)('Firebase 삭제 실패:', err));
     }
   }
+
 
   /**
    * 년도별 데이터 로드
