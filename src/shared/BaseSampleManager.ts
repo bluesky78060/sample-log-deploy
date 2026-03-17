@@ -374,6 +374,14 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
     localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
     this.log('💾 로컬 저장 완료:', this.sampleLogs.length, '건');
 
+    // Firebase 백그라운드 동기화 (fire-and-forget — Quota 초과 시에도 UI 블로킹 없음)
+    // soil은 자체 override로 개별 저장, 나머지(water/compost/heavy-metal/pesticide)는 batchSave
+    if (window.firestoreDb?.isEnabled()) {
+      window.firestoreDb.batchSave(this.moduleKey, parseInt(this.selectedYear), this.sampleLogs as unknown as Record<string, unknown>[])
+        .then(() => this.log('Firebase 동기화 완료:', this.sampleLogs.length, '건'))
+        .catch((err: unknown) => (window.logger?.error || console.error)('Firebase 동기화 실패:', err));
+    }
+
     // 자동 저장 트리거
     this.triggerAutoSave();
 
