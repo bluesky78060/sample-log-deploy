@@ -6542,3 +6542,13 @@ select {
 .table-wrapper::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+
+/* 필지 주소 검증 실패 표시 */
+.data-table td.address-invalid {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+[data-theme="dark"] .data-table td.address-invalid {
+    color: #f87171;
+}

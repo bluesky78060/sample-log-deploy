@@ -1324,3 +1324,31 @@ ipcMain.handle('clear-session-password', async (event) => {
   _sessionPasswordEncrypted = null;
   return true;
 });
+
+// ========================================
+// VWORLD 지번 지오코딩 (main process → Origin 헤더 없음, 도메인 제한 우회)
+// ========================================
+
+ipcMain.handle('vworld-geocode', async (_event, { address, apiKey }: { address: string; apiKey: string }) => {
+  const https = require('node:https');
+  const url = `https://api.vworld.kr/req/address?service=address&request=getCoord&version=2.0&crs=epsg:4326&address=${encodeURIComponent(address)}&refine=true&simple=false&format=json&type=parcel&key=${apiKey}`;
+  return new Promise<boolean | null>((resolve) => {
+    const timeout = setTimeout(() => { req.destroy(); resolve(null); }, 8000);
+    const req = https.get(url, (res: any) => {
+      let data = '';
+      res.on('data', (chunk: any) => { data += chunk; });
+      res.on('end', () => {
+        clearTimeout(timeout);
+        try {
+          const json = JSON.parse(data);
+          const ok = json?.response?.status === 'OK' &&
+            parseInt(json?.response?.result?.totalCount ?? '0', 10) > 0;
+          resolve(ok);
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => { clearTimeout(timeout); resolve(null); });
+  });
+});

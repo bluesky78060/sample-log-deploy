@@ -123,6 +123,12 @@ interface ElectronAPI {
 
   // Auto-update
   quitAndInstall?(): void;
+
+  // Heuktoram popup
+  openHeuktoram?(): Promise<boolean>;
+
+  // VWORLD geocoding (IPC via main process, no Origin restriction)
+  vworldGeocode?(address: string, apiKey: string): Promise<boolean | null>;
 }
 
 // ========================================
