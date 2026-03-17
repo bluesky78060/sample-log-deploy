@@ -385,8 +385,8 @@ const createWindow = (): void => {
           // 개발 모드: Vite HMR 허용
           process.env.NODE_ENV === 'development'
             ? "default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:* ws://localhost:* https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;"
-            // 프로덕션: frame-src HTTP 제거(HTTPS만 허용), unsafe-inline은 추후 nonce/hash 방식으로 전환 예정
-            : "default-src 'self'; script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' https://postcode.map.daum.net https://*.daumcdn.net https://postcode.map.kakao.com https://*.kakaocdn.net;"
+            // 프로덕션: Kakao postcode SDK가 http://postcode.map.kakao.com을 직접 로드하므로 HTTP도 허용
+            : "default-src 'self'; script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;"
         ]
       }
     });
@@ -450,7 +450,7 @@ app.whenReady().then(async () => {
               "font-src 'self' file: https://fonts.gstatic.com; " +
               "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.ipify.org https://www.gstatic.com https://cdnjs.cloudflare.com; " +
               "img-src 'self' file: data:; " +
-              "frame-src 'self' https://t1.kakaocdn.net https://postcode.map.kakao.com https://*.kakaocdn.net https://t1.daumcdn.net https://postcode.map.daum.net https://*.daumcdn.net; " + // Kakao 우편번호 API iframe (전환기간 중 기존 도메인 유지)
+              "frame-src 'self' http://t1.kakaocdn.net https://t1.kakaocdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net http://t1.daumcdn.net https://t1.daumcdn.net http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net; " + // Kakao 우편번호 API iframe (HTTP/HTTPS 모두 허용)
               "object-src 'none'; " + // Flash, Java 등 플러그인 차단
               "base-uri 'self'; " + // <base> 태그 제한
               "form-action 'self'; " + // 폼 제출 대상 제한
