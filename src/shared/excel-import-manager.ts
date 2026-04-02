@@ -442,7 +442,7 @@ class ExcelImportManager {
                 <select class="mapping-select" data-col-idx="${idx}">
                     <option value="">-- 건너뛰기 --</option>
                     ${this.config.appFields.map(f =>
-                        `<option value="${f.key}" ${this._columnMapping[idx] === f.key ? 'selected' : ''}>${f.label}</option>`
+                        `<option value="${window.escapeHTML(f.key)}" ${this._columnMapping[idx] === f.key ? 'selected' : ''}>${window.escapeHTML(f.label)}</option>`
                     ).join('')}
                 </select>
                 <span class="mapping-sample" title="${safeSampleValue}">예: ${safeSampleValue}</span>
@@ -627,7 +627,7 @@ class ExcelImportManager {
                 const cells = cols.map(c => {
                     if (renderCell) {
                         const custom = renderCell(l, c.key);
-                        if (custom !== undefined) return `<td>${custom}</td>`;
+                        if (custom !== undefined) return '<td>' + window.escapeHTML(String(custom)) + '</td>';
                     }
                     const val = l[c.key];
                     return `<td>${escapeHTML(val !== undefined && val !== null ? String(val) : '')}</td>`;

@@ -44,22 +44,22 @@ interface BaseSample {
   id: string;
 
   /** Reception date (YYYY-MM-DD format) */
-  접수일: string;
+  date: string;
 
   /** Reception number (sequential per type/year) */
-  접수번호: string;
+  receptionNumber: string;
 
   /** Applicant name */
-  성명: string;
+  name: string;
 
   /** Applicant phone number */
-  전화번호?: string;
+  phoneNumber?: string;
 
   /** Reception method */
-  수령방법?: ReceptionMethod | string;
+  receptionMethod?: ReceptionMethod | string;
 
   /** Additional notes */
-  비고?: string;
+  note?: string;
 
   /** Completion status */
   completed?: boolean;
@@ -87,13 +87,13 @@ interface FirebaseTimestamp {
  */
 interface CropArea {
   /** Crop name */
-  작물명: string;
+  cropName: string;
 
   /** Cultivation area */
-  재배면적: number | string;
+  area: number | string;
 
   /** Area unit */
-  단위: AreaUnit;
+  unit: AreaUnit;
 }
 
 /**
@@ -101,16 +101,16 @@ interface CropArea {
  */
 interface SubLot {
   /** Lot number (지번) */
-  지번: string;
+  lotNumber: string;
 
   /** Region (읍/면/동) */
-  읍면동?: string;
+  district?: string;
 
   /** Village (리/마을) */
-  리?: string;
+  village?: string;
 
   /** Crops in this lot */
-  작물?: CropArea[];
+  crops?: CropArea[];
 }
 
 /**
@@ -121,22 +121,22 @@ interface SoilParcel {
   id: string | number;
 
   /** Region (읍/면/동) */
-  읍면동: string;
+  district: string;
 
   /** Village (리/마을) */
-  리: string;
+  village: string;
 
   /** Lot number (지번) */
-  지번: string;
+  lotNumber: string;
 
   /** Sub-lots (multiple lots per parcel) */
   subLots?: SubLot[];
 
   /** Crops and areas */
-  작물재배면적?: CropArea[];
+  cropAreas?: CropArea[];
 
   /** Purpose of soil test */
-  검정목적?: string;
+  purpose?: string;
 }
 
 /**
@@ -144,34 +144,34 @@ interface SoilParcel {
  */
 interface SoilSample extends BaseSample {
   /** Sample category */
-  구분?: '토양' | '농업용수' | string;
+  category?: '토양' | '농업용수' | string;
 
   /** Sub-category */
-  세부구분?: string;
+  subCategory?: string;
 
   /** Address information */
-  주소?: string;
-  도로명주소?: string;
-  상세주소?: string;
-  우편번호?: string;
+  address?: string;
+  addressRoad?: string;
+  addressDetail?: string;
+  addressPostcode?: string;
 
   /** Parcel data (JSON string or array) */
   parcels?: SoilParcel[] | string;
 
   /** Flattened parcel info for table display */
-  읍면동?: string;
-  리?: string;
-  지번?: string;
-  작물명?: string;
-  재배면적?: number | string;
-  면적단위?: AreaUnit;
-  검정목적?: string;
+  district?: string;
+  village?: string;
+  lotNumber?: string;
+  cropName?: string;
+  area?: number | string;
+  areaUnit?: AreaUnit;
+  purpose?: string;
 
   /** Test results */
-  결과?: TestResult | string;
+  testResult?: TestResult | string;
 
   /** Mail dispatch date */
-  우편발송일?: string;
+  mailDate?: string;
 }
 
 // ========================================
@@ -183,16 +183,16 @@ interface SoilSample extends BaseSample {
  */
 interface WaterTestItem {
   /** Test item name */
-  항목명: string;
+  itemName: string;
 
   /** Test result value */
-  결과값?: string | number;
+  resultValue?: string | number;
 
   /** Reference value */
-  기준값?: string | number;
+  referenceValue?: string | number;
 
   /** Unit */
-  단위?: string;
+  unit?: string;
 }
 
 /**
@@ -200,31 +200,31 @@ interface WaterTestItem {
  */
 interface WaterSample extends BaseSample {
   /** Sample source type */
-  수원종류?: string;
+  waterSourceType?: string;
 
   /** Sample location */
-  채수지점?: string;
+  samplingPoint?: string;
 
   /** Address */
-  주소?: string;
+  address?: string;
 
   /** Purpose of water test */
-  검정목적?: string;
+  purpose?: string;
 
   /** Test items */
-  검사항목?: WaterTestItem[] | string;
+  testItems?: WaterTestItem[] | string;
 
   /** Overall result */
-  결과?: TestResult | string;
+  testResult?: TestResult | string;
 
   /** Report number */
-  성적서번호?: string;
+  reportNumber?: string;
 
   /** Test date */
-  검사일?: string;
+  testDate?: string;
 
   /** Report issue date */
-  발급일?: string;
+  issueDate?: string;
 }
 
 // ========================================
@@ -326,22 +326,22 @@ interface CompostSample extends BaseSample {
  */
 interface PesticideTestItem {
   /** Pesticide name */
-  농약명: string;
+  pesticideName: string;
 
   /** Detected amount */
-  검출량?: number;
+  detectedAmount?: number;
 
   /** Detection limit */
-  검출한계?: number;
+  detectionLimit?: number;
 
   /** Maximum residue limit (MRL) */
-  잔류허용기준?: number;
+  maxResidueLimit?: number;
 
   /** Unit (usually ppm or mg/kg) */
-  단위?: string;
+  unit?: string;
 
   /** Result */
-  판정?: '적합' | '부적합' | string;
+  verdict?: '적합' | '부적합' | string;
 }
 
 /**
@@ -349,40 +349,40 @@ interface PesticideTestItem {
  */
 interface PesticideSample extends BaseSample {
   /** Sample name / crop type */
-  시료명?: string;
+  sampleName?: string;
 
   /** Producer name */
-  생산자?: string;
+  producerName?: string;
 
   /** Producer address */
-  생산자주소?: string;
+  producerAddress?: string;
 
   /** Production location */
-  생산지?: string;
+  productionLocation?: string;
 
   /** Crop name */
-  농산물명?: string;
+  requestContent?: string;
 
   /** Sample collection date */
-  채취일?: string;
+  samplingDate?: string;
 
   /** Test date */
-  검사일?: string;
+  testDate?: string;
 
   /** Test items (individual pesticides) */
-  검사항목?: PesticideTestItem[] | string;
+  testItems?: PesticideTestItem[] | string;
 
   /** Number of pesticides tested */
-  검사항목수?: number;
+  testItemCount?: number;
 
   /** Overall result */
-  결과?: TestResult | string;
+  testResult?: TestResult | string;
 
   /** Report number */
-  성적서번호?: string;
+  reportNumber?: string;
 
   /** Certificate issue date */
-  증명서발급일?: string;
+  certificateDate?: string;
 }
 
 // ========================================
@@ -394,19 +394,19 @@ interface PesticideSample extends BaseSample {
  */
 interface HeavyMetalTestItem {
   /** Element name (e.g., Cd, Pb, As, Hg) */
-  항목명: string;
+  elementName: string;
 
   /** Detected concentration */
-  검출농도?: number;
+  detectedConcentration?: number;
 
   /** Standard limit */
-  기준농도?: number;
+  standardLimit?: number;
 
   /** Unit (usually mg/kg) */
-  단위?: string;
+  unit?: string;
 
   /** Result */
-  판정?: '적합' | '부적합' | string;
+  verdict?: '적합' | '부적합' | string;
 }
 
 /**
@@ -414,43 +414,43 @@ interface HeavyMetalTestItem {
  */
 interface HeavyMetalSample extends BaseSample {
   /** Sample location */
-  채취지점?: string;
+  samplingLocation?: string;
 
   /** Address */
-  주소?: string;
+  address?: string;
 
   /** Region */
-  읍면동?: string;
+  district?: string;
 
   /** Village */
-  리?: string;
+  village?: string;
 
   /** Lot number */
-  지번?: string;
+  lotNumber?: string;
 
   /** Land use type */
-  지목?: string;
+  landUseType?: string;
 
   /** Sample depth */
-  채취심도?: string;
+  samplingDepth?: string;
 
   /** Sample collection date */
-  채취일?: string;
+  samplingDate?: string;
 
   /** Test purpose */
-  검사목적?: string;
+  purpose?: string;
 
   /** Test items (individual metals) */
-  검사항목?: HeavyMetalTestItem[] | string;
+  testItems?: HeavyMetalTestItem[] | string;
 
   /** Overall result */
-  결과?: TestResult | string;
+  testResult?: TestResult | string;
 
   /** Soil grade */
-  토양등급?: '1등급' | '2등급' | '3등급' | string;
+  soilGrade?: '1등급' | '2등급' | '3등급' | string;
 
   /** Report number */
-  성적서번호?: string;
+  reportNumber?: string;
 }
 
 // ========================================
@@ -581,13 +581,13 @@ type SoilStatistics = SampleStatistics;
  */
 interface ParsedParcelAddress {
   /** Region (읍/면/동) */
-  읍면동: string;
+  district: string;
 
   /** Village (리/마을) */
-  리: string;
+  village: string;
 
   /** Lot number (지번) */
-  지번: string;
+  lotNumber: string;
 }
 
 /**

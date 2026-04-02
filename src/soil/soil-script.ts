@@ -3,8 +3,16 @@
  * SoilSampleManager - BaseSampleManager 상속
  */
 
-import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow, SoilSearchFilter, ParsedParcelAddress, RegionSelectionModalData, SoilStatistics } from '../types/sample-types';
-import { BaseSampleManager } from '../shared/BaseSampleManager';
+import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow, ParsedParcelAddress, RegionSelectionModalData, SoilStatistics } from '../types/sample-types';
+import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleManager';
+
+/**
+ * Soil 전용 검색 필터 (BaseSearchFilter 확장)
+ */
+interface SoilSearchFilter extends BaseSearchFilter {
+    lot: string;
+    purpose: string;
+}
 
 // ========================================
 // 상수 및 설정
@@ -24,7 +32,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     parcelIdCounter: number;
     currentRegistrationData: SoilLog | null;
     listViewStale: boolean;
-    currentSearchFilter: SoilSearchFilter;
+    declare currentSearchFilter: SoilSearchFilter;
     isFullView: boolean;
     autoSaveFileHandle: FileSystemFileHandle | null;
     regionSelectionModalData: RegionSelectionModalData | null;
@@ -302,25 +310,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     }
 
     // ========================================
-    // Override: completed 필드 마이그레이션 (soil은 isComplete 사용)
-    // ========================================
-
-    migrateCompletedField(logs) {
-        if (!Array.isArray(logs)) return logs;
-        return logs.map(log => {
-            if (log.completed !== undefined || log.isCompleted !== undefined) {
-                log.isComplete = log.isComplete || log.isCompleted || log.completed || false;
-                delete log.completed;
-                delete log.isCompleted;
-            }
-            if (log.isComplete === undefined) {
-                log.isComplete = false;
-            }
-            return log;
-        });
-    }
-
-    // ========================================
     // Override: 렌더링 전 데이터 가공 (flattenLogsForTable)
     // ========================================
 
@@ -339,23 +328,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     switchView(viewName) {
         this.closeAllAutocomplete();
-        const views = document.querySelectorAll('.view');
-        const navItems = document.querySelectorAll('.nav-btn');
-
-        views.forEach(view => view.classList.remove('active'));
-        navItems.forEach(nav => nav.classList.remove('active'));
-
-        const targetView = document.getElementById(`${viewName}View`);
-        const targetNav = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
-
-        if (targetView) targetView.classList.add('active');
-        if (targetNav) targetNav.classList.add('active');
-
-        // 목록 뷰로 전환 시 데이터 변경이 있을 때만 새로고침
-        if (viewName === 'list' && this.listViewStale) {
-            this.filterAndRenderLogs();
-            this.listViewStale = false;
-        }
+        super.switchView(viewName);
     }
 
     // ========================================
@@ -1786,6 +1759,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 };
             });
 
+            // 그룹 수정 시 주소 재검증 위해 addressVerified 먼저 초기화
+            newLogs.forEach(log => delete (log as any).addressVerified);
+
             newLogs.forEach(log => this.sampleLogs.push(log));
             this.saveLogs(); // localStorage 먼저 (ID 할당 보장)
 
@@ -1798,6 +1774,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             this.cancelEditMode();
             this.showToast(`${validParcels.length}건의 필지가 수정되었습니다.`, 'success');
             this.switchView('list');
+            // 주소 재검증 (UI 전환 후 비동기 실행)
+            this.validateAndMarkLogs(newLogs).catch(() => {});
             return;
         }
 
@@ -2284,111 +2262,71 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     // 검색/필터
     // ========================================
 
-    extractReceptionNumber(receptionNumber) {
-        const match = receptionNumber.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-    }
+    // extractReceptionNumber, filterAndRenderLogs는 BaseSampleManager에서 상속
+    // lot/purpose 추가 필터는 applyAdditionalFilters로 처리
 
-    filterAndRenderLogs() {
-        const filteredLogs = this.sampleLogs.filter(log => {
-            const matchesName = !this.currentSearchFilter.name ||
-                log.name.toLowerCase().includes(this.currentSearchFilter.name);
+    protected applyAdditionalFilters(log: SoilSample): boolean {
+        // lot 검색
+        let matchesLot = true;
+        if (this.currentSearchFilter.lot) {
+            matchesLot = false;
+            const searchQuery = this.currentSearchFilter.lot.trim().toLowerCase();
+            const searchTerms = searchQuery.split(/\s+/).filter(t => t);
 
-            let matchesReception = true;
-            if (this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo) {
-                const logNum = this.extractReceptionNumber(log.receptionNumber);
-                const fromNum = this.currentSearchFilter.receptionFrom ? parseInt(this.currentSearchFilter.receptionFrom, 10) : 0;
-                const toNum = this.currentSearchFilter.receptionTo ? parseInt(this.currentSearchFilter.receptionTo, 10) : Infinity;
-                if (fromNum && logNum < fromNum) matchesReception = false;
-                if (toNum !== Infinity && logNum > toNum) matchesReception = false;
-            }
+            const getSubLotAddress = (subLot: any): string => {
+                if (typeof subLot === 'string') return subLot.toLowerCase();
+                if (subLot && typeof subLot === 'object' && subLot.lotAddress) return subLot.lotAddress.toLowerCase();
+                return '';
+            };
 
-            let matchesDate = true;
-            if (this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo) {
-                const logDate = log.date;
-                if (this.currentSearchFilter.dateFrom && logDate < this.currentSearchFilter.dateFrom) matchesDate = false;
-                if (this.currentSearchFilter.dateTo && logDate > this.currentSearchFilter.dateTo) matchesDate = false;
-            }
-
-            let matchesLot = true;
-            if (this.currentSearchFilter.lot) {
-                matchesLot = false;
-                const searchQuery = this.currentSearchFilter.lot.trim().toLowerCase();
-                const searchTerms = searchQuery.split(/\s+/).filter(t => t);
-
-                const getSubLotAddress = (subLot) => {
-                    if (typeof subLot === 'string') return subLot.toLowerCase();
-                    if (subLot && typeof subLot === 'object' && subLot.lotAddress) return subLot.lotAddress.toLowerCase();
-                    return '';
-                };
-
-                if (log.parcels && log.parcels.length > 0) {
-                    matchesLot = log.parcels.some(parcel => {
-                        const lotAddrLower = parcel.lotAddress ? parcel.lotAddress.toLowerCase() : '';
-                        if (lotAddrLower.includes(searchQuery)) return true;
-                        if (searchTerms.every(term => lotAddrLower.includes(term))) return true;
-                        if (searchTerms.length === 1) {
-                            const term = searchTerms[0];
-                            if (parcel.subLots && parcel.subLots.length > 0) {
-                                if (parcel.subLots.some(subLot => {
+            if (log.parcels && log.parcels.length > 0) {
+                matchesLot = log.parcels.some(parcel => {
+                    const lotAddrLower = parcel.lotAddress ? parcel.lotAddress.toLowerCase() : '';
+                    if (lotAddrLower.includes(searchQuery)) return true;
+                    if (searchTerms.every(term => lotAddrLower.includes(term))) return true;
+                    if (searchTerms.length === 1) {
+                        const term = searchTerms[0];
+                        if (parcel.subLots && parcel.subLots.length > 0) {
+                            if (parcel.subLots.some(subLot => {
+                                const addr = getSubLotAddress(subLot);
+                                return addr && addr.includes(term);
+                            })) return true;
+                        }
+                    }
+                    if (searchTerms.length >= 2) {
+                        const riTerm = searchTerms[0];
+                        const lotTerms = searchTerms.slice(1);
+                        const matchesRi = lotAddrLower.includes(riTerm);
+                        if (matchesRi && parcel.subLots && parcel.subLots.length > 0) {
+                            const matchesSubLots = lotTerms.every(lotTerm =>
+                                parcel.subLots.some(subLot => {
                                     const addr = getSubLotAddress(subLot);
-                                    return addr && addr.includes(term);
-                                })) return true;
-                            }
+                                    return addr && addr.includes(lotTerm);
+                                })
+                            );
+                            if (matchesSubLots) return true;
                         }
-                        if (searchTerms.length >= 2) {
-                            const riTerm = searchTerms[0];
-                            const lotTerms = searchTerms.slice(1);
-                            const matchesRi = lotAddrLower.includes(riTerm);
-                            if (matchesRi && parcel.subLots && parcel.subLots.length > 0) {
-                                const matchesSubLots = lotTerms.every(lotTerm =>
-                                    parcel.subLots.some(subLot => {
-                                        const addr = getSubLotAddress(subLot);
-                                        return addr && addr.includes(lotTerm);
-                                    })
-                                );
-                                if (matchesSubLots) return true;
-                            }
-                        }
-                        return false;
-                    });
-                }
-            }
-
-            const matchesPurpose = !this.currentSearchFilter.purpose ||
-                (log.purpose || '') === this.currentSearchFilter.purpose;
-
-            let matchesCompleted = true;
-            if (this.currentSearchFilter.completed === 'completed') {
-                matchesCompleted = log.isComplete === true;
-            } else if (this.currentSearchFilter.completed === 'incomplete') {
-                matchesCompleted = !log.isComplete;
-            }
-
-            return matchesName && matchesReception && matchesDate && matchesLot && matchesPurpose && matchesCompleted;
-        });
-
-        this.renderLogs(filteredLogs);
-        this.updateSearchButtonState();
-    }
-
-    updateSearchButtonState() {
-        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
-        const purposeFilter = document.getElementById('purposeFilter');
-        const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
-            this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom ||
-            this.currentSearchFilter.receptionTo || this.currentSearchFilter.lot || this.currentSearchFilter.purpose ||
-            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
-
-        if (openSearchModalBtn) {
-            if (hasFilter) {
-                openSearchModalBtn.classList.add('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
-            } else {
-                openSearchModalBtn.classList.remove('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
+                    }
+                    return false;
+                });
             }
         }
+
+        const matchesPurpose = !this.currentSearchFilter.purpose ||
+            (log.purpose || '') === this.currentSearchFilter.purpose;
+
+        return matchesLot && matchesPurpose;
+    }
+
+    protected updateSearchButtonState(): void {
+        super.updateSearchButtonState();
+        // lot/purpose 추가 필터 체크
+        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
+        if (openSearchModalBtn && (this.currentSearchFilter.lot || this.currentSearchFilter.purpose)) {
+            openSearchModalBtn.classList.add('has-filter');
+            openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
+        }
+        const purposeFilter = document.getElementById('purposeFilter');
         if (purposeFilter) {
             if (this.currentSearchFilter.purpose) {
                 purposeFilter.classList.add('has-filter');
@@ -4338,7 +4276,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const res = await fetch(url, { signal: controller.signal });
             if (!res.ok) return null;
             const data = await res.json();
-            return data?.response?.status === 'OK' && parseInt(data?.response?.result?.totalCount ?? '0', 10) > 0;
+            return data?.response?.status === 'OK';
         } catch {
             return null;
         } finally {

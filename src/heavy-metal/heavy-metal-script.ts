@@ -5,9 +5,10 @@
 
 // TypeScript migration completed
 
+import { BaseSampleManager, BaseSample } from '../shared/BaseSampleManager';
+
 // Type declarations
-interface HeavyMetalSample {
-    id: string;
+interface HeavyMetalSample extends BaseSample {
     receptionNumber: string;
     date: string;
     applicantType: '개인' | '법인';
@@ -30,7 +31,6 @@ interface HeavyMetalSample {
     note?: string;
     isComplete?: boolean;
     isCompleted?: boolean;
-    completed?: boolean;
     testResult?: 'pass' | 'fail' | '';
     mailDate?: string;
     createdAt?: string;
@@ -59,21 +59,15 @@ interface ExcelImportManagerInstance {
 declare var ExcelImportManager: ExcelImportManagerConstructor;
 
 // Extend window interface for global functions
-interface WindowExtensions {
-    BaseSampleManager: any;
-    showToast?: (message: string, type: string) => void;
-    toggleComplete?: (id: string) => void;
-    toggleResult?: (id: string) => void;
-    heavyMetalManager?: HeavyMetalSampleManager;
-    DEBUG?: boolean;
-    PaginationManager?: any;
-    AddressManager?: any;
-    firestoreDb?: any;
-    encryptionManager?: any;
-    logger?: any;
+declare global {
+    interface Window {
+        toggleComplete?: (id: string) => void;
+        toggleResult?: (id: string) => void;
+        heavyMetalManager?: HeavyMetalSampleManager;
+        DEBUG?: boolean;
+        AddressManager?: new (options: any) => any;
+    }
 }
-
-interface Window extends WindowExtensions {}
 
 // Helper function for type-safe element access
 function getInput(id: string): HTMLInputElement | null {
@@ -88,27 +82,17 @@ function getTextArea(id: string): HTMLTextAreaElement | null {
     return document.getElementById(id) as HTMLTextAreaElement | null;
 }
 
-// Use `any` to avoid most TypeScript errors - this is converted JS code
-class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
-    [key: string]: any; // Allow any property access
+// HeavyMetalSampleManager extends BaseSampleManager with typed generic
+class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
     // Property declarations
     ANALYSIS_ITEMS: string[];
     isAllSelected: boolean;
     autoSaveFileHandle: any;
     listViewStale: boolean;
-    currentSearchFilter: {
-        dateFrom: string;
-        dateTo: string;
-        name: string;
-        receptionFrom: string;
-        receptionTo: string;
-        completed: 'all' | 'completed' | 'incomplete';
-    };
     currentRegistrationData: HeavyMetalSample | null;
     pendingMailDateIndices: string[];
     GYEONGBUK_REGION_NAMES: string[];
     declare sampleLogs: HeavyMetalSample[];
-    declare selectedYear: number;
     declare form: HTMLFormElement | null;
     declare tableBody: HTMLTableSectionElement | null;
     declare emptyState: HTMLElement | null;
@@ -130,10 +114,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         this.isAllSelected = false;
         this.autoSaveFileHandle = null;
         this.listViewStale = true;
-        this.currentSearchFilter = {
-            dateFrom: '', dateTo: '', name: '',
-            receptionFrom: '', receptionTo: '', completed: 'incomplete'
-        };
+        // currentSearchFilter는 BaseSampleManager에서 초기화
         this.currentRegistrationData = null;
         this.pendingMailDateIndices = [];
 
@@ -156,54 +137,6 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
         this.tableBody = document.getElementById('logTableBody') as HTMLTableSectionElement | null;
         this.emptyState = document.getElementById('emptyState');
         this.recordCountEl = document.getElementById('recordCount');
-    }
-
-    // ========================================
-    // 오버라이드: 완료 필드 마이그레이션 (isComplete 사용)
-    // ========================================
-    migrateCompletedField(logs: HeavyMetalSample[]): HeavyMetalSample[] {
-        if (!Array.isArray(logs)) return logs;
-        return logs.map(log => {
-            if (log.completed !== undefined || log.isCompleted !== undefined) {
-                log.isComplete = log.isComplete || log.isCompleted || log.completed || false;
-                delete log.completed;
-                delete log.isCompleted;
-            }
-            return log;
-        });
-    }
-
-    // ========================================
-    // 오버라이드: 렌더링 전 데이터 정렬
-    // ========================================
-    prepareDataForRender(logs: HeavyMetalSample[]): HeavyMetalSample[] {
-        return [...logs].sort((a, b) => {
-            const numA = parseInt(a.receptionNumber, 10) || 0;
-            const numB = parseInt(b.receptionNumber, 10) || 0;
-            return numA - numB;
-        });
-    }
-
-    // ========================================
-    // 오버라이드: 뷰 전환 (listViewStale 지원)
-    // ========================================
-    switchView(viewName: string): void {
-        const views = document.querySelectorAll('.view');
-        const navItems = document.querySelectorAll('.nav-btn');
-
-        views.forEach(view => view.classList.remove('active'));
-        navItems.forEach(nav => nav.classList.remove('active'));
-
-        const targetView = document.getElementById(`${viewName}View`);
-        const targetNav = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
-
-        if (targetView) targetView.classList.add('active');
-        if (targetNav) targetNav.classList.add('active');
-
-        if (viewName === 'list' && this.listViewStale) {
-            this.filterAndRenderLogs();
-            this.listViewStale = false;
-        }
     }
 
     // ========================================
@@ -635,7 +568,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     // ========================================
     // 오버라이드: 연도 변경 hook
     // ========================================
-    onYearChange(newYear: number): void {
+    onYearChange(_newYear: string): void {
         this.updateListViewTitle();
     }
 
@@ -998,64 +931,9 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
     }
 
     // ========================================
-    // 검색/필터
+    // 검색/필터 - extractReceptionNumber, filterAndRenderLogs, updateSearchButtonState
+    // BaseSampleManager에서 상속
     // ========================================
-    extractReceptionNumber(receptionNumber: string): number {
-        const match = receptionNumber.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-    }
-
-    filterAndRenderLogs(): void {
-        const filtered = this.sampleLogs.filter(log => {
-            const matchesName = !this.currentSearchFilter.name ||
-                (log.name || '').toLowerCase().includes(this.currentSearchFilter.name);
-
-            let matchesReception = true;
-            if (this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo) {
-                const logNum = this.extractReceptionNumber(log.receptionNumber || '');
-                const fromNum = this.currentSearchFilter.receptionFrom ? parseInt(this.currentSearchFilter.receptionFrom, 10) : 0;
-                const toNum = this.currentSearchFilter.receptionTo ? parseInt(this.currentSearchFilter.receptionTo, 10) : Infinity;
-                if (fromNum && logNum < fromNum) matchesReception = false;
-                if (toNum !== Infinity && logNum > toNum) matchesReception = false;
-            }
-
-            let matchesDate = true;
-            if (this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo) {
-                const logDate = log.date;
-                if (this.currentSearchFilter.dateFrom && logDate < this.currentSearchFilter.dateFrom) matchesDate = false;
-                if (this.currentSearchFilter.dateTo && logDate > this.currentSearchFilter.dateTo) matchesDate = false;
-            }
-
-            let matchesCompleted = true;
-            if (this.currentSearchFilter.completed === 'completed') {
-                matchesCompleted = log.isComplete === true;
-            } else if (this.currentSearchFilter.completed === 'incomplete') {
-                matchesCompleted = !log.isComplete;
-            }
-
-            return matchesName && matchesReception && matchesDate && matchesCompleted;
-        });
-
-        this.renderLogs(filtered);
-        this.updateSearchButtonState();
-        this.showToast(`${filtered.length}건의 검색 결과`, 'success');
-    }
-
-    updateSearchButtonState(): void {
-        const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
-            this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo ||
-            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
-        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
-        if (openSearchModalBtn) {
-            if (hasFilter) {
-                openSearchModalBtn.classList.add('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
-            } else {
-                openSearchModalBtn.classList.remove('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
-            }
-        }
-    }
 
     // ========================================
     // 우편발송일자 모달
@@ -2001,7 +1879,7 @@ class HeavyMetalSampleManager extends (window as any).BaseSampleManager {
             renderPreviewCell: (record: any, key: string) => {
                 if (key === 'analysisItems') {
                     const items = record.analysisItems;
-                    return escapeHTML(items.length === ANALYSIS_ITEMS.length ? '전항목' : items.join(', '));
+                    return items.length === ANALYSIS_ITEMS.length ? '전항목' : items.join(', ');
                 }
                 return undefined;
             },

@@ -8,6 +8,7 @@ import DOMPurify from 'dompurify';
 interface DOMPurifyConfig {
     ALLOWED_TAGS: string[];
     ALLOWED_ATTR: string[];
+    FORBID_ATTR?: string[];
     ALLOW_DATA_ATTR: boolean;
 }
 
@@ -39,21 +40,22 @@ function sanitizeHTML(html: string): string {
                 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
                 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
-                'a', 'img', 'button', 'input', 'select', 'option', 'textarea', 'label',
-                'form', 'fieldset', 'legend',
+                'a', 'img', 'input', 'select', 'option', 'textarea', 'button', 'label',
+                'fieldset', 'legend',
                 'strong', 'em', 'b', 'i', 'u', 's', 'small', 'mark', 'sub', 'sup',
                 'pre', 'code', 'blockquote', 'cite', 'abbr',
                 'header', 'footer', 'nav', 'main', 'section', 'article', 'aside',
                 'figure', 'figcaption', 'details', 'summary'
             ],
             ALLOWED_ATTR: [
-                'class', 'id', 'style', 'title', 'alt', 'src', 'href', 'target', 'rel',
+                'class', 'id', 'title', 'alt', 'src', 'href', 'target', 'rel',
                 'type', 'name', 'value', 'placeholder', 'disabled', 'readonly', 'checked', 'selected',
                 'for', 'data-*', 'aria-*', 'role',
                 'colspan', 'rowspan', 'width', 'height',
                 'min', 'max', 'step', 'pattern', 'required', 'maxlength', 'minlength',
                 'rows', 'cols', 'multiple', 'accept'
             ],
+            FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
             ALLOW_DATA_ATTR: true
         };
         return DOMPurify.sanitize(html, config);

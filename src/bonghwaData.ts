@@ -61,6 +61,7 @@ interface VillageSuggestion {
     region: string;
     isMountain: boolean;
     displayText: string;
+    score?: number;
 }
 
 /**
@@ -3799,6 +3800,10 @@ function suggestRegionVillages(input: string | null | undefined, regions: string
 
             // 리명 부분이 검색어와 매칭되는지 확인
             if (villageOnly.includes(villageInput)) {
+                let score = 2;
+                if (villageOnly === villageInput) score = 0;
+                else if (villageOnly.startsWith(villageInput)) score = 1;
+
                 // 일반 지번 옵션 (산 키워드가 입력에 없을 때만)
                 if (!hasMountainKeyword) {
                     results.push({
@@ -3808,6 +3813,7 @@ function suggestRegionVillages(input: string | null | undefined, regions: string
                         regionKey,
                         region: REGION_NAMES[regionKey],
                         isMountain: false,
+                        score,
                         displayText: `${displayVillage} (${REGION_NAMES[regionKey]} ${district})`
                     });
                 }
@@ -3821,8 +3827,51 @@ function suggestRegionVillages(input: string | null | undefined, regions: string
                         regionKey,
                         region: REGION_NAMES[regionKey],
                         isMountain: true,
+                        score,
                         displayText: `${displayVillage} 산 (${REGION_NAMES[regionKey]} ${district})`
                     });
+                }
+            }
+        }
+
+        // duplicates에서도 검색
+        if (regionData.duplicates) {
+            for (const [village, districts] of Object.entries(regionData.duplicates)) {
+                const villageOnly = village;
+                if (villageOnly.includes(villageInput)) {
+                    let score = 2;
+                    if (villageOnly === villageInput) score = 0;
+                    else if (villageOnly.startsWith(villageInput)) score = 1;
+
+                    for (const district of districts) {
+                        // villages에서 이미 추가된 항목은 건너뛰기
+                        if (regionData.villages[village] === district) continue;
+
+                        if (!hasMountainKeyword) {
+                            results.push({
+                                village,
+                                villageOnly: village,
+                                district,
+                                regionKey,
+                                region: REGION_NAMES[regionKey],
+                                isMountain: false,
+                                score,
+                                displayText: `${village} (${REGION_NAMES[regionKey]} ${district})`
+                            });
+                        }
+                        if (includeMountain || hasMountainKeyword) {
+                            results.push({
+                                village,
+                                villageOnly: village,
+                                district,
+                                regionKey,
+                                region: REGION_NAMES[regionKey],
+                                isMountain: true,
+                                score,
+                                displayText: `${village} 산 (${REGION_NAMES[regionKey]} ${district})`
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -3830,6 +3879,9 @@ function suggestRegionVillages(input: string | null | undefined, regions: string
 
     // 가나다순 정렬 (리명 기준, 산 지번은 일반 지번 다음에)
     results.sort((a: VillageSuggestion, b: VillageSuggestion) => {
+        // 0. 매칭 정확도 순서 (정확 > 접두사 > 부분)
+        const scoreCompare = (a.score ?? 2) - (b.score ?? 2);
+        if (scoreCompare !== 0) return scoreCompare;
         // 1. 리명으로 먼저 정렬
         const villageCompare = a.villageOnly.localeCompare(b.villageOnly, 'ko');
         if (villageCompare !== 0) return villageCompare;
@@ -3875,6 +3927,22 @@ function checkCrossRegionDuplicate(villageName: string | null | undefined): Cros
                 district,
                 fullAddress: `${REGION_NAMES[regionKey] || regionKey} ${district} ${villageName}`
             });
+        }
+
+        // duplicates에서도 확인
+        const dupDistricts = regionData.duplicates?.[villageName];
+        if (dupDistricts) {
+            for (const dupDistrict of dupDistricts) {
+                // villages에서 이미 추가된 것과 중복 방지
+                if (dupDistrict !== district) {
+                    locations.push({
+                        regionKey,
+                        region: REGION_NAMES[regionKey] || regionKey,
+                        district: dupDistrict,
+                        fullAddress: `${REGION_NAMES[regionKey] || regionKey} ${dupDistrict} ${villageName}`
+                    });
+                }
+            }
         }
     }
 
@@ -3935,6 +4003,42 @@ function parseParcelAddress(input: string): ParcelAddressResult | null {
                 alternatives: regionData.duplicates[villageName] || null
             };
             return result;
+        }
+    }
+
+    // villages에서 못 찾으면 duplicates에서 검색
+    for (const [regionKey, regionData] of Object.entries(REGION_DATA)) {
+        const dupDistricts = regionData.duplicates?.[villageName];
+        if (dupDistricts && dupDistricts.length > 0) {
+            if (dupDistricts.length > 1) {
+                // 같은 지역 내에서도 여러 읍면에 있으면 중복 처리
+                const locations: CrossRegionLocation[] = dupDistricts.map(d => ({
+                    regionKey,
+                    region: REGION_NAMES[regionKey] || regionKey,
+                    district: d,
+                    fullAddress: `${REGION_NAMES[regionKey] || regionKey} ${d} ${villageName}`
+                }));
+                return {
+                    isDuplicate: true,
+                    villageName,
+                    lotNumber,
+                    locations
+                } as DuplicateParseResult;
+            }
+            const district = dupDistricts[0];
+            const regionName = REGION_NAMES[regionKey] || regionKey;
+            const baseAddress = `${regionName} ${district} ${villageName}`;
+            const fullAddress = lotNumber ? `${baseAddress} ${lotNumber}` : baseAddress;
+            return {
+                isDuplicate: false,
+                fullAddress,
+                village: villageName,
+                district,
+                lotNumber,
+                region: regionName,
+                regionKey,
+                alternatives: null
+            } as SingleParseResult;
         }
     }
 

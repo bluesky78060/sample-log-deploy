@@ -3,6 +3,9 @@
 // 모든 시료 타입의 공통 기능을 관리하는 기본 클래스
 // ========================================
 
+import { smartMerge as syncSmartMerge } from './sync-utils';
+import { sanitizeHTML } from './sanitize';
+
 // ========================================
 // Type Definitions
 // ========================================
@@ -29,6 +32,18 @@ export interface BaseSampleManagerConfig {
   sampleType?: string;
   autoSaveFile?: string;
   debug?: boolean;
+}
+
+/**
+ * 공통 검색 필터 인터페이스
+ */
+export interface BaseSearchFilter {
+  dateFrom: string;
+  dateTo: string;
+  name: string;
+  receptionFrom: string;
+  receptionTo: string;
+  completed: 'all' | 'completed' | 'incomplete';
 }
 
 /**
@@ -149,6 +164,16 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
 
   /** PER-5: 목록 뷰 리렌더 필요 여부 */
   protected listViewStale: boolean = true;
+
+  /** 현재 검색 필터 (서브클래스에서 확장 가능) */
+  protected currentSearchFilter: BaseSearchFilter = {
+    dateFrom: '',
+    dateTo: '',
+    name: '',
+    receptionFrom: '',
+    receptionTo: '',
+    completed: 'incomplete',
+  };
 
   /** PER-9: 연도별 Firebase 데이터 캐시 */
   private _firebaseCache: Map<string, FirebaseCacheEntry<T>> = new Map();
@@ -371,7 +396,16 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
     }));
 
     // 로컬 저장 (Firebase는 호출자에서 개별 변경분만 저장 — Quota 절감)
-    localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
+    try {
+      localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
+    } catch (e) {
+      if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        this.showToast('저장 공간이 부족합니다. 오래된 데이터를 정리해주세요.', 'error');
+        (window.logger?.error || console.error)('localStorage QuotaExceededError:', e);
+        return; // Don't proceed with Firebase sync or auto-save
+      }
+      throw e;
+    }
     this.log('💾 로컬 저장 완료:', this.sampleLogs.length, '건');
 
     // Firebase 백그라운드 동기화 (fire-and-forget — Quota 초과 시에도 UI 블로킹 없음)
@@ -379,7 +413,10 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
     if (window.firestoreDb?.isEnabled()) {
       window.firestoreDb.batchSave(this.moduleKey, parseInt(this.selectedYear), this.sampleLogs as unknown as Record<string, unknown>[])
         .then(() => this.log('Firebase 동기화 완료:', this.sampleLogs.length, '건'))
-        .catch((err: unknown) => (window.logger?.error || console.error)('Firebase 동기화 실패:', err));
+        .catch((err: unknown) => {
+          (window.logger?.error || console.error)('Firebase 동기화 실패:', err);
+          this.showToast('클라우드 동기화에 실패했습니다. 로컬에는 저장되었습니다.', 'warning');
+        });
     }
 
     // 자동 저장 트리거
@@ -448,7 +485,15 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
             }
 
             // Firebase 데이터를 localStorage에 저장 (캐싱)
-            localStorage.setItem(yearStorageKey, JSON.stringify(firebaseLogs));
+            try {
+              localStorage.setItem(yearStorageKey, JSON.stringify(firebaseLogs));
+            } catch (e) {
+              if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+                (window.logger?.error || console.error)('localStorage QuotaExceededError (Firebase 캐싱):', e);
+              } else {
+                throw e;
+              }
+            }
             this.log(' Firebase 데이터를 localStorage에 캐싱');
           } else {
             this.log(' Firebase에 데이터 없음, localStorage 확인');
@@ -598,14 +643,14 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
   }
 
   /**
-   * 스마트 병합 - utils.js의 함수 사용
+   * 스마트 병합 - sync-utils ES 모듈 import 사용
    */
   protected smartMerge(localData: T[], firebaseData: T[]): T[] {
-    if (window.SyncUtils?.smartMerge) {
-      return window.SyncUtils.smartMerge(localData as Array<{ id: string }>, firebaseData as Array<{ id: string }>) as T[];
-    }
-    // 폴백: Firebase 데이터 우선
-    return firebaseData;
+    const result = syncSmartMerge(
+      localData as Array<{ id: string }>,
+      firebaseData as Array<{ id: string }>
+    );
+    return result.data as T[];
   }
 
   /**
@@ -1054,11 +1099,87 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
   // ========================================
 
   /**
-   * 필터를 적용한 렌더링 (서브클래스에서 override)
-   * 기본 구현은 renderLogs를 직접 호출 (필터 없음)
+   * 접수번호에서 숫자 추출
+   */
+  protected extractReceptionNumber(receptionNumber: string): number {
+    const match = receptionNumber.match(/(\d+)$/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+
+  /**
+   * 공통 필터 체인 적용
+   * 서브클래스에서 추가 필터가 필요하면 applyAdditionalFilters()를 오버라이드
    */
   public filterAndRenderLogs(): void {
-    this.renderLogs(this.sampleLogs);
+    const filtered = this.sampleLogs.filter((log: T) => {
+      const anyLog = log as Record<string, unknown>;
+
+      // 성명 검색
+      const matchesName = !this.currentSearchFilter.name ||
+        ((anyLog.name as string) || '').toLowerCase().includes(this.currentSearchFilter.name);
+
+      // 접수번호 범위 검색
+      let matchesReception = true;
+      if (this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo) {
+        const logNum = this.extractReceptionNumber((anyLog.receptionNumber as string) || '');
+        const fromNum = this.currentSearchFilter.receptionFrom ? parseInt(this.currentSearchFilter.receptionFrom, 10) : 0;
+        const toNum = this.currentSearchFilter.receptionTo ? parseInt(this.currentSearchFilter.receptionTo, 10) : Infinity;
+        if (fromNum && logNum < fromNum) matchesReception = false;
+        if (toNum !== Infinity && logNum > toNum) matchesReception = false;
+      }
+
+      // 날짜 범위 검색
+      let matchesDate = true;
+      if (this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo) {
+        const logDate = (anyLog.date as string) || '';
+        if (this.currentSearchFilter.dateFrom && logDate < this.currentSearchFilter.dateFrom) matchesDate = false;
+        if (this.currentSearchFilter.dateTo && logDate > this.currentSearchFilter.dateTo) matchesDate = false;
+      }
+
+      // 완료 상태 필터
+      let matchesCompleted = true;
+      if (this.currentSearchFilter.completed === 'completed') {
+        matchesCompleted = anyLog.isComplete === true;
+      } else if (this.currentSearchFilter.completed === 'incomplete') {
+        matchesCompleted = !anyLog.isComplete;
+      }
+
+      // 추가 필터 (서브클래스에서 오버라이드)
+      const matchesAdditional = this.applyAdditionalFilters(log);
+
+      return matchesName && matchesReception && matchesDate && matchesCompleted && matchesAdditional;
+    });
+
+    this.renderLogs(filtered);
+    this.updateSearchButtonState();
+  }
+
+  /**
+   * 추가 필터 적용 hook (서브클래스에서 오버라이드)
+   * @returns true면 포함, false면 제외
+   */
+  protected applyAdditionalFilters(_log: T): boolean {
+    return true;
+  }
+
+  /**
+   * 검색 버튼 상태 업데이트
+   */
+  protected updateSearchButtonState(): void {
+    const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
+      this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom ||
+      this.currentSearchFilter.receptionTo ||
+      (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
+    const openSearchModalBtn = document.getElementById('openSearchModalBtn');
+    if (openSearchModalBtn) {
+      if (hasFilter) {
+        openSearchModalBtn.classList.add('has-filter');
+        openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
+      } else {
+        openSearchModalBtn.classList.remove('has-filter');
+        openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
+      }
+    }
   }
 
   /**
@@ -1095,12 +1216,18 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
   }
 
   /**
-   * 렌더링 전 데이터 가공 (soil/pesticide: flattenLogsForTable)
+   * 렌더링 전 데이터 가공 - 기본: 접수번호 오름차순 정렬
    * @param logs - 원본 데이터
    * @returns 가공된 데이터
    */
-  public prepareDataForRender(logs: T[]): unknown[] {
-    return logs;
+  protected prepareDataForRender(logs: T[]): T[] {
+    return [...logs].sort((a, b) => {
+      const anyA = a as Record<string, unknown>;
+      const anyB = b as Record<string, unknown>;
+      const numA = parseInt((anyA.receptionNumber as string) || '', 10) || 0;
+      const numB = parseInt((anyB.receptionNumber as string) || '', 10) || 0;
+      return numA - numB;
+    });
   }
 
   /**
@@ -1119,8 +1246,14 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
   protected migrateCompletedField(logs: T[]): T[] {
     if (!Array.isArray(logs)) return logs;
     return logs.map((log) => {
-      if (log.completed === undefined) {
-        return { ...log, completed: false };
+      const anyLog = log as Record<string, unknown>;
+      if (anyLog.completed !== undefined || anyLog.isCompleted !== undefined) {
+        anyLog.isComplete = anyLog.isComplete || anyLog.isCompleted || anyLog.completed || false;
+        delete anyLog.completed;
+        delete anyLog.isCompleted;
+      }
+      if (anyLog.isComplete === undefined) {
+        anyLog.isComplete = false;
       }
       return log;
     });

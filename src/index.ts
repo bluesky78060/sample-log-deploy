@@ -68,6 +68,10 @@ const IPC_RATE_LIMIT = {
 // ========================================
 
 const RELEASE_CHANNEL = process.env.RELEASE_CHANNEL || 'stable';
+const isDev =
+  process.argv.includes('--dev') ||
+  process.env.NODE_ENV === 'development' ||
+  process.env.DEV_MODE === '1';
 
 // ========================================
 // Auto Updater Configuration
@@ -117,6 +121,19 @@ if (require('electron-squirrel-startup')) {
 // ========================================
 
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * M-3: 앱의 실제 docs 디렉토리 절대 경로 (will-navigate 검증용)
+ * realpath로 심볼릭 링크 해석 (존재하지 않으면 resolve 경로 사용)
+ */
+const DOCS_DIR = (() => {
+    const resolved = path.resolve(__dirname, '..', 'docs');
+    try {
+        return fs.realpathSync(resolved);
+    } catch {
+        return resolved;
+    }
+})();
 
 // ========================================
 // Path Validation
@@ -345,52 +362,43 @@ const createWindow = (): void => {
   const docsPath = path.join(__dirname, '..', 'docs', 'index.html');
 
   async function loadApp(): Promise<void> {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const req = http.get(VITE_DEV_SERVER_URL, { timeout: 1000 }, (res) => {
-          res.destroy();
-          resolve();
+    // 개발 모드에서만 Vite dev server 연결 시도
+    if (isDev) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const req = http.get(VITE_DEV_SERVER_URL, { timeout: 1000 }, (res) => {
+            res.destroy();
+            resolve();
+          });
+          req.on('error', reject);
+          req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('timeout'));
+          });
         });
-        req.on('error', reject);
-        req.on('timeout', () => {
-          req.destroy();
-          reject(new Error('timeout'));
-        });
-      });
-      mainWindow!.loadURL(VITE_DEV_SERVER_URL);
-      console.log(`[App] Vite dev server에서 로드: ${VITE_DEV_SERVER_URL}`);
-    } catch {
-      if (fs.existsSync(docsPath)) {
-        mainWindow!.loadFile(docsPath);
-        console.log(`[App] 빌드된 파일에서 로드: ${docsPath}`);
-      } else {
-        mainWindow!.loadURL(
-          `data:text/html;charset=utf-8,
-          <h2 style="font-family:sans-serif;padding:2rem;">앱을 시작할 수 없습니다</h2>
-          <p style="font-family:sans-serif;padding:0 2rem;">
-            <code>npm run build</code> 로 빌드하거나<br>
-            <code>npm run dev</code> 로 개발 서버를 시작해주세요.
-          </p>`
-        );
+        mainWindow!.loadURL(VITE_DEV_SERVER_URL);
+        console.log(`[App] Vite dev server에서 로드: ${VITE_DEV_SERVER_URL}`);
+        return;
+      } catch {
+        console.log('[App] Dev server 연결 실패, 빌드된 파일로 폴백');
       }
     }
-  }
 
-  // Content Security Policy 설정 (보안 경고 제거)
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          // 개발 모드: Vite HMR 허용
-          process.env.NODE_ENV === 'development'
-            ? "default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:* ws://localhost:* https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;"
-            // 프로덕션: Kakao postcode SDK가 http://postcode.map.kakao.com을 직접 로드하므로 HTTP도 허용
-            : "default-src 'self'; script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.ipify.org; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;"
-        ]
-      }
-    });
-  });
+    // 프로덕션: 빌드된 파일 직접 로드
+    if (fs.existsSync(docsPath)) {
+      mainWindow!.loadFile(docsPath);
+      console.log(`[App] 빌드된 파일에서 로드: ${docsPath}`);
+    } else {
+      mainWindow!.loadURL(
+        `data:text/html;charset=utf-8,
+        <h2 style="font-family:sans-serif;padding:2rem;">앱을 시작할 수 없습니다</h2>
+        <p style="font-family:sans-serif;padding:0 2rem;">
+          <code>npm run build</code> 로 빌드하거나<br>
+          <code>npm run dev</code> 로 개발 서버를 시작해주세요.
+        </p>`
+      );
+    }
+  }
 
   loadApp();
 
@@ -399,10 +407,27 @@ const createWindow = (): void => {
     mainWindow.setTitle(mainWindow.getTitle() + ' [BETA]');
   }
 
-  // 내부 링크 네비게이션 허용 (docs/ 하위 폴더)
-  mainWindow.webContents.on('will-navigate', (_event, url) => {
-    if (url.startsWith('file://') && (url.includes('/docs/') || url.includes('/src/'))) {
-      // 허용
+  // M-3: 내부 링크 네비게이션 허용 (실제 docs 디렉토리 기준 검증)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('file://')) {
+      try {
+        const fileUrl = new URL(url);
+        const filePath = decodeURIComponent(fileUrl.pathname);
+        // Windows: pathname이 /C:/... 형식 → 선행 슬래시 제거
+        const normalizedPath = process.platform === 'win32' ? filePath.replace(/^\//, '') : filePath;
+        let realFilePath: string;
+        try {
+          realFilePath = fs.realpathSync(normalizedPath);
+        } catch {
+          realFilePath = path.resolve(normalizedPath);
+        }
+        if (realFilePath.startsWith(DOCS_DIR + path.sep) || realFilePath === DOCS_DIR) {
+          return; // 허용
+        }
+      } catch {
+        // 경로 파싱 실패 시 차단
+      }
+      event.preventDefault();
     }
   });
 
@@ -423,11 +448,6 @@ const createWindow = (): void => {
 // Electron 초기화 완료 후 브라우저 창 생성 준비
 app.whenReady().then(async () => {
   // 개발 모드에서 캐시 클리어
-  const isDev =
-    process.argv.includes('--dev') ||
-    process.env.NODE_ENV === 'development' ||
-    process.env.DEV_MODE === '1';
-
   if (isDev) {
     await session.defaultSession.clearCache();
     console.log('[Dev] Cache cleared');
@@ -445,7 +465,7 @@ app.whenReady().then(async () => {
             "default-src 'self' file:; " +
               // unsafe-eval 제거 완료: eval(), Function(), setTimeout(string) 사용 차단
               // unsafe-inline은 단계적 마이그레이션을 위해 일시적으로 유지 (추후 해시 방식으로 전환 예정)
-              "script-src 'self' 'unsafe-inline' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://t1.kakaocdn.net https://t1.daumcdn.net https://cdnjs.cloudflare.com; " +
+              "script-src 'self' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://t1.kakaocdn.net https://t1.daumcdn.net https://cdnjs.cloudflare.com; " +
               "style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com https://t1.kakaocdn.net; " +
               "font-src 'self' file: https://fonts.gstatic.com; " +
               "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.ipify.org https://www.gstatic.com https://cdnjs.cloudflare.com; " +
@@ -1341,8 +1361,7 @@ ipcMain.handle('vworld-geocode', async (_event, { address, apiKey }: { address: 
         clearTimeout(timeout);
         try {
           const json = JSON.parse(data);
-          const ok = json?.response?.status === 'OK' &&
-            parseInt(json?.response?.result?.totalCount ?? '0', 10) > 0;
+          const ok = json?.response?.status === 'OK';
           resolve(ok);
         } catch {
           resolve(null);

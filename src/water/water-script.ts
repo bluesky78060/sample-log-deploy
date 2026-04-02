@@ -1,7 +1,22 @@
 /**
  * @fileoverview 수질분석 시료 전용 스크립트 (BaseSampleManager 기반)
- * @description 수질 분석용 시료 접수/관리 기능
+ * @description 수질 분析용 시료 접수/관리 기능
  */
+
+import { BaseSampleManager, BaseSample, ToastType } from '../shared/BaseSampleManager';
+
+// Global declarations - provided at runtime by the bundled environment
+declare var SIDO_PATTERN: RegExp;
+declare var SampleUtils: any;
+declare var XLSX: any;
+
+interface ExcelImportManagerConstructor {
+    new(config: any): ExcelImportManagerInstance;
+}
+interface ExcelImportManagerInstance {
+    init(): void;
+}
+declare var ExcelImportManager: ExcelImportManagerConstructor;
 
 // ========================================
 // 경상북도 전체 시/군 목록 (자동완성용)
@@ -22,18 +37,10 @@ const GYEONGBUK_REGION_NAMES: string[] = [
     '봉화군', '울릉군', '영주시', '울진군'
 ];
 
-interface WaterSearchFilter {
-    dateFrom: string;
-    dateTo: string;
-    name: string;
-    receptionFrom: string;
-    receptionTo: string;
-    completed: 'all' | 'completed' | 'incomplete';
-}
+// WaterSearchFilter → BaseSearchFilter로 통합 (BaseSampleManager에서 상속)
 
 // Type imports for base class
-interface WaterSampleLog {
-    id: string;
+interface WaterSampleLog extends BaseSample {
     receptionNumber: string;
     date: string;
     applicantType?: string;
@@ -51,6 +58,7 @@ interface WaterSampleLog {
     samplingLocation?: string;
     samplingLocations?: string[];
     samplingCrops?: string[];
+    sampleNamesPerRow?: string[];
     mainCrop?: string;
     purpose?: string;
     testItems?: string;
@@ -76,19 +84,12 @@ interface QuarterData {
     label: string;
 }
 
-class WaterSampleManager extends (window as any).BaseSampleManager {
+class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
     // 수질 전용 상태
     currentRegistrationData: WaterSampleLog | null;
     pendingMailDateIds: string[];
     isFullView: boolean;
-    currentSearchFilter: WaterSearchFilter;
     declare sampleLogs: WaterSampleLog[];
-    declare FileAPI: any;
-    declare tableBody: HTMLTableSectionElement | null;
-    declare emptyState: HTMLElement | null;
-    declare form: HTMLFormElement;
-    declare editingId: string | null;
-    declare selectedYear: string;
 
     // DOM 참조
     dateInput: HTMLInputElement | null;
@@ -125,14 +126,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         this.currentRegistrationData = null;
         this.pendingMailDateIds = [];
         this.isFullView = false;
-        this.currentSearchFilter = {
-            dateFrom: '',
-            dateTo: '',
-            name: '',
-            receptionFrom: '',
-            receptionTo: '',
-            completed: 'incomplete'
-        };
+        // currentSearchFilter는 BaseSampleManager에서 초기화
 
         // DOM 참조 (init 후 설정)
         this.dateInput = null;
@@ -188,32 +182,6 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         if (this.dateInput) {
             this.dateInput.valueAsDate = new Date();
         }
-    }
-
-    // ========================================
-    // 오버라이드: 완료 필드 마이그레이션 (isComplete 사용)
-    // ========================================
-    migrateCompletedField(logs: any): any {
-        if (!Array.isArray(logs)) return logs;
-        return logs.map((log: any) => {
-            if (log.completed !== undefined || log.isCompleted !== undefined) {
-                log.isComplete = log.isComplete || log.isCompleted || log.completed || false;
-                delete log.completed;
-                delete log.isCompleted;
-            }
-            return log;
-        });
-    }
-
-    // ========================================
-    // 오버라이드: 렌더링 전 데이터 정렬 (접수번호 오름차순)
-    // ========================================
-    prepareDataForRender(logs: any[]): any[] {
-        return [...logs].sort((a: any, b: any) => {
-            const numA = parseInt(a.receptionNumber, 10) || 0;
-            const numB = parseInt(b.receptionNumber, 10) || 0;
-            return numA - numB;
-        });
     }
 
     // ========================================
@@ -411,9 +379,10 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             return;
         }
 
-        const formData = new FormData(this.form);
+        const formData = new FormData(this.form ?? undefined);
         const samplingLocations = this.getAllSamplingLocations();
         const samplingCrops = this.getAllSamplingCrops();
+        const sampleNames = this.getAllSampleNames();
 
         // 접수번호 파싱 (예: "1, 2, 3" -> [1, 2, 3])
         const receptionNumberStr = String(formData.get('receptionNumber') || this.generateNextReceptionNumber());
@@ -450,6 +419,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
                 ...commonData,
                 id: SampleUtils.generateUUID(),
                 receptionNumber: receptionNumbers[i] || String(parseInt(receptionNumbers[0], 10) + i),
+                sampleName: sampleNames[i] || String(formData.get('sampleName') || '지하수'),
                 sampleCount: '1',
                 samplingLocation: samplingLocations[i] || '',
                 mainCrop: samplingCrops[i] || ''
@@ -537,11 +507,18 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
 
             // 채취장소 및 주작목 설정
             const crops = log.samplingCrops || [];
+            // 기존 데이터 호환: 개별 시료명 배열이 없으면 공통 sampleName으로 채움
+            const sampleNamesForRows = log.sampleNamesPerRow && Array.isArray(log.sampleNamesPerRow)
+                ? log.sampleNamesPerRow
+                : [];
             if (log.samplingLocations && Array.isArray(log.samplingLocations)) {
-                this.setSamplingLocations(log.samplingLocations, crops);
+                // 개별 시료명이 없으면 공통 sampleName을 각 위치에 반복 적용
+                const names = log.samplingLocations.map((_: unknown, i: number) => sampleNamesForRows[i] || log.sampleName || '지하수');
+                this.setSamplingLocations(log.samplingLocations, crops, names);
             } else if (log.samplingLocation) {
                 const locations = log.samplingLocation.split(',').map((s: string) => s.trim());
-                this.setSamplingLocations(locations, crops);
+                const names = locations.map((_: unknown, i: number) => sampleNamesForRows[i] || log.sampleName || '지하수');
+                this.setSamplingLocations(locations, crops, names);
             }
 
             // 통보방법 선택
@@ -589,7 +566,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         const receptionNumber = this.receptionNumberInput?.value;
         const date = this.dateInput?.value;
 
-        this.form.reset();
+        this.form?.reset();
 
         if (receptionNumber && this.receptionNumberInput) {
             this.receptionNumberInput.value = receptionNumber;
@@ -692,6 +669,11 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         item.dataset.index = String(index);
         item.innerHTML = sanitizeHTML(`
             <span class="location-number">${index + 1}</span>
+            <select class="sampling-samplename-select" name="sampleNames[]">
+                <option value="지하수">지하수</option>
+                <option value="지표수">지표수</option>
+                <option value="기타">기타</option>
+            </select>
             <div class="location-autocomplete-wrapper">
                 <input type="text" class="sampling-location-input" name="samplingLocations[]" required placeholder="리+지번 입력 (예: 내성리 123, 내성리 산 45)">
                 <ul class="location-autocomplete-list"></ul>
@@ -755,10 +737,16 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         return Array.from(inputs || []).map(input => input.value.trim());
     }
 
-    setSamplingLocations(locations: string[] | string, crops: string[] = []): void {
+    getAllSampleNames(): string[] {
+        const selects = this.samplingLocationsList?.querySelectorAll<HTMLSelectElement>('.sampling-samplename-select') || [];
+        return Array.from(selects).map(s => s.value || '지하수');
+    }
+
+    setSamplingLocations(locations: string[] | string, crops: string[] = [], sampleNames: string[] = []): void {
         if (!this.samplingLocationsList) return;
         let locs = Array.isArray(locations) ? locations : [locations];
         const cropsArray = Array.isArray(crops) ? crops : [crops];
+        const namesArray = Array.isArray(sampleNames) ? sampleNames : [sampleNames];
         locs = locs.filter((l: string) => l);
 
         const count = Math.max(1, locs.length);
@@ -766,10 +754,12 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
 
         const locationInputs = this.samplingLocationsList.querySelectorAll<HTMLInputElement>('.sampling-location-input');
         const cropInputs = this.samplingLocationsList.querySelectorAll<HTMLInputElement>('.sampling-crop-input');
+        const sampleNameSelects = this.samplingLocationsList.querySelectorAll<HTMLSelectElement>('.sampling-samplename-select');
 
         locs.forEach((loc: string, i: number) => {
             if (locationInputs[i]) locationInputs[i].value = loc;
             if (cropInputs[i] && cropsArray[i]) cropInputs[i].value = cropsArray[i];
+            if (sampleNameSelects[i] && namesArray[i]) sampleNameSelects[i].value = namesArray[i];
         });
     }
 
@@ -817,7 +807,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             }
 
             if (value.length >= 1) {
-                const suggestions: AutocompleteItem[] = suggestRegionVillages(value, null, true);
+                const suggestions: AutocompleteItem[] = suggestRegionVillages(value, [], true);
                 if (suggestions.length > 0) {
                     autocompleteList.innerHTML = sanitizeHTML(suggestions.map((item: AutocompleteItem) => `
                         <li data-village="${item.village}" data-district="${item.district}" data-region-key="${item.regionKey}" data-region="${item.region || ''}" data-is-mountain="${item.isMountain}">
@@ -906,10 +896,11 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
     // 샘플 수정 (updateSample)
     // ========================================
     updateSample(): void {
-        const formData = new FormData(this.form);
+        const formData = new FormData(this.form ?? undefined);
         const log = this.sampleLogs.find((l: WaterSampleLog) => l.id === this.editingId);
         const samplingLocations = this.getAllSamplingLocations();
         const samplingCrops = this.getAllSamplingCrops();
+        const sampleNames = this.getAllSampleNames();
 
         if (log) {
             log.receptionNumber = String(formData.get('receptionNumber') || '');
@@ -925,7 +916,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             log.addressRoad = String(formData.get('addressRoad') || '');
             log.addressDetail = String(formData.get('addressDetail') || '');
             log.receptionMethod = String(formData.get('receptionMethod') || '');
-            log.sampleName = String(formData.get('sampleName') || '');
+            log.sampleName = sampleNames[0] || String(formData.get('sampleName') || '지하수');
             log.sampleCount = String(formData.get('sampleCount') || '');
             log.samplingLocations = samplingLocations;
             log.samplingLocation = samplingLocations.join(', ');
@@ -1199,63 +1190,9 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
     }
 
     // ========================================
-    // 검색/필터
+    // 검색/필터 - extractReceptionNumber, filterAndRenderLogs, updateSearchButtonState
+    // BaseSampleManager에서 상속
     // ========================================
-    extractReceptionNumber(receptionNumber: string): number {
-        const match = receptionNumber.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-    }
-
-    filterAndRenderLogs(): void {
-        const filtered = this.sampleLogs.filter((log: WaterSampleLog) => {
-            const matchesName = !this.currentSearchFilter.name ||
-                (log.name || '').toLowerCase().includes(this.currentSearchFilter.name);
-
-            let matchesReception = true;
-            if (this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo) {
-                const logNum = this.extractReceptionNumber(log.receptionNumber);
-                const fromNum = this.currentSearchFilter.receptionFrom ? parseInt(this.currentSearchFilter.receptionFrom, 10) : 0;
-                const toNum = this.currentSearchFilter.receptionTo ? parseInt(this.currentSearchFilter.receptionTo, 10) : Infinity;
-                if (fromNum && logNum < fromNum) matchesReception = false;
-                if (toNum !== Infinity && logNum > toNum) matchesReception = false;
-            }
-
-            let matchesDate = true;
-            if (this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo) {
-                const logDate = log.date;
-                if (this.currentSearchFilter.dateFrom && logDate < this.currentSearchFilter.dateFrom) matchesDate = false;
-                if (this.currentSearchFilter.dateTo && logDate > this.currentSearchFilter.dateTo) matchesDate = false;
-            }
-
-            let matchesCompleted = true;
-            if (this.currentSearchFilter.completed === 'completed') {
-                matchesCompleted = log.isComplete === true;
-            } else if (this.currentSearchFilter.completed === 'incomplete') {
-                matchesCompleted = !log.isComplete;
-            }
-
-            return matchesName && matchesReception && matchesDate && matchesCompleted;
-        });
-
-        this.renderLogs(filtered);
-        this.updateSearchButtonState();
-    }
-
-    updateSearchButtonState() {
-        const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
-            this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom ||
-            this.currentSearchFilter.receptionTo || (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
-        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
-        if (openSearchModalBtn) {
-            if (hasFilter) {
-                openSearchModalBtn.classList.add('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
-            } else {
-                openSearchModalBtn.classList.remove('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
-            }
-        }
-    }
 
     // ========================================
     // 라벨 인쇄
@@ -1403,6 +1340,17 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             });
         }
 
+        // 상단 시료명 변경 시 모든 채취장소 행 일괄 변경
+        const sampleNameSelect = document.getElementById('sampleName') as HTMLSelectElement | null;
+        if (sampleNameSelect) {
+            sampleNameSelect.addEventListener('change', () => {
+                const value = sampleNameSelect.value;
+                this.samplingLocationsList?.querySelectorAll<HTMLSelectElement>('.sampling-samplename-select').forEach(s => {
+                    s.value = value;
+                });
+            });
+        }
+
         // 시료수 변경 시 채취장소 필드 및 접수번호 업데이트
         if (this.sampleCountInput) {
             this.sampleCountInput.addEventListener('change', (e: Event) => {
@@ -1464,10 +1412,10 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
         const navResetBtn = document.getElementById('navResetBtn');
         if (this.navSubmitBtn) {
             this.navSubmitBtn.addEventListener('click', () => {
-                if (this.form.checkValidity()) {
+                if (this.form?.checkValidity()) {
                     this.submitForm();
                 } else {
-                    this.form.reportValidity();
+                    this.form?.reportValidity();
                 }
             });
         }
@@ -1800,7 +1748,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             getData: () => this.sampleLogs,
             FileAPI: this.FileAPI,
             filePrefix: 'water-samples',
-            showToast: (msg: string, type: string) => this.showToast(msg, type)
+            showToast: (msg: string, type?: ToastType) => this.showToast(msg, type)
         });
 
         SampleUtils.setupJSONLoadHandler({
@@ -1809,7 +1757,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             setData: (data: WaterSampleLog[]) => { this.sampleLogs = data; },
             saveData: () => this.saveLogs(),
             renderData: () => this.filterAndRenderLogs(),
-            showToast: (msg: string, type: string) => this.showToast(msg, type)
+            showToast: (msg: string, type?: ToastType) => this.showToast(msg, type)
         });
 
         // 엑셀 내보내기
@@ -1910,7 +1858,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             getWebFileHandle: () => autoSaveFileHandle,
             setWebFileHandle: (handle: FileSystemFileHandle | null) => { autoSaveFileHandle = handle; },
             autoSaveCallback: autoSaveToFile,
-            showToast: (msg: string, type: string) => this.showToast(msg, type)
+            showToast: (msg: string, type?: ToastType) => this.showToast(msg, type)
         });
 
         SampleUtils.setupAutoSaveToggle({
@@ -1919,7 +1867,7 @@ class WaterSampleManager extends (window as any).BaseSampleManager {
             getWebFileHandle: () => autoSaveFileHandle,
             setWebFileHandle: (handle: FileSystemFileHandle | null) => { autoSaveFileHandle = handle; },
             autoSaveCallback: autoSaveToFile,
-            showToast: (msg: string, type: string) => this.showToast(msg, type),
+            showToast: (msg: string, type?: ToastType) => this.showToast(msg, type),
             log: (...args: unknown[]) => this.log(...args)
         });
 

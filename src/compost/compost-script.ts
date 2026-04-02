@@ -19,14 +19,7 @@ const AUTO_SAVE_FILE = 'compost-autosave.json';
 // Interfaces
 // ========================================
 
-interface SearchFilter {
-    dateFrom: string;
-    dateTo: string;
-    name: string;
-    receptionFrom: string;
-    receptionTo: string;
-    completed: 'all' | 'completed' | 'incomplete';
-}
+// SearchFilter → BaseSearchFilter로 통합 (BaseSampleManager에서 상속)
 
 interface MonthStats {
     count: number;
@@ -51,7 +44,7 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
     // Compost-specific state
     currentRegistrationData: CompostSample | null;
     listViewStale: boolean;
-    currentSearchFilter: SearchFilter;
+    // currentSearchFilter는 BaseSampleManager에서 상속
     isFullView: boolean;
     autoSaveFileHandle: any;
     pendingMailDateIds: string[];
@@ -96,14 +89,7 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
         // Compost-specific state
         this.currentRegistrationData = null;
         this.listViewStale = true;
-        this.currentSearchFilter = {
-            dateFrom: '',
-            dateTo: '',
-            name: '',
-            receptionFrom: '',
-            receptionTo: '',
-            completed: 'incomplete'
-        };
+        // currentSearchFilter는 BaseSampleManager에서 초기화
         this.isFullView = false;
         this.autoSaveFileHandle = null;
         this.pendingMailDateIds = [];
@@ -226,60 +212,6 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
 
         // 리스트 뷰 제목 업데이트
         this.updateListViewTitle();
-    }
-
-    // ========================================
-    // Override: completed 필드 마이그레이션 (compost는 isComplete 사용)
-    // ========================================
-
-    migrateCompletedField(logs: CompostSample[]): CompostSample[] {
-        if (!Array.isArray(logs)) return logs;
-        return logs.map(log => {
-            if ((log as any).completed !== undefined || (log as any).isCompleted !== undefined) {
-                log.isComplete = log.isComplete || (log as any).isCompleted || (log as any).completed || false;
-                delete (log as any).completed;
-                delete (log as any).isCompleted;
-            }
-            if (log.isComplete === undefined) {
-                log.isComplete = false;
-            }
-            return log;
-        });
-    }
-
-    // ========================================
-    // Override: 렌더링 전 데이터 정렬 (접수번호 오름차순)
-    // ========================================
-
-    prepareDataForRender(logs: CompostSample[]): CompostSample[] {
-        return [...logs].sort((a, b) => {
-            const numA = parseInt(a.receptionNumber || '', 10) || 0;
-            const numB = parseInt(b.receptionNumber || '', 10) || 0;
-            return numA - numB;
-        });
-    }
-
-    // ========================================
-    // Override: 뷰 전환 (listViewStale 지원)
-    // ========================================
-
-    switchView(viewName: string): void {
-        const views = document.querySelectorAll('.view');
-        const navItems = document.querySelectorAll('.nav-btn');
-
-        views.forEach(view => view.classList.remove('active'));
-        navItems.forEach(nav => nav.classList.remove('active'));
-
-        const targetView = document.getElementById(`${viewName}View`);
-        const targetNav = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
-
-        if (targetView) targetView.classList.add('active');
-        if (targetNav) targetNav.classList.add('active');
-
-        if (viewName === 'list' && this.listViewStale) {
-            this.filterAndRenderLogs();
-            this.listViewStale = false;
-        }
     }
 
     // ========================================
@@ -637,10 +569,7 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
                 isComplete: false,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                // Required BaseSample fields
-                접수일: getString('date'),
-                접수번호: getString('receptionNumber'),
-                성명: getString('name'),
+                // BaseSample fields already set above: date, receptionNumber, name
             };
 
             this.sampleLogs.push(data);
@@ -1838,65 +1767,8 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
         });
     }
 
-    extractReceptionNumber(receptionNumber: string): number {
-        const match = receptionNumber.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-    }
-
-    filterAndRenderLogs(): void {
-        const filtered = this.sampleLogs.filter(log => {
-            // 성명 검색
-            const matchesName = !this.currentSearchFilter.name ||
-                (log.name || '').toLowerCase().includes(this.currentSearchFilter.name);
-
-            // 접수번호 범위 검색
-            let matchesReception = true;
-            if (this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo) {
-                const logNum = this.extractReceptionNumber(log.receptionNumber || '');
-                const fromNum = this.currentSearchFilter.receptionFrom ? parseInt(this.currentSearchFilter.receptionFrom, 10) : 0;
-                const toNum = this.currentSearchFilter.receptionTo ? parseInt(this.currentSearchFilter.receptionTo, 10) : Infinity;
-                if (fromNum && logNum < fromNum) matchesReception = false;
-                if (toNum !== Infinity && logNum > toNum) matchesReception = false;
-            }
-
-            // 날짜 범위 검색
-            let matchesDate = true;
-            if (this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo) {
-                const logDate = log.date;
-                if (this.currentSearchFilter.dateFrom && logDate < this.currentSearchFilter.dateFrom) matchesDate = false;
-                if (this.currentSearchFilter.dateTo && logDate > this.currentSearchFilter.dateTo) matchesDate = false;
-            }
-
-            // 완료 상태 필터
-            let matchesCompleted = true;
-            if (this.currentSearchFilter.completed === 'completed') {
-                matchesCompleted = log.isComplete === true;
-            } else if (this.currentSearchFilter.completed === 'incomplete') {
-                matchesCompleted = !log.isComplete;
-            }
-
-            return matchesName && matchesReception && matchesDate && matchesCompleted;
-        });
-
-        this.renderLogs(filtered);
-        this.updateSearchButtonState();
-    }
-
-    updateSearchButtonState(): void {
-        const openSearchModalBtn = document.getElementById('openSearchModalBtn');
-        const hasFilter = this.currentSearchFilter.dateFrom || this.currentSearchFilter.dateTo ||
-            this.currentSearchFilter.name || this.currentSearchFilter.receptionFrom || this.currentSearchFilter.receptionTo ||
-            (this.currentSearchFilter.completed && this.currentSearchFilter.completed !== 'incomplete');
-        if (openSearchModalBtn) {
-            if (hasFilter) {
-                openSearchModalBtn.classList.add('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색 중');
-            } else {
-                openSearchModalBtn.classList.remove('has-filter');
-                openSearchModalBtn.innerHTML = sanitizeHTML('🔍 검색');
-            }
-        }
-    }
+    // extractReceptionNumber, filterAndRenderLogs, updateSearchButtonState
+    // BaseSampleManager에서 상속
 
     // ========================================
     // 엑셀 내보내기

@@ -98,27 +98,6 @@ interface RegistrationResult {
  * Extended pesticide sample with internal fields
  */
 interface PesticideSampleData {
-  // PesticideSample fields
-  접수일?: string;
-  접수번호?: string;
-  성명?: string;
-  전화번호?: string;
-  수령방법?: string;
-  비고?: string;
-  시료명?: string;
-  생산자?: string;
-  생산자주소?: string;
-  생산지?: string;
-  농산물명?: string;
-  채취일?: string;
-  검사일?: string;
-  검사항목?: any;
-  검사항목수?: number;
-  결과?: string;
-  성적서번호?: string;
-  증명서발급일?: string;
-
-  // Internal fields
   id: string;
   date?: string;
   receptionNumber?: string;
@@ -138,6 +117,7 @@ interface PesticideSampleData {
   producerName?: string;
   producerAddress?: string;
   requestContent?: string;
+  testItems?: string[];
   completed?: boolean;
   isComplete?: boolean;
   testResult?: PesticideResult;

@@ -249,7 +249,15 @@ function getAvailableModes(): StorageModeOption[] {
 async function saveData(sampleType: string, year: number, localStorageKey: string, data: DataItem[]): Promise<boolean> {
     try {
         // 1. localStorage에 항상 저장 (백업 및 오프라인 지원)
-        localStorage.setItem(localStorageKey, JSON.stringify(data));
+        try {
+            localStorage.setItem(localStorageKey, JSON.stringify(data));
+        } catch (e) {
+            if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+                (window.logger?.error || console.error)('localStorage 저장 공간 부족:', localStorageKey, e);
+                return false;
+            }
+            throw e;
+        }
         logStorage(`localStorage 저장: ${localStorageKey}`);
 
         // 2. 클라우드 동기화 모드면 Firestore에도 저장
@@ -259,8 +267,16 @@ async function saveData(sampleType: string, year: number, localStorageKey: strin
                 id: item.id || generateId()
             }));
 
-            await window.firestoreDb.batchSave(sampleType, year, documentsWithId);
-            syncStatus.lastSyncTime = new Date();
+            try {
+                await window.firestoreDb.batchSave(sampleType, year, documentsWithId);
+                syncStatus.lastSyncTime = new Date();
+            } catch (syncError) {
+                (window.logger?.error || console.error)('Firebase 동기화 실패:', syncError);
+                // Dispatch event for UI notification
+                window.dispatchEvent(new CustomEvent('storage-sync-error', {
+                    detail: { sampleType, year, error: syncError }
+                }));
+            }
         }
 
         return true;
@@ -281,7 +297,13 @@ async function saveData(sampleType: string, year: number, localStorageKey: strin
 async function saveItem(sampleType: string, year: number, localStorageKey: string, item: DataItem): Promise<boolean> {
     try {
         // localStorage에서 기존 데이터 로드
-        const existingData: DataItem[] = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+        let existingData: DataItem[];
+        try {
+            existingData = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+        } catch (parseError) {
+            window.logger?.warn('[storage-manager] JSON.parse 실패 (saveItem), 빈 배열로 폴백:', parseError);
+            existingData = [];
+        }
 
         // ID 확인/생성
         const itemWithId: DataItem = {
@@ -336,12 +358,24 @@ async function loadData(sampleType: string, year: number, localStorageKey: strin
 
         // localStorage에서 로드 (오프라인 또는 클라우드 데이터 없음)
         const localData: string | null = localStorage.getItem(localStorageKey);
-        return localData ? JSON.parse(localData) : [];
+        if (!localData) return [];
+        try {
+            return JSON.parse(localData);
+        } catch (e) {
+            (window.logger?.error || console.error)('localStorage JSON 파싱 오류:', localStorageKey, e);
+            return [];
+        }
     } catch (error) {
         (window.logger?.error || console.error)('데이터 로드 실패:', error);
         // 에러 시 localStorage 폴백
         const localData: string | null = localStorage.getItem(localStorageKey);
-        return localData ? JSON.parse(localData) : [];
+        if (!localData) return [];
+        try {
+            return JSON.parse(localData);
+        } catch (e) {
+            (window.logger?.error || console.error)('localStorage JSON 파싱 오류 (폴백):', localStorageKey, e);
+            return [];
+        }
     }
 }
 
@@ -356,7 +390,13 @@ async function loadData(sampleType: string, year: number, localStorageKey: strin
 async function deleteItem(sampleType: string, year: number, localStorageKey: string, itemId: string): Promise<boolean> {
     try {
         // localStorage에서 삭제
-        const existingData: DataItem[] = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+        let existingData: DataItem[];
+        try {
+            existingData = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+        } catch (parseError) {
+            window.logger?.warn('[storage-manager] JSON.parse 실패 (deleteItem), 빈 배열로 폴백:', parseError);
+            existingData = [];
+        }
         const filteredData: DataItem[] = existingData.filter((item: DataItem) => item.id !== itemId);
         localStorage.setItem(localStorageKey, JSON.stringify(filteredData));
 

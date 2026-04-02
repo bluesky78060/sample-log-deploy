@@ -148,7 +148,7 @@ function smartMerge(localData: DataItem[], cloudData: DataItem[]): MergeResult {
                 hasChanges = true;
             } else {
                 // 로컬이 더 최신이거나 동일
-                merged.push(localItem);
+                merged.push({ ...localItem });
             }
         }
     });
@@ -166,7 +166,7 @@ function smartMerge(localData: DataItem[], cloudData: DataItem[]): MergeResult {
                 // merged에 추가하지 않음 (삭제)
             } else {
                 // 아직 업로드 안된 로컬 데이터 → 유지
-                merged.push(localItem);
+                merged.push({ ...localItem });
             }
         }
     });
