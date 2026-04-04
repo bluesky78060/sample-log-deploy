@@ -26,7 +26,9 @@ export default defineConfig({
         labelPrint: resolve(__dirname, 'src/label-print/index.html'),
         manual: resolve(__dirname, 'src/manual/index.html'),
         heuktoram: resolve(__dirname, 'src/heuktoram/index.html'),
-        release: resolve(__dirname, 'src/release/index.html')
+        release: resolve(__dirname, 'src/release/index.html'),
+        waterAnalysis: resolve(__dirname, 'src/water-analysis/index.html'),
+        pesticideAnalysis: resolve(__dirname, 'src/pesticide-analysis/index.html')
       }
     }
   }

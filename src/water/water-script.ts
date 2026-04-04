@@ -70,6 +70,17 @@ interface WaterSampleLog extends BaseSample {
     updatedAt?: string;
 }
 
+interface WaterQualityField {
+    key: string;
+    label: string;
+    unit: string;
+    group: string;
+    living: string;
+    agri: string;
+    industry: string;
+    livingOnly?: boolean;
+}
+
 interface MonthData {
     count: number;
     completed: number;
@@ -346,7 +357,25 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         tdMailDate.textContent = log.mailDate || '-';
         row.appendChild(tdMailDate);
 
-        // 21. Action buttons
+        // 21. Analysis result button
+        const tdAnalysis = document.createElement('td');
+        tdAnalysis.className = 'col-analysis';
+        const btnAnalysis = document.createElement('button');
+        btnAnalysis.className = 'btn-analysis-open';
+        btnAnalysis.dataset.id = log.id;
+        btnAnalysis.title = '분석결과 입력/수정';
+        // 기존 결과가 있는지 확인
+        const existingResult = this.loadTestResultForLog(log.id);
+        if (existingResult && Object.keys(existingResult).some(k => k !== 'testDate' && k !== 'judgment' && existingResult[k])) {
+            btnAnalysis.classList.add('has-result');
+            btnAnalysis.textContent = '결과확인';
+        } else {
+            btnAnalysis.textContent = '결과입력';
+        }
+        tdAnalysis.appendChild(btnAnalysis);
+        row.appendChild(tdAnalysis);
+
+        // 22. Action buttons
         const tdAction = document.createElement('td');
         tdAction.className = 'col-action';
         const btnEdit = document.createElement('button');
@@ -1458,6 +1487,11 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                 this.editSample(editBtn.dataset.id || '');
                 return;
             }
+            const analysisBtn = target.closest('.btn-analysis-open') as HTMLElement | null;
+            if (analysisBtn) {
+                this.openAnalysisModal(analysisBtn.dataset.id || '');
+                return;
+            }
         });
 
         // 전체 선택 / 선택 삭제
@@ -1977,6 +2011,482 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
             }
         });
         excelImporter.init();
+
+        // 분석결과 입력 모달 이벤트
+        this.initAnalysisModal();
+
+        // Firestore에서 분석 결과 동기화 (비동기, UI 블로킹 없음)
+        this.syncTestResultsFromFirestore();
+
+        // 수질분석 결과 입력 버튼 (별도 창으로 열기)
+        const waterAnalysisBtn = document.getElementById('waterAnalysisBtn');
+        if (waterAnalysisBtn) waterAnalysisBtn.addEventListener('click', () => {
+            const selectedIds = Array.from(document.querySelectorAll<HTMLInputElement>('.row-checkbox:checked')).map(cb => cb.dataset.id).filter(Boolean);
+            localStorage.setItem('waterAnalysis_year', this.selectedYear);
+            localStorage.setItem('waterAnalysis_selected_ids', JSON.stringify(selectedIds));
+
+            const isElectron = window.electronAPI?.isElectron === true;
+            if (isElectron) {
+                window.electronAPI!.openWaterAnalysis!();
+            } else {
+                const popup = window.open('../water-analysis/index.html', '_blank');
+                if (!popup) {
+                    window.location.href = '../water-analysis/index.html';
+                }
+            }
+        });
+    }
+
+    // ========================================
+    // 분석결과 입력 모달
+    // ========================================
+
+    /**
+     * 지하수법 시행규칙 [별표 9] 수질기준
+     * 일반오염물질 5개 + 특정유해물질 14개 = 총 19개
+     * livingOnly: true인 항목은 생활용수에만 적용
+     */
+    static WATER_QUALITY_FIELDS: WaterQualityField[] = [
+        // === 일반오염물질 (5개) ===
+        { key: 'pH',            label: 'pH',           unit: '',           group: '일반', living: '5.8~8.5',   agri: '6.0~8.5',   industry: '5.0~9.0' },
+        { key: 'ec',            label: 'EC',           unit: '\u00B5S/cm',      group: '일반', living: '-',          agri: '-',          industry: '-' },
+        { key: 'totalColiform', label: '총대장균군',    unit: '군수/100mL', group: '일반', living: '5,000 이하', agri: '-',          industry: '-', livingOnly: false },
+        { key: 'nitrate',       label: '질산성질소',    unit: 'mg/L',       group: '일반', living: '20 이하',    agri: '20 이하',    industry: '40 이하' },
+        { key: 'chloride',      label: '염소이온',      unit: 'mg/L',       group: '일반', living: '250 이하',   agri: '250 이하',   industry: '500 이하' },
+        { key: 'cadmium',       label: '카드뮴',        unit: 'mg/L',       group: '일반', living: '0.01 이하',  agri: '0.01 이하',  industry: '0.02 이하' },
+        // === 특정유해물질 (14개) ===
+        { key: 'arsenic',       label: '비소',          unit: 'mg/L',       group: '유해', living: '0.05 이하',  agri: '0.05 이하',  industry: '0.1 이하' },
+        { key: 'cyanide',       label: '시안',          unit: 'mg/L',       group: '유해', living: '0.01 이하',  agri: '0.01 이하',  industry: '0.2 이하' },
+        { key: 'mercury',       label: '수은',          unit: 'mg/L',       group: '유해', living: '0.001 이하', agri: '0.001 이하', industry: '0.001 이하' },
+        { key: 'organophos',    label: '유기인',        unit: 'mg/L',       group: '유해', living: '0.0005 이하', agri: '0.0005 이하', industry: '0.0005 이하' },
+        { key: 'phenol',        label: '페놀',          unit: 'mg/L',       group: '유해', living: '0.005 이하', agri: '0.005 이하', industry: '0.01 이하' },
+        { key: 'lead',          label: '납',            unit: 'mg/L',       group: '유해', living: '0.1 이하',   agri: '0.1 이하',   industry: '0.2 이하' },
+        { key: 'chromium6',     label: '6가크롬',       unit: 'mg/L',       group: '유해', living: '0.05 이하',  agri: '0.05 이하',  industry: '0.1 이하' },
+        { key: 'tce',           label: '트리클로로에틸렌', unit: 'mg/L',    group: '유해', living: '0.03 이하',  agri: '0.03 이하',  industry: '0.06 이하' },
+        { key: 'pce',           label: '테트라클로로에틸렌', unit: 'mg/L',  group: '유해', living: '0.01 이하',  agri: '0.01 이하',  industry: '0.02 이하' },
+        { key: 'tca',           label: '1,1,1-트리클로로에탄', unit: 'mg/L', group: '유해', living: '0.15 이하', agri: '0.3 이하',   industry: '0.5 이하' },
+        // === 생활용수 전용 (4개) ===
+        { key: 'benzene',       label: '벤젠',          unit: 'mg/L',       group: '유해', living: '0.015 이하', agri: '-', industry: '-', livingOnly: true },
+        { key: 'toluene',       label: '톨루엔',        unit: 'mg/L',       group: '유해', living: '1 이하',     agri: '-', industry: '-', livingOnly: true },
+        { key: 'ethylbenzene',  label: '에틸벤젠',      unit: 'mg/L',       group: '유해', living: '0.45 이하',  agri: '-', industry: '-', livingOnly: true },
+        { key: 'xylene',        label: '크실렌',        unit: 'mg/L',       group: '유해', living: '0.75 이하',  agri: '-', industry: '-', livingOnly: true },
+    ];
+
+    private _analysisLogId: string | null = null;
+    private _cachedTestResults: Record<string, Record<string, string>> | null = null;
+
+    initAnalysisModal(): void {
+        const modal = document.getElementById('analysisResultModal');
+        if (!modal) return;
+
+        const closeBtn = document.getElementById('closeAnalysisModal');
+        const cancelBtn = document.getElementById('cancelAnalysisBtn');
+        const saveBtn = document.getElementById('saveAnalysisBtn');
+        const overlay = modal.querySelector('.modal-overlay');
+
+        const closeModal = (): void => { modal.classList.add('hidden'); this._analysisLogId = null; };
+        closeBtn?.addEventListener('click', closeModal);
+        cancelBtn?.addEventListener('click', closeModal);
+        overlay?.addEventListener('click', closeModal);
+
+        saveBtn?.addEventListener('click', () => this.saveAnalysisResult());
+
+        // ESC 키로 닫기
+        modal.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeModal();
+        });
+    }
+
+    openAnalysisModal(logId: string): void {
+        const log = this.sampleLogs.find(l => l.id === logId);
+        if (!log) return;
+
+        const modal = document.getElementById('analysisResultModal');
+        if (!modal) return;
+
+        this._analysisLogId = logId;
+
+        // 접수 정보 채우기
+        const setTextContent = (id: string, text: string): void => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        setTextContent('analysisReceptionNumber', log.receptionNumber || '-');
+        setTextContent('analysisDate', log.date || '-');
+        setTextContent('analysisName', log.name || '-');
+        setTextContent('analysisSampleName', log.sampleName || '-');
+        setTextContent('analysisLocation', log.samplingLocation || '-');
+
+        const testItemsEl = document.getElementById('analysisTestItems');
+        const testItems = log.testItems || '생활용수';
+        if (testItemsEl) {
+            testItemsEl.textContent = testItems;
+            testItemsEl.style.background = testItems === '농업용수' ? '#F59E0B' : '#0EA5E9';
+        }
+
+        // 검사항목에 맞는 분석 필드 필터링 (농업용수: livingOnly 제외)
+        const allFields = WaterSampleManager.WATER_QUALITY_FIELDS;
+        const fields = testItems === '농업용수'
+            ? allFields.filter(f => !f.livingOnly)
+            : allFields;
+
+        this.renderAnalysisFields(fields, testItems);
+
+        // 기존 결과 로드
+        const existingResultData = this.loadTestResultForLog(logId);
+        if (existingResultData) {
+            const testDateInput = document.getElementById('analysisTestDate') as HTMLInputElement | null;
+            if (testDateInput) testDateInput.value = existingResultData.testDate || '';
+            // 각 필드 값 채우기 + 불검출 상태 복원
+            for (const field of fields) {
+                const input = document.getElementById(`af_${field.key}`) as HTMLInputElement | null;
+                const ndCheck = document.getElementById(`af_nd_${field.key}`) as HTMLInputElement | null;
+                const val = existingResultData[field.key] || '';
+                if (input) {
+                    input.value = val;
+                    if (val === '불검출' && ndCheck) {
+                        ndCheck.checked = true;
+                        input.disabled = true;
+                        const statusEl = document.getElementById(`af_status_${field.key}`);
+                        if (statusEl) statusEl.innerHTML = '<span class="af-status-ok">\u2713</span>';
+                    }
+                }
+            }
+            // 판정 (허용 값만 사용)
+            const judgment = existingResultData.judgment || '';
+            if (['', 'pass', 'fail'].includes(judgment)) {
+                const radio = document.querySelector(`input[name="analysisJudgment"][value="${judgment}"]`) as HTMLInputElement | null;
+                if (radio) radio.checked = true;
+            }
+        } else {
+            const testDateInput = document.getElementById('analysisTestDate') as HTMLInputElement | null;
+            if (testDateInput) testDateInput.value = '';
+            document.querySelectorAll<HTMLInputElement>('input[name="analysisJudgment"]').forEach(r => r.checked = false);
+            const defaultRadio = document.querySelector('input[name="analysisJudgment"][value=""]') as HTMLInputElement | null;
+            if (defaultRadio) defaultRadio.checked = true;
+        }
+
+        modal.classList.remove('hidden');
+
+        // 첫 번째 입력 필드에 포커스
+        setTimeout(() => {
+            const firstInput = modal.querySelector('.analysis-result-input') as HTMLInputElement | null;
+            if (firstInput) firstInput.focus();
+        }, 100);
+    }
+
+    renderAnalysisFields(fields: WaterQualityField[], testItems: string): void {
+        const tbody = document.getElementById('analysisFieldsBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        fields.forEach((field, idx) => {
+            const tr = document.createElement('tr');
+
+            // No
+            const tdNo = document.createElement('td');
+            tdNo.className = 'af-col-no';
+            tdNo.textContent = String(idx + 1);
+            tr.appendChild(tdNo);
+
+            // 항목명
+            const tdName = document.createElement('td');
+            tdName.className = 'af-col-name';
+            tdName.textContent = field.label;
+            tr.appendChild(tdName);
+
+            // 단위
+            const tdUnit = document.createElement('td');
+            tdUnit.className = 'af-col-unit';
+            tdUnit.textContent = field.unit || '-';
+            tr.appendChild(tdUnit);
+
+            // 기준 (용도별)
+            const tdStandard = document.createElement('td');
+            tdStandard.className = 'af-col-standard';
+            const standardVal = testItems === '농업용수' ? field.agri : field.living;
+            tdStandard.textContent = standardVal;
+            tr.appendChild(tdStandard);
+
+            // 결과값 입력
+            const tdValue = document.createElement('td');
+            tdValue.className = 'af-col-value';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'analysis-result-input';
+            input.id = `af_${field.key}`;
+            input.placeholder = '-';
+            input.autocomplete = 'off';
+
+            // 입력 시 기준 비교
+            input.addEventListener('input', () => {
+                this.checkAnalysisFieldRange(input, field, testItems);
+            });
+
+            // Enter 키로 다음 필드 이동
+            input.addEventListener('keydown', (e: KeyboardEvent) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const nextRow = tr.nextElementSibling;
+                    if (nextRow) {
+                        const nextInput = nextRow.querySelector('.analysis-result-input') as HTMLInputElement | null;
+                        if (nextInput) nextInput.focus();
+                    }
+                }
+            });
+
+            tdValue.appendChild(input);
+
+            // 불검출 체크박스
+            const ndLabel = document.createElement('label');
+            ndLabel.className = 'af-nd-label';
+            ndLabel.title = '불검출';
+            const ndCheck = document.createElement('input');
+            ndCheck.type = 'checkbox';
+            ndCheck.className = 'af-nd-check';
+            ndCheck.id = `af_nd_${field.key}`;
+            ndCheck.addEventListener('change', () => {
+                const statusEl = document.getElementById(`af_status_${field.key}`);
+                if (ndCheck.checked) {
+                    input.value = '불검출';
+                    input.disabled = true;
+                    input.classList.remove('out-of-range');
+                    if (statusEl) statusEl.innerHTML = '<span class="af-status-ok">\u2713</span>';
+                } else {
+                    input.value = '';
+                    input.disabled = false;
+                    input.focus();
+                    if (statusEl) statusEl.innerHTML = '<span class="af-status-empty">\u25CB</span>';
+                }
+            });
+            const ndText = document.createElement('span');
+            ndText.className = 'af-nd-text';
+            ndText.textContent = 'ND';
+            ndLabel.appendChild(ndCheck);
+            ndLabel.appendChild(ndText);
+            tdValue.appendChild(ndLabel);
+
+            tr.appendChild(tdValue);
+
+            // 상태
+            const tdStatus = document.createElement('td');
+            tdStatus.className = 'af-col-status';
+            tdStatus.id = `af_status_${field.key}`;
+            tdStatus.innerHTML = '<span class="af-status-empty">\u25CB</span>';
+            tr.appendChild(tdStatus);
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    checkAnalysisFieldRange(input: HTMLInputElement, field: WaterQualityField, testItems: string): void {
+        const statusEl = document.getElementById(`af_status_${field.key}`);
+        const val = input.value.trim();
+        const standard = testItems === '농업용수' ? field.agri : field.living;
+
+        if (!val) {
+            input.classList.remove('out-of-range');
+            if (statusEl) statusEl.innerHTML = '<span class="af-status-empty">\u25CB</span>';
+            return;
+        }
+
+        // 기준이 '-' (해당없음): 범위 체크 안 함
+        if (!standard || standard === '-') {
+            input.classList.remove('out-of-range');
+            if (statusEl) statusEl.innerHTML = '<span class="af-status-ok">\u2713</span>';
+            return;
+        }
+
+        const num = parseFloat(val.replace(/,/g, ''));
+        if (isNaN(num)) {
+            input.classList.remove('out-of-range');
+            if (statusEl) statusEl.innerHTML = '<span class="af-status-empty">\u25CB</span>';
+            return;
+        }
+
+        // "X 이하", "X 이상", "X~Y", "X,XXX 이하" 패턴 파싱
+        let isOk = true;
+        const cleanStd = standard.replace(/,/g, '');
+        const rangeMatch = cleanStd.match(/^([\d.]+)\s*~\s*([\d.]+)$/);
+        const maxMatch = cleanStd.match(/^([\d.]+)\s*이하$/);
+        const minMatch = cleanStd.match(/^([\d.]+)\s*이상$/);
+
+        if (rangeMatch) {
+            isOk = num >= parseFloat(rangeMatch[1]) && num <= parseFloat(rangeMatch[2]);
+        } else if (maxMatch) {
+            isOk = num <= parseFloat(maxMatch[1]);
+        } else if (minMatch) {
+            isOk = num >= parseFloat(minMatch[1]);
+        } else {
+            input.classList.remove('out-of-range');
+            if (statusEl) statusEl.innerHTML = '<span class="af-status-ok">\u2713</span>';
+            return;
+        }
+
+        input.classList.toggle('out-of-range', !isOk);
+        if (statusEl) {
+            statusEl.innerHTML = isOk
+                ? '<span class="af-status-ok">\u2713</span>'
+                : '<span class="af-status-warn">\u2715</span>';
+        }
+    }
+
+    saveAnalysisResult(): void {
+        const logId = this._analysisLogId;
+        if (!logId) return;
+
+        const log = this.sampleLogs.find(l => l.id === logId);
+        if (!log) return;
+
+        const testItems = log.testItems || '생활용수';
+        const allFields = WaterSampleManager.WATER_QUALITY_FIELDS;
+        const fields = testItems === '농업용수'
+            ? allFields.filter(f => !f.livingOnly)
+            : allFields;
+
+        // waterTestResults_{year} 에서 기존 결과 로드
+        const allResults = this.loadAllTestResults();
+        const key = `${logId}_0`;
+
+        if (!allResults[key]) allResults[key] = {};
+
+        // 검사일자
+        allResults[key].testDate = (document.getElementById('analysisTestDate') as HTMLInputElement | null)?.value || '';
+
+        // 각 필드 값
+        for (const field of fields) {
+            const input = document.getElementById(`af_${field.key}`) as HTMLInputElement | null;
+            if (input) {
+                allResults[key][field.key] = input.value.trim();
+            }
+        }
+
+        // 판정
+        const judgmentRadio = document.querySelector('input[name="analysisJudgment"]:checked') as HTMLInputElement | null;
+        allResults[key].judgment = judgmentRadio?.value || '';
+
+        // 저장
+        this.saveAllTestResults(allResults);
+
+        // 접수 데이터의 testResult도 동기화
+        const judgment = allResults[key].judgment;
+        if (judgment) {
+            log.testResult = judgment;
+            this.saveLogs();
+        }
+
+        // 모달 닫기 + 목록 갱신
+        document.getElementById('analysisResultModal')?.classList.add('hidden');
+        this.filterAndRenderLogs();
+
+        if (window.showToast) window.showToast('분석결과가 저장되었습니다.', 'success');
+    }
+
+    // key = logId + '_' + locationIdx (채취장소 인덱스, 모달에서는 첫 번째 시료만 지원)
+    loadTestResultForLog(logId: string): Record<string, string> | null {
+        if (!this._cachedTestResults) {
+            this._cachedTestResults = this.loadAllTestResults();
+        }
+        return this._cachedTestResults[`${logId}_0`] || null;
+    }
+
+    loadAllTestResults(): Record<string, Record<string, string>> {
+        const key = `waterTestResults_${this.selectedYear}`;
+        try {
+            const data = localStorage.getItem(key);
+            if (!data) return {};
+            return JSON.parse(data) || {};
+        } catch (e) {
+            (window.logger?.error || console.error)('수질 검사 결과 로드 실패:', e);
+            return {};
+        }
+    }
+
+    /**
+     * 초기 로드 시 Firestore -> localStorage 병합
+     * 클라우드 데이터가 있으면 로컬과 병합 (클라우드 우선)
+     */
+    async syncTestResultsFromFirestore(): Promise<void> {
+        const cloudResults = await this.loadTestResultsFromFirestore();
+        if (!cloudResults) return;
+
+        const localResults = this.loadAllTestResults();
+        const merged: Record<string, Record<string, string>> = { ...localResults, ...cloudResults };
+
+        const key = `waterTestResults_${this.selectedYear}`;
+        localStorage.setItem(key, JSON.stringify(merged));
+        this._cachedTestResults = merged;
+
+        // 목록 갱신
+        this.filterAndRenderLogs();
+        (window.logger?.info || console.log)('[수질분석] Firestore -> localStorage 동기화 완료');
+    }
+
+    saveAllTestResults(results: Record<string, Record<string, string>>): void {
+        const key = `waterTestResults_${this.selectedYear}`;
+        try {
+            localStorage.setItem(key, JSON.stringify(results));
+            this._cachedTestResults = results;
+
+            // Firestore 동기화
+            this.syncTestResultsToFirestore(results);
+        } catch (e) {
+            (window.logger?.error || console.error)('수질 검사 결과 저장 실패:', e);
+        }
+    }
+
+    /**
+     * 분석 결과를 Firestore에 동기화
+     * 각 결과를 개별 문서로 저장 (key = logId_locationIdx)
+     */
+    async syncTestResultsToFirestore(results: Record<string, Record<string, string>>): Promise<void> {
+        if (!window.firestoreDb?.isEnabled()) return;
+
+        try {
+            const year = parseInt(this.selectedYear);
+            const entries = Object.entries(results);
+            if (entries.length === 0) return;
+
+            // 배치 저장용 배열 변환
+            const documents = entries.map(([docKey, data]) => ({
+                ...data,
+                id: docKey,
+                _resultKey: docKey,
+            }));
+
+            await window.firestoreDb.batchSave('waterTestResults', year, documents as unknown as Record<string, unknown>[]);
+            (window.logger?.info || console.log)(`[수질분석] Firestore 동기화 완료: ${documents.length}건`);
+        } catch (e) {
+            (window.logger?.error || console.error)('수질 검사 결과 Firestore 동기화 실패:', e);
+        }
+    }
+
+    /**
+     * Firestore에서 분석 결과 로드 -> localStorage와 병합
+     */
+    async loadTestResultsFromFirestore(): Promise<Record<string, Record<string, string>> | null> {
+        if (!window.firestoreDb?.isEnabled()) return null;
+
+        try {
+            const year = parseInt(this.selectedYear);
+            const cloudData = await window.firestoreDb.getAll('waterTestResults', year);
+            if (!cloudData || cloudData.length === 0) return null;
+
+            // 배열 -> 맵 변환
+            const resultsMap: Record<string, Record<string, string>> = {};
+            for (const doc of cloudData) {
+                const key = (doc as Record<string, unknown>)._resultKey as string || (doc as Record<string, unknown>).id as string;
+                if (key) {
+                    const { _resultKey, syncedAt, updatedAt, ...rest } = doc as Record<string, unknown>;
+                    resultsMap[key] = rest as Record<string, string>;
+                }
+            }
+
+            return resultsMap;
+        } catch (e) {
+            (window.logger?.error || console.error)('수질 검사 결과 Firestore 로드 실패:', e);
+            return null;
+        }
     }
 }
 

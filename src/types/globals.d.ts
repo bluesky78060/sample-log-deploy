@@ -127,6 +127,9 @@ interface ElectronAPI {
   // Heuktoram popup
   openHeuktoram?(): Promise<boolean>;
 
+  // Water analysis popup
+  openWaterAnalysis?(): Promise<boolean>;
+
   // VWORLD geocoding (IPC via main process, no Origin restriction)
   vworldGeocode?(address: string, apiKey: string): Promise<boolean | null>;
 }
@@ -775,6 +778,12 @@ interface Window {
 
   // Global functions exposed by modules
   loadFromAutoSaveFile?: () => Promise<unknown[] | null>;
+
+  // Pesticide data (exposed by pesticide-data.ts)
+  PESTICIDE_ANALYSIS_DATA?: import('../shared/pesticide-data').PesticideDataItem[];
+  getPesticidesByMethod?: (method: string) => import('../shared/pesticide-data').PesticideDataItem[];
+  searchPesticides?: (query: string, method?: string, limit?: number) => import('../shared/pesticide-data').PesticideDataItem[];
+  getPesticideStats?: () => import('../shared/pesticide-data').PesticideStats;
 
   // Allow dynamic property access
   [key: string]: unknown;

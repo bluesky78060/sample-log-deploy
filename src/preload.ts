@@ -71,6 +71,12 @@ interface ElectronAPI {
     // 흙토람 팝업 창 열기
     openHeuktoram: () => Promise<boolean>;
 
+    // 수질분석 결과 입력 팝업 창 열기
+    openWaterAnalysis: () => Promise<boolean>;
+
+    // 잔류농약 분석결과 조회 팝업 창 열기
+    openPesticideAnalysis: () => Promise<boolean>;
+
     // VWORLD 지번 지오코딩
     vworldGeocode: (address: string, apiKey: string) => Promise<boolean | null>;
 
@@ -173,6 +179,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 흙토람 팝업 창 열기
     openHeuktoram: () => ipcRenderer.invoke('open-heuktoram'),
+
+    // 수질분석 결과 입력 팝업 창 열기
+    openWaterAnalysis: () => ipcRenderer.invoke('open-water-analysis'),
+
+    // 잔류농약 분석결과 조회 팝업 창 열기
+    openPesticideAnalysis: () => ipcRenderer.invoke('open-pesticide-analysis'),
 
     // VWORLD 지번 지오코딩 (main process 경유, Origin 제한 없음)
     vworldGeocode: (address: string, apiKey: string) => ipcRenderer.invoke('vworld-geocode', { address, apiKey }),

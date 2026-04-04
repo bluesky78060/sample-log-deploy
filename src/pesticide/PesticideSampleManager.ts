@@ -21,6 +21,29 @@ declare function sanitizeExcelData(data: Record<string, unknown>[]): Record<stri
 type PesticideResult = 'pass' | 'fail' | null;
 
 /**
+ * Pesticide detection data (single detected pesticide)
+ */
+interface PesticideDetectionData {
+  method: string;
+  name: string;
+  engName: string;
+  rawValue: string;
+  value: string;
+}
+
+/**
+ * Pesticide test result data for a single sample
+ */
+interface PesticideTestResultData {
+  id: string;
+  testDate: string;
+  judgment: string;
+  allNd: boolean;
+  detections: PesticideDetectionData[];
+  updatedAt: string;
+}
+
+/**
  * Pesticide sample data with internal fields
  */
 interface PesticideSampleData {
@@ -131,6 +154,11 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   private parcelsContainer: HTMLElement | null = null;
   private parcels: unknown[] = [];
   private parcelIdCounter: number = 0;
+
+  // Pesticide analysis modal state
+  private _paLogId: string | null = null;
+  private _paAllNd: boolean = false;
+  private _cachedPesticideResults: Record<string, PesticideTestResultData> | null = null;
 
   private currentRegionSelection: {
     result: { villageName: string; locations: { fullAddress: string; region: string; district: string }[]; lotNumber?: string };
@@ -352,6 +380,15 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
               this.editingId = null;
             }
           }
+        }
+      }
+
+      // 분석결과 입력 버튼
+      const analysisBtn = target.closest('.btn-analysis') as HTMLElement | null;
+      if (analysisBtn) {
+        const id = analysisBtn.dataset.id;
+        if (id) {
+          this.openPesticideAnalysisModal(id);
         }
       }
 
@@ -893,6 +930,31 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
 
     // -- 27. 엑셀 가져오기 (ExcelImportManager) --
     this.setupExcelImport();
+
+    // -- 28. 분석결과 입력 모달 --
+    this.initPesticideAnalysisModal();
+
+    // -- 29. 분석결과 조회 페이지 열기 버튼 --
+    const pesticideAnalysisBtn = document.getElementById('pesticideAnalysisBtn');
+    if (pesticideAnalysisBtn) {
+      pesticideAnalysisBtn.addEventListener('click', () => {
+        localStorage.setItem('pesticideAnalysis_year', this.selectedYear);
+        const selectedIds = Array.from(document.querySelectorAll<HTMLInputElement>('.row-checkbox:checked'))
+          .map(cb => cb.dataset.id).filter(Boolean) as string[];
+        localStorage.setItem('pesticideAnalysis_selected_ids', JSON.stringify(selectedIds));
+
+        const isElectron = (window as any).electronAPI?.isElectron === true;
+        if (isElectron) {
+          (window as any).electronAPI.openPesticideAnalysis();
+        } else {
+          const popup = window.open('../pesticide-analysis/index.html', '_blank');
+          if (!popup) window.location.href = '../pesticide-analysis/index.html';
+        }
+      });
+    }
+
+    // -- 30. Firestore에서 분석 결과 동기화 --
+    this.syncPesticideTestResultsFromFirestore();
   }
 
   // ========================================
@@ -2536,6 +2598,28 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       const tdMailDate = document.createElement('td'); tdMailDate.className = 'col-mail-date';
       tdMailDate.textContent = row.mailDate || '-'; tr.appendChild(tdMailDate);
 
+      // Analysis result
+      const tdAnalysis = document.createElement('td'); tdAnalysis.className = 'col-analysis';
+      const btnAnalysis = document.createElement('button');
+      btnAnalysis.className = 'btn-analysis';
+      btnAnalysis.dataset.id = row.id;
+      btnAnalysis.title = '분석결과 입력';
+      const testResultData = this.loadTestResultForLog(row.id);
+      if (testResultData) {
+        if (testResultData.allNd) {
+          btnAnalysis.textContent = '불검출';
+          btnAnalysis.classList.add('has-result', 'nd');
+        } else if (testResultData.detections && testResultData.detections.length > 0) {
+          btnAnalysis.textContent = `${testResultData.detections.length}건 검출`;
+          btnAnalysis.classList.add('has-result', 'detected');
+        } else {
+          btnAnalysis.textContent = '입력';
+        }
+      } else {
+        btnAnalysis.textContent = '입력';
+      }
+      tdAnalysis.appendChild(btnAnalysis); tr.appendChild(tdAnalysis);
+
       // Actions
       const tdActions = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'table-actions';
@@ -2787,6 +2871,468 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   /**
    * 의뢰 항목 가져오기
    */
+  // ========================================
+  // 잔류농약 분석결과 모달
+  // ========================================
+
+  /**
+   * 분석결과 모달 초기화
+   */
+  private initPesticideAnalysisModal(): void {
+    const modal = document.getElementById('pesticideAnalysisModal');
+    if (!modal) return;
+
+    const closeModal = () => { modal.classList.add('hidden'); this._paLogId = null; };
+    document.getElementById('closePesticideAnalysisModal')?.addEventListener('click', closeModal);
+    document.getElementById('cancelPesticideAnalysisBtn')?.addEventListener('click', closeModal);
+    modal.querySelector('.modal-overlay')?.addEventListener('click', closeModal);
+    modal.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); });
+
+    document.getElementById('paAddRowBtn')?.addEventListener('click', () => this.addDetectionRow());
+    document.getElementById('paAllNdBtn')?.addEventListener('click', () => this.setAllNd(true));
+    document.getElementById('paCancelNdBtn')?.addEventListener('click', () => this.setAllNd(false));
+    document.getElementById('savePesticideAnalysisBtn')?.addEventListener('click', () => this.savePesticideAnalysis());
+  }
+
+  /**
+   * 분석결과 모달 열기
+   */
+  private openPesticideAnalysisModal(logId: string): void {
+    const log = this.sampleLogs.find(l => String(l.id) === String(logId));
+    if (!log) return;
+
+    const modal = document.getElementById('pesticideAnalysisModal');
+    if (!modal) return;
+
+    this._paLogId = logId;
+
+    // 시료 정보 채우기
+    const paReceptionNumber = document.getElementById('paReceptionNumber');
+    const paDate = document.getElementById('paDate');
+    const paCategory = document.getElementById('paCategory');
+    const paName = document.getElementById('paName');
+    const paCrop = document.getElementById('paCrop');
+    const paPurpose = document.getElementById('paPurpose');
+
+    if (paReceptionNumber) paReceptionNumber.textContent = log.receptionNumber || '-';
+    if (paDate) paDate.textContent = log.date || '-';
+    if (paCategory) paCategory.textContent = log.subCategory || '-';
+    if (paName) paName.textContent = log.name || '-';
+    if (paCrop) paCrop.textContent = log.requestContent || '-';
+    if (paPurpose) paPurpose.textContent = log.purpose || '-';
+
+    // 기존 결과 로드
+    const existing = this.loadTestResultForLog(logId);
+    const paTestDate = document.getElementById('paTestDate') as HTMLInputElement | null;
+    if (paTestDate) paTestDate.value = existing?.testDate || '';
+
+    // 판정
+    const judgment = existing?.judgment || '';
+    if (['', 'pass', 'fail'].includes(judgment)) {
+      const radio = document.querySelector(`input[name="paJudgment"][value="${judgment}"]`) as HTMLInputElement | null;
+      if (radio) radio.checked = true;
+    }
+
+    // 검출 농약 행 렌더
+    const tbody = document.getElementById('paDetectionsBody');
+    if (tbody) tbody.innerHTML = '';
+
+    // 전체 불검출 상태 복원
+    this._paAllNd = existing?.allNd || false;
+    this.updateNdStatusUI();
+
+    if (existing?.detections && existing.detections.length > 0) {
+      for (const det of existing.detections) {
+        this.addDetectionRow(det);
+      }
+    }
+
+    this.updateDetectionCount();
+    this.toggleEmptyMsg();
+    modal.classList.remove('hidden');
+  }
+
+  /**
+   * 검출 농약 행 추가
+   */
+  private addDetectionRow(data: PesticideDetectionData | null = null): void {
+    const tbody = document.getElementById('paDetectionsBody');
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.className = 'pa-detection-row';
+    const rowIdx = tbody.querySelectorAll('tr').length;
+
+    // No
+    const tdNo = document.createElement('td');
+    tdNo.className = 'pa-col-no';
+    tdNo.textContent = String(rowIdx + 1);
+    tr.appendChild(tdNo);
+
+    // 분석법 선택
+    const tdMethod = document.createElement('td');
+    tdMethod.className = 'pa-col-method';
+    const selMethod = document.createElement('select');
+    selMethod.className = 'pa-method-select';
+    ['GC', 'LC'].forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      selMethod.appendChild(opt);
+    });
+    if (data?.method) selMethod.value = data.method;
+    tdMethod.appendChild(selMethod);
+    tr.appendChild(tdMethod);
+
+    // 농약명 (자동완성)
+    const tdName = document.createElement('td');
+    tdName.className = 'pa-col-name';
+    const nameWrapper = document.createElement('div');
+    nameWrapper.className = 'pa-autocomplete-wrapper';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'pa-name-input';
+    nameInput.placeholder = '농약명 검색...';
+    nameInput.autocomplete = 'off';
+    if (data?.name) nameInput.value = data.name;
+
+    const sugList = document.createElement('ul');
+    sugList.className = 'pa-suggestions hidden';
+
+    // 자동완성 이벤트
+    nameInput.addEventListener('input', () => {
+      const q = nameInput.value.trim();
+      if (q.length < 1) { sugList.classList.add('hidden'); return; }
+
+      const searchFn = (window as any).searchPesticides;
+      const results: { engName: string }[] = searchFn ? searchFn(q, 'all', 10) : [];
+      sugList.innerHTML = '';
+      if (results.length === 0) { sugList.classList.add('hidden'); return; }
+
+      results.forEach((p: { engName: string }) => {
+        const li = document.createElement('li');
+        li.className = 'pa-suggestion-item';
+        li.innerHTML = `<span class="pa-sug-name">${this.escapeHTMLForSuggestion(p.engName)}</span>`;
+        li.addEventListener('mousedown', (e: Event) => {
+          e.preventDefault();
+          nameInput.value = p.engName;
+          nameInput.dataset.engName = p.engName;
+          sugList.classList.add('hidden');
+        });
+        sugList.appendChild(li);
+      });
+
+      // position: fixed 기준으로 입력 필드 아래에 위치
+      const rect = nameInput.getBoundingClientRect();
+      sugList.style.top = `${rect.bottom + 2}px`;
+      sugList.style.left = `${rect.left}px`;
+      sugList.style.width = `${rect.width}px`;
+      sugList.classList.remove('hidden');
+    });
+
+    nameInput.addEventListener('blur', () => {
+      setTimeout(() => sugList.classList.add('hidden'), 200);
+    });
+
+    nameWrapper.appendChild(nameInput);
+    nameWrapper.appendChild(sugList);
+    tdName.appendChild(nameWrapper);
+    tr.appendChild(tdName);
+
+    // 기기분석값
+    const tdRaw = document.createElement('td');
+    tdRaw.className = 'pa-col-raw';
+    const rawInput = document.createElement('input');
+    rawInput.type = 'text';
+    rawInput.className = 'pa-raw-input';
+    rawInput.placeholder = 'ppb';
+    rawInput.autocomplete = 'off';
+    if (data?.rawValue) rawInput.value = data.rawValue;
+    tdRaw.appendChild(rawInput);
+    tr.appendChild(tdRaw);
+
+    // 검출량 (ppm = mg/kg)
+    const tdValue = document.createElement('td');
+    tdValue.className = 'pa-col-value';
+    const valInput = document.createElement('input');
+    valInput.type = 'text';
+    valInput.className = 'pa-value-input';
+    valInput.placeholder = '0.00';
+    valInput.autocomplete = 'off';
+    if (data?.value) valInput.value = data.value;
+    tdValue.appendChild(valInput);
+
+    // 기기분석값(ppb) 입력 → 검출량(ppm) 자동 계산 (÷1000)
+    rawInput.addEventListener('input', () => {
+      const ppb = parseFloat(rawInput.value);
+      if (!isNaN(ppb)) {
+        const ppm = ppb / 1000;
+        valInput.value = ppm % 1 === 0 ? String(ppm) : ppm.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+      } else {
+        valInput.value = '';
+      }
+    });
+
+    tr.appendChild(tdValue);
+
+    // 삭제
+    const tdDel = document.createElement('td');
+    tdDel.className = 'pa-col-del';
+    const btnDel = document.createElement('button');
+    btnDel.className = 'pa-del-btn';
+    btnDel.title = '삭제';
+    btnDel.textContent = '\u2715';
+    btnDel.addEventListener('click', () => {
+      tr.remove();
+      this.renumberDetectionRows();
+      this.updateDetectionCount();
+      this.toggleEmptyMsg();
+    });
+    tdDel.appendChild(btnDel);
+    tr.appendChild(tdDel);
+
+    tbody.appendChild(tr);
+    this.updateDetectionCount();
+    this.toggleEmptyMsg();
+
+    if (!data) nameInput.focus();
+  }
+
+  /**
+   * HTML 이스케이프 (suggestion 표시용)
+   */
+  private escapeHTMLForSuggestion(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /**
+   * 검출 행 번호 재정렬
+   */
+  private renumberDetectionRows(): void {
+    const rows = document.querySelectorAll('#paDetectionsBody .pa-detection-row');
+    rows.forEach((tr, idx) => {
+      const noCell = tr.querySelector('.pa-col-no');
+      if (noCell) noCell.textContent = String(idx + 1);
+    });
+  }
+
+  /**
+   * 검출 건수 업데이트
+   */
+  private updateDetectionCount(): void {
+    const count = document.querySelectorAll('#paDetectionsBody .pa-detection-row').length;
+    const el = document.getElementById('paDetectionCount');
+    if (el) el.textContent = `${count}건`;
+  }
+
+  /**
+   * 전체 불검출 설정/해제
+   */
+  private setAllNd(isNd: boolean): void {
+    this._paAllNd = isNd;
+    if (isNd) {
+      // 전체 불검출 시 기존 검출 행 모두 제거 + 판정 자동 선택
+      const tbody = document.getElementById('paDetectionsBody');
+      if (tbody) tbody.innerHTML = '';
+      this.updateDetectionCount();
+      const radio = document.querySelector('input[name="paJudgment"][value="pass"]') as HTMLInputElement | null;
+      if (radio) radio.checked = true;
+    } else {
+      // 해제 시 판정 초기화
+      const radio = document.querySelector('input[name="paJudgment"][value=""]') as HTMLInputElement | null;
+      if (radio) radio.checked = true;
+    }
+    this.updateNdStatusUI();
+    this.toggleEmptyMsg();
+  }
+
+  /**
+   * 불검출 상태 UI 업데이트
+   */
+  private updateNdStatusUI(): void {
+    const ndStatus = document.getElementById('paNdStatus');
+    const emptyMsg = document.getElementById('paEmptyMsg');
+    const addBtn = document.getElementById('paAddRowBtn') as HTMLButtonElement | null;
+
+    if (this._paAllNd) {
+      if (ndStatus) ndStatus.classList.remove('hidden');
+      if (emptyMsg) emptyMsg.style.display = 'none';
+      if (addBtn) addBtn.disabled = true;
+    } else {
+      if (ndStatus) ndStatus.classList.add('hidden');
+      if (addBtn) addBtn.disabled = false;
+    }
+  }
+
+  /**
+   * 빈 메시지 토글
+   */
+  private toggleEmptyMsg(): void {
+    const count = document.querySelectorAll('#paDetectionsBody .pa-detection-row').length;
+    const msg = document.getElementById('paEmptyMsg');
+    if (msg) msg.style.display = (count > 0 || this._paAllNd) ? 'none' : 'block';
+  }
+
+  /**
+   * 분석결과 저장
+   */
+  private savePesticideAnalysis(): void {
+    const logId = this._paLogId;
+    if (!logId) return;
+
+    const log = this.sampleLogs.find(l => String(l.id) === String(logId));
+    if (!log) return;
+
+    const allResults = this.loadAllPesticideTestResults();
+
+    // 검출 농약 수집
+    const detections: PesticideDetectionData[] = [];
+    const rows = document.querySelectorAll('#paDetectionsBody .pa-detection-row');
+    rows.forEach(tr => {
+      const method = (tr.querySelector('.pa-method-select') as HTMLSelectElement | null)?.value || 'GC';
+      const name = (tr.querySelector('.pa-name-input') as HTMLInputElement | null)?.value?.trim() || '';
+      const engName = (tr.querySelector('.pa-name-input') as HTMLInputElement | null)?.dataset?.engName || '';
+      const rawValue = (tr.querySelector('.pa-raw-input') as HTMLInputElement | null)?.value?.trim() || '';
+      const value = (tr.querySelector('.pa-value-input') as HTMLInputElement | null)?.value?.trim() || '';
+
+      if (name) {
+        detections.push({ method, name, engName, rawValue, value });
+      }
+    });
+
+    allResults[logId] = {
+      id: logId,
+      testDate: (document.getElementById('paTestDate') as HTMLInputElement | null)?.value || '',
+      judgment: (document.querySelector('input[name="paJudgment"]:checked') as HTMLInputElement | null)?.value || '',
+      allNd: this._paAllNd || false,
+      detections: detections,
+      updatedAt: new Date().toISOString()
+    };
+
+    // 판정 자동 결정: 전체 불검출이면 pass, 검출 농약 있으면 fail
+    if (this._paAllNd && detections.length === 0) {
+      allResults[logId].judgment = 'pass';
+    } else if (detections.length > 0) {
+      allResults[logId].judgment = 'fail';
+    }
+    // 수동 선택한 판정이 있으면 우선
+    const manualJudgment = (document.querySelector('input[name="paJudgment"]:checked') as HTMLInputElement | null)?.value;
+    if (manualJudgment) {
+      allResults[logId].judgment = manualJudgment;
+    }
+
+    this.saveAllPesticideTestResults(allResults);
+
+    // 접수 데이터 판정 동기화 (항상 반영)
+    log.testResult = (allResults[logId].judgment || null) as PesticideResult;
+    this.saveLogs();
+
+    document.getElementById('pesticideAnalysisModal')?.classList.add('hidden');
+    this._paLogId = null;
+    this.filterAndRenderLogs();
+    this.showToast('분석결과가 저장되었습니다.', 'success');
+  }
+
+  // === 분석결과 데이터 저장/로드 ===
+
+  /**
+   * 특정 시료의 분석결과 로드
+   */
+  private loadTestResultForLog(logId: string): PesticideTestResultData | null {
+    if (!this._cachedPesticideResults) {
+      this._cachedPesticideResults = this.loadAllPesticideTestResults();
+    }
+    return this._cachedPesticideResults[logId] || null;
+  }
+
+  /**
+   * 전체 분석결과 로드
+   */
+  private loadAllPesticideTestResults(): Record<string, PesticideTestResultData> {
+    const key = `pesticideTestResults_${this.selectedYear}`;
+    try {
+      const data = localStorage.getItem(key);
+      if (!data) return {};
+      return JSON.parse(data) || {};
+    } catch (e) {
+      (window.logger?.error || console.error)('잔류농약 검사 결과 로드 실패:', e);
+      return {};
+    }
+  }
+
+  /**
+   * 전체 분석결과 저장
+   */
+  private saveAllPesticideTestResults(results: Record<string, PesticideTestResultData>): void {
+    const key = `pesticideTestResults_${this.selectedYear}`;
+    try {
+      localStorage.setItem(key, JSON.stringify(results));
+      this._cachedPesticideResults = results;
+      this.syncPesticideTestResultsToFirestore(results);
+    } catch (e) {
+      (window.logger?.error || console.error)('잔류농약 검사 결과 저장 실패:', e);
+    }
+  }
+
+  /**
+   * Firestore로 분석결과 동기화 (업로드)
+   */
+  private async syncPesticideTestResultsToFirestore(results: Record<string, PesticideTestResultData>): Promise<void> {
+    if (!window.firestoreDb?.isEnabled()) return;
+    try {
+      const year = parseInt(this.selectedYear);
+      const entries = Object.entries(results);
+      if (entries.length === 0) return;
+      const documents = entries.map(([docKey, data]) => ({
+        ...data,
+        id: docKey,
+        _resultKey: docKey,
+      }));
+      await window.firestoreDb.batchSave('pesticideTestResults', year, documents);
+    } catch (e) {
+      (window.logger?.error || console.error)('잔류농약 Firestore 동기화 실패:', e);
+    }
+  }
+
+  /**
+   * Firestore에서 분석결과 동기화 (다운로드)
+   */
+  private async syncPesticideTestResultsFromFirestore(): Promise<void> {
+    if (!window.firestoreDb?.isEnabled()) return;
+    try {
+      const year = parseInt(this.selectedYear);
+      const cloudData = await window.firestoreDb.getAll('pesticideTestResults', year);
+      if (!cloudData || cloudData.length === 0) return;
+
+      const cloudMap: Record<string, PesticideTestResultData> = {};
+      for (const doc of cloudData) {
+        const key = (doc as any)._resultKey || doc.id;
+        if (key) {
+          const { _resultKey, syncedAt, updatedAt: _, ...rest } = doc as any;
+          cloudMap[key] = rest as PesticideTestResultData;
+        }
+      }
+
+      const localResults = this.loadAllPesticideTestResults();
+      // updatedAt 기준 병합 (최신 데이터 우선)
+      const merged: Record<string, PesticideTestResultData> = { ...localResults };
+      for (const [key, cloudVal] of Object.entries(cloudMap)) {
+        const localVal = merged[key];
+        if (!localVal || !localVal.updatedAt || new Date(cloudVal.updatedAt) >= new Date(localVal.updatedAt)) {
+          merged[key] = cloudVal;
+        }
+      }
+      const lsKey = `pesticideTestResults_${this.selectedYear}`;
+      localStorage.setItem(lsKey, JSON.stringify(merged));
+      this._cachedPesticideResults = merged;
+      this.filterAndRenderLogs();
+    } catch (e) {
+      (window.logger?.error || console.error)('잔류농약 Firestore 로드 실패:', e);
+    }
+  }
+
   private getRequestItems(): { index: number; producerAddress: string; cropName: string }[] {
     const items: { index: number; producerAddress: string; cropName: string }[] = [];
     const requestItems = this.requestItemsList?.querySelectorAll('.request-item') || [];

@@ -130,6 +130,10 @@
                 <span class="util-btn-label">가져오기</span>
                 <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" hidden>
             </label>
+            <button type="button" id="pesticideAnalysisBtn" class="util-btn pa-view-btn" title="잔류농약 분석결과 조회">
+                <span class="material-icons-outlined">biotech</span>
+                <span class="util-btn-label">분석결과</span>
+            </button>
         </div>
 
         <div class="navbar-divider"></div>
@@ -422,6 +426,7 @@
                             <th>수령 방법</th>
                             <th class="col-note">비고</th>
                             <th class="col-mail-date">발송일자</th>
+                            <th class="col-analysis">분석결과</th>
                             <th class="col-action">관리</th>
                         </tr>
                     </thead>
@@ -808,6 +813,95 @@
                 <div class="modal-footer-spacer"></div>
                 <button type="button" id="cancelExcelImportBtn" class="btn-cancel">취소</button>
                 <button type="button" id="excelImportNextBtn" class="btn-confirm">다음</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 잔류농약 분석결과 입력 모달 -->
+    <div id="pesticideAnalysisModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-pesticide-analysis">
+            <div class="modal-header pesticide-analysis-header">
+                <h3><span class="material-icons-outlined" style="font-size:20px;vertical-align:middle;">biotech</span> 잔류농약 분석결과 입력</h3>
+                <button type="button" class="modal-close" id="closePesticideAnalysisModal">&times;</button>
+            </div>
+            <div class="modal-body pesticide-analysis-body">
+                <!-- 시료 정보 -->
+                <div class="pa-sample-info">
+                    <div class="info-row">
+                        <span class="info-label">접수번호</span>
+                        <span class="info-value" id="paReceptionNumber">-</span>
+                        <span class="info-label">접수일자</span>
+                        <span class="info-value" id="paDate">-</span>
+                        <span class="info-label">구분</span>
+                        <span class="info-value" id="paCategory">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">성명</span>
+                        <span class="info-value" id="paName">-</span>
+                        <span class="info-label">의뢰물품</span>
+                        <span class="info-value" id="paCrop">-</span>
+                        <span class="info-label">목적</span>
+                        <span class="info-value" id="paPurpose">-</span>
+                    </div>
+                </div>
+
+                <!-- 검사일자 + 판정 -->
+                <div class="pa-meta-row">
+                    <div class="pa-field">
+                        <label for="paTestDate">검사일자</label>
+                        <input type="date" id="paTestDate" class="pa-input">
+                    </div>
+                    <div class="pa-field">
+                        <label>판정</label>
+                        <div class="judgment-options">
+                            <label class="judgment-option"><input type="radio" name="paJudgment" value=""><span class="judgment-chip">미판정</span></label>
+                            <label class="judgment-option"><input type="radio" name="paJudgment" value="pass"><span class="judgment-chip chip-pass">불검출</span></label>
+                            <label class="judgment-option"><input type="radio" name="paJudgment" value="fail"><span class="judgment-chip chip-fail">검출</span></label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 검출 농약 입력 영역 -->
+                <div class="pa-detections-header">
+                    <span class="pa-detections-title">검출 농약</span>
+                    <span class="pa-detections-count" id="paDetectionCount">0건</span>
+                    <button type="button" id="paAllNdBtn" class="pa-nd-all-btn" title="전체 불검출 처리">
+                        <span class="material-icons-outlined" style="font-size:16px;">check_circle</span> 전체 불검출
+                    </button>
+                    <button type="button" id="paAddRowBtn" class="pa-add-btn" title="검출 농약 추가">
+                        <span class="material-icons-outlined" style="font-size:16px;">add_circle</span> 추가
+                    </button>
+                </div>
+
+                <div class="pa-detections-wrapper">
+                    <table class="pa-detections-table">
+                        <thead>
+                            <tr>
+                                <th class="pa-col-no">No.</th>
+                                <th class="pa-col-method">분석법</th>
+                                <th class="pa-col-name">농약명</th>
+                                <th class="pa-col-raw">기기분석값 (ng/kg)</th>
+                                <th class="pa-col-value">검출량 (mg/kg)</th>
+                                <th class="pa-col-del"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="paDetectionsBody">
+                        </tbody>
+                    </table>
+                    <div id="paEmptyMsg" class="pa-empty-msg">
+                        검출된 농약이 없습니다. "추가"로 검출 농약을 입력하거나 "전체 불검출"을 선택하세요.
+                    </div>
+                    <div id="paNdStatus" class="pa-nd-status hidden">
+                        <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;color:#16a34a;">check_circle</span>
+                        <span>전체 불검출 처리됨</span>
+                        <button type="button" id="paCancelNdBtn" class="pa-cancel-nd-btn">해제</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer pesticide-analysis-footer">
+                <button type="button" id="cancelPesticideAnalysisBtn" class="btn-cancel">닫기</button>
+                <button type="button" id="savePesticideAnalysisBtn" class="btn-confirm btn-pa-save">저장</button>
             </div>
         </div>
     </div>
