@@ -537,6 +537,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
         const receptionNumberInput = document.getElementById('receptionNumber') as HTMLInputElement | null;
         if (receptionNumberInput && nextNumber) {
           receptionNumberInput.value = nextNumber;
+          receptionNumberInput.dataset.baseNumber = nextNumber;
         }
       }
 
@@ -913,7 +914,11 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
    */
   protected updateRecordCount(): void {
     if (this.recordCountEl) {
-      this.recordCountEl.textContent = `총 ${this.sampleLogs.length}건`;
+      const total = this.sampleLogs.length;
+      const incomplete = this.sampleLogs.filter((log: T) => !(log as Record<string, unknown>).isComplete).length;
+      this.recordCountEl.textContent = incomplete > 0
+        ? `총 ${total}건 (미완료 ${incomplete}건)`
+        : `총 ${total}건`;
     }
   }
 
@@ -997,6 +1002,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
     if (yearSelect) {
       yearSelect.addEventListener('change', (e) => {
         const target = e.target as HTMLSelectElement;
+        this._firebaseCache.delete(target.value); // 연도 변경 시 캐시 무효화 → Firebase 재동기화
         this.syncYearSelects(target.value);
         this.loadYearData(target.value);
       });
@@ -1005,6 +1011,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
     if (listYearSelect) {
       listYearSelect.addEventListener('change', (e) => {
         const target = e.target as HTMLSelectElement;
+        this._firebaseCache.delete(target.value); // 연도 변경 시 캐시 무효화 → Firebase 재동기화
         this.syncYearSelects(target.value);
         this.loadYearData(target.value);
       });

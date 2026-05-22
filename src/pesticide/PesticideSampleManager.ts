@@ -24,11 +24,20 @@ type PesticideResult = 'pass' | 'fail' | null;
  * Pesticide detection data (single detected pesticide)
  */
 interface PesticideDetectionData {
-  method: string;
+  equipment: string;
   name: string;
   engName: string;
-  rawValue: string;
+  origRaw: string;
+  origDil: string;
+  origVal: string;
+  acidRaw: string;
+  acidDil: string;
+  acidVal: string;
   value: string;
+  // Legacy fields for backward compatibility
+  method?: string;
+  rawValue?: string;
+  dilution?: string;
 }
 
 /**
@@ -48,6 +57,7 @@ interface PesticideTestResultData {
  */
 interface PesticideSampleData {
   id: string;
+  groupId?: string;
   date?: string;
   receptionNumber?: string;
   name?: string;
@@ -141,6 +151,9 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   private currentRegistrationData: PesticideSampleData | null = null;
   private requestItemCounter: number = 1;
   private currentFlatRows: PesticideSampleData[] = [];
+
+  // 그룹 묶음 수정용 (같은 접수로 만든 N개 행 추적)
+  private editingGroupIds: string[] = [];
 
   // Additional DOM refs for pagination/rendering/form
   private dateInput: HTMLInputElement | null = null;
@@ -358,28 +371,12 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
         }
       }
 
-      // 삭제 버튼
+      // 삭제 버튼 (그룹 일괄 삭제는 deleteSample override에서 처리)
       const deleteBtn = target.closest('.btn-delete') as HTMLElement | null;
       if (deleteBtn) {
         const id = deleteBtn.dataset.id;
-        if (id && confirm('정말 삭제하시겠습니까?')) {
-          this.sampleLogs = this.sampleLogs.filter(item => String(item.id) !== String(id));
-          this.saveLogs();
-          this.filterAndRenderLogs();
-          this.showToast('삭제되었습니다.', 'success');
-
-          if (window.firestoreDb?.isEnabled()) {
-            window.firestoreDb.delete('pesticide', parseInt(this.selectedYear), String(id))
-              .catch((err: unknown) => (window.logger?.error || console.error)('Firebase 삭제 실패:', err));
-          }
-
-          if (this.editingId === id) {
-            if (typeof (this as any).cancelEditMode === 'function') {
-              (this as any).cancelEditMode();
-            } else {
-              this.editingId = null;
-            }
-          }
+        if (id) {
+          void this.deleteSample(id);
         }
       }
 
@@ -1992,9 +1989,17 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    * 폼 편집 모드용 채우기 (JS 917-1019)
    */
   populateFormForEdit(log: PesticideSampleData): void {
+    const groupMembers = this.getGroupMembers(log);
     this.editingId = log.id;
+    this.editingGroupIds = groupMembers.map(m => String(m.id));
 
-    if (this.receptionNumberInput) this.receptionNumberInput.value = log.receptionNumber || '';
+    if (this.receptionNumberInput) {
+      const receptionNumbersStr = groupMembers
+        .map(m => m.receptionNumber || '')
+        .filter(v => v)
+        .join(', ');
+      this.receptionNumberInput.value = receptionNumbersStr || (log.receptionNumber || '');
+    }
     if (this.dateInput) this.dateInput.value = log.date || '';
     this.setInputValue('name', log.name);
     this.setInputValue('phoneNumber', log.phoneNumber);
@@ -2052,15 +2057,29 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     this.setInputValue('note', log.note);
     this.setInputValue('producerName', log.producerName);
 
-    // 의뢰 항목 초기화 후 데이터 채우기
+    // 의뢰 항목 초기화 후 그룹 멤버 모두 채우기
     this.resetRequestItems();
-    const firstRequestItem = this.requestItemsList?.querySelector('.request-item');
-    if (firstRequestItem) {
-      const addressInput = firstRequestItem.querySelector('.request-producer-address') as HTMLInputElement | null;
-      const cropInput = firstRequestItem.querySelector('.request-crop-name') as HTMLInputElement | null;
-      if (addressInput) addressInput.value = log.producerAddress || '';
-      if (cropInput) cropInput.value = log.requestContent || '';
+    const groupMembersForForm: PesticideSampleData[] = (this.editingGroupIds && this.editingGroupIds.length > 1)
+      ? this.sampleLogs
+          .filter(l => this.editingGroupIds.includes(String(l.id)))
+          .sort((a, b) => {
+            const na = parseInt(a.receptionNumber || '', 10) || 0;
+            const nb = parseInt(b.receptionNumber || '', 10) || 0;
+            return na - nb;
+          })
+      : [log];
+    for (let i = 1; i < groupMembersForForm.length; i++) {
+      this.addRequestItem();
     }
+    const requestItemEls = this.requestItemsList?.querySelectorAll('.request-item') || [];
+    groupMembersForForm.forEach((member, idx) => {
+      const itemEl = requestItemEls[idx];
+      if (!itemEl) return;
+      const addressInput = itemEl.querySelector('.request-producer-address') as HTMLInputElement | null;
+      const cropInput = itemEl.querySelector('.request-crop-name') as HTMLInputElement | null;
+      if (addressInput) addressInput.value = member.producerAddress || '';
+      if (cropInput) cropInput.value = member.requestContent || '';
+    });
 
     // 네비게이션 바 버튼 변경
     if (this.navSubmitBtn) {
@@ -2094,6 +2113,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    */
   resetForm(): void {
     this.editingId = null;
+    this.editingGroupIds = [];
     if (this.form) this.form.reset();
     if (this.dateInput) this.dateInput.valueAsDate = new Date();
 
@@ -2117,6 +2137,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    */
   cancelEditMode(): void {
     this.editingId = null;
+    this.editingGroupIds = [];
 
     if (this.navSubmitBtn) {
       this.navSubmitBtn.title = '접수 등록';
@@ -2154,22 +2175,66 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     if (!this.form) return;
     const formData = new FormData(this.form);
 
-    // 수정 모드
+    // 수정 모드 (그룹 멤버 전체 삭제+재생성)
     if (this.editingId) {
-      const logIndex = this.sampleLogs.findIndex(l => l.id === this.editingId);
-      if (logIndex === -1) {
+      const editingLog = this.sampleLogs.find(l => String(l.id) === String(this.editingId));
+      if (!editingLog) {
         this.showToast('수정할 데이터를 찾을 수 없습니다.', 'error');
         return;
       }
 
-      const existingLog = this.sampleLogs[logIndex];
       const requestItems = this.getRequestItems();
-      const firstItem = requestItems[0] || { producerAddress: '', cropName: '' };
-      const applicantType = (formData.get('applicantType') as string) || '개인';
+      if (requestItems.length === 0) {
+        this.showToast('최소 하나의 의뢰 항목을 입력해주세요.', 'error');
+        return;
+      }
 
-      const updatedLog: PesticideSampleData = {
-        ...existingLog,
-        receptionNumber: formData.get('receptionNumber') as string,
+      const applicantType = (formData.get('applicantType') as string) || '개인';
+      const oldMembers: PesticideSampleData[] = (this.editingGroupIds && this.editingGroupIds.length > 0)
+        ? this.sampleLogs.filter(l => this.editingGroupIds.includes(String(l.id)))
+        : [editingLog];
+
+      // 의뢰 항목을 줄인 경우 확인
+      if (requestItems.length < oldMembers.length) {
+        const removeCount = oldMembers.length - requestItems.length;
+        if (!confirm(`기존 ${oldMembers.length}건 중 ${removeCount}건이 삭제됩니다. 계속하시겠습니까?`)) {
+          return;
+        }
+      }
+
+      const oldById = new Map(oldMembers.map(m => [String(m.id), m]));
+      const groupId = editingLog.groupId || oldMembers[0]?.groupId || crypto.randomUUID();
+
+      // 접수번호 파싱
+      const receptionRaw = String(formData.get('receptionNumber') || '').trim();
+      const receptionNumbers = receptionRaw.split(',').map(n => n.trim()).filter(n => n);
+      const safeBaseParsed = parseInt(receptionNumbers[0], 10);
+      const safeBase = !isNaN(safeBaseParsed)
+        ? safeBaseParsed
+        : (parseInt(this.generateNextReceptionNumber(), 10) || 1);
+
+      // 정렬 (Firestore 삭제와 재생성 양쪽에서 재사용)
+      const oldOrdered = oldMembers.slice().sort((a, b) => {
+        const na = parseInt(a.receptionNumber || '', 10) || 0;
+        const nb = parseInt(b.receptionNumber || '', 10) || 0;
+        return na - nb;
+      });
+
+      // 로컬에서 기존 멤버 제거
+      this.sampleLogs = this.sampleLogs.filter(l => !oldById.has(String(l.id)));
+      const newSlotCount = requestItems.length;
+      const fdb = (window as unknown as { firestoreDb?: { isEnabled?: () => boolean; delete?: (mk: string, year: number, id: string) => Promise<unknown> } }).firestoreDb;
+      if (fdb?.isEnabled?.() && oldOrdered.length > newSlotCount) {
+        const year = parseInt(String(this.selectedYear), 10);
+        for (let i = newSlotCount; i < oldOrdered.length; i++) {
+          const rid = String(oldOrdered[i].id);
+          fdb.delete?.(this.moduleKey, year, rid)?.catch((err: unknown) => {
+            (window.logger?.error || console.error)('Firestore 그룹 멤버 삭제 실패:', err);
+          });
+        }
+      }
+
+      const commonData = {
         date: formData.get('date') as string,
         applicantType: applicantType as '개인' | '법인',
         birthDate: applicantType === '개인' ? (formData.get('birthDate') as string) : '',
@@ -2184,13 +2249,27 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
         purpose: formData.get('purpose') as string,
         receptionMethod: (formData.get('receptionMethod') as string) || '-',
         note: (formData.get('note') as string) || '',
-        producerName: (formData.get('producerName') as string) || '',
-        producerAddress: firstItem.producerAddress,
-        requestContent: firstItem.cropName,
-        updatedAt: new Date().toISOString()
+        producerName: (formData.get('producerName') as string) || ''
       };
 
-      this.sampleLogs[logIndex] = updatedLog;
+      const nowIso = new Date().toISOString();
+      requestItems.forEach((item, idx) => {
+        const prev = oldOrdered[item.index] || oldOrdered[idx];
+        const newLog: PesticideSampleData = {
+          ...commonData,
+          id: prev?.id || crypto.randomUUID(),
+          groupId,
+          receptionNumber: receptionNumbers[idx] || String(safeBase + idx),
+          producerAddress: item.producerAddress,
+          requestContent: item.cropName,
+          isComplete: prev?.isComplete || false,
+          testResult: prev?.testResult ?? null,
+          createdAt: prev?.createdAt || nowIso,
+          updatedAt: nowIso
+        };
+        this.sampleLogs.push(newLog);
+      });
+
       this.saveLogs();
       this.filterAndRenderLogs();
       this.cancelEditMode();
@@ -2209,11 +2288,14 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     const baseReceptionNumber = parseInt(formData.get('receptionNumber') as string, 10);
     const createdLogs: PesticideSampleData[] = [];
     const applicantType = (formData.get('applicantType') as string) || '개인';
+    // 동일 폼 제출로 생성된 N개 행을 그룹으로 묶기 위한 식별자
+    const groupId = crypto.randomUUID();
 
     requestItems.forEach((item, idx) => {
       const itemReceptionNumber = String(baseReceptionNumber + idx);
       const newLog: PesticideSampleData = {
         id: crypto.randomUUID(),
+        groupId,
         receptionNumber: itemReceptionNumber,
         date: formData.get('date') as string,
         applicantType: applicantType as '개인' | '법인',
@@ -2268,6 +2350,35 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   }
 
   /**
+   * 동일 접수 그룹 멤버 조회
+   *  - 신규: groupId 일치
+   *  - 레거시: createdAt + name + phoneNumber + date 휴리스틱 매칭
+   *  반환: receptionNumber 오름차순
+   */
+  getGroupMembers(log: PesticideSampleData | undefined): PesticideSampleData[] {
+    if (!log) return [];
+    const matchByGroupId: PesticideSampleData[] = log.groupId
+      ? this.sampleLogs.filter(l => l.groupId && l.groupId === log.groupId)
+      : [];
+    let members: PesticideSampleData[] = matchByGroupId;
+    if (members.length === 0) {
+      members = this.sampleLogs.filter(l =>
+        l.createdAt && l.createdAt === log.createdAt &&
+        (l.name || '') === (log.name || '') &&
+        (l.phoneNumber || '') === (log.phoneNumber || '') &&
+        (l.date || '') === (log.date || '')
+      );
+    }
+    if (members.length === 0) members = [log];
+    members.sort((a, b) => {
+      const na = parseInt(a.receptionNumber || '', 10) || 0;
+      const nb = parseInt(b.receptionNumber || '', 10) || 0;
+      return na - nb;
+    });
+    return members;
+  }
+
+  /**
    * 샘플 편집
    */
   editSample(id: string): void {
@@ -2278,10 +2389,40 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   }
 
   /**
-   * 샘플 삭제 (base class override)
+   * 샘플 삭제 (base class override) — 같은 접수 그룹 전체 일괄 삭제
    */
   override async deleteSample(id: string): Promise<void> {
-    await super.deleteSample(id);
+    const target = this.sampleLogs.find(l => String(l.id) === String(id));
+    if (!target) {
+      await super.deleteSample(id);
+      return;
+    }
+    const members = this.getGroupMembers(target);
+    const confirmMsg = members.length > 1
+      ? `같은 접수로 등록된 ${members.length}건이 함께 삭제됩니다. 정말 삭제하시겠습니까?`
+      : '정말 삭제하시겠습니까?';
+    if (!confirm(confirmMsg)) return;
+
+    const memberIds = new Set(members.map(m => String(m.id)));
+    this.sampleLogs = this.sampleLogs.filter(l => !memberIds.has(String(l.id)));
+    this.saveLogs();
+    if (typeof this.filterAndRenderLogs === 'function') {
+      this.filterAndRenderLogs();
+    }
+    this.showToast(members.length > 1 ? `${members.length}건 삭제되었습니다.` : '삭제되었습니다.', 'success');
+
+    const fdb = (window as unknown as { firestoreDb?: { isEnabled?: () => boolean; delete?: (mk: string, year: number, id: string) => Promise<unknown> } }).firestoreDb;
+    if (fdb?.isEnabled?.()) {
+      const year = parseInt(String(this.selectedYear), 10);
+      memberIds.forEach(mid => {
+        fdb.delete?.(this.moduleKey, year, mid)?.catch((err: unknown) => {
+          (window.logger?.error || console.error)('Firestore 그룹 멤버 삭제 실패:', err);
+        });
+      });
+    }
+    if (this.editingId && memberIds.has(String(this.editingId))) {
+      this.cancelEditMode();
+    }
   }
 
   // ========================================
@@ -2316,6 +2457,11 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   // Override: 연도 변경 시 hook (JS 372-374)
   protected override onYearChange(_newYear: string): void {
     this.updateListViewTitle();
+    // 연도 변경 시 분석결과 캐시 무효화 + Firestore 재동기화
+    this._cachedPesticideResults = null;
+    // 빠른 연도 변경 시 race condition 방지 — 토큰 기반 검증
+    const reqYear = this.selectedYear;
+    void this.syncPesticideTestResultsFromFirestore(reqYear);
   }
 
   // Override: 저장 후 hook (자동 저장) (JS 382-388)
@@ -2520,12 +2666,12 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       tr.dataset.id = row.id;
 
       // Checkbox
-      const tdCheckbox = document.createElement('td'); tdCheckbox.className = 'col-checkbox';
+      const tdCheckbox = document.createElement('td'); tdCheckbox.className = 'sticky-col col-checkbox';
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.className = 'row-checkbox'; checkbox.dataset.id = row.id;
       tdCheckbox.appendChild(checkbox); tr.appendChild(tdCheckbox);
 
       // Complete
-      const tdComplete = document.createElement('td'); tdComplete.className = 'col-complete';
+      const tdComplete = document.createElement('td'); tdComplete.className = 'sticky-col col-complete';
       const btnComplete = document.createElement('button');
       btnComplete.className = 'btn-complete' + (isComplete ? ' completed' : '');
       btnComplete.dataset.id = row.id; btnComplete.title = isComplete ? '완료 취소' : '완료';
@@ -2533,7 +2679,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       tdComplete.appendChild(btnComplete); tr.appendChild(tdComplete);
 
       // Result
-      const tdResult = document.createElement('td'); tdResult.className = 'col-result';
+      const tdResult = document.createElement('td'); tdResult.className = 'sticky-col col-result';
       const btnResult = document.createElement('button'); btnResult.className = 'btn-result';
       if (row.testResult === 'pass') { btnResult.classList.add('pass'); btnResult.textContent = '불검출'; btnResult.title = '불검출'; }
       else if (row.testResult === 'fail') { btnResult.classList.add('fail'); btnResult.textContent = '검출'; btnResult.title = '검출'; }
@@ -2542,10 +2688,11 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
 
       // Number
       const tdNumber = document.createElement('td');
+      tdNumber.className = 'sticky-col col-num';
       tdNumber.textContent = rowAny._displayNumber || row.receptionNumber || ''; tr.appendChild(tdNumber);
 
       // Date
-      const tdDate = document.createElement('td'); tdDate.textContent = row.date || ''; tr.appendChild(tdDate);
+      const tdDate = document.createElement('td'); tdDate.className = 'sticky-col col-date'; tdDate.textContent = row.date || ''; tr.appendChild(tdDate);
 
       // Applicant type (hidden)
       const tdApplicantType = document.createElement('td'); tdApplicantType.className = 'col-applicant-type col-hidden';
@@ -2556,13 +2703,13 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       tdBirthCorp.textContent = birthOrCorp; tr.appendChild(tdBirthCorp);
 
       // Sub category
-      const tdSubCategory = document.createElement('td'); tdSubCategory.textContent = row.subCategory || '-'; tr.appendChild(tdSubCategory);
+      const tdSubCategory = document.createElement('td'); tdSubCategory.className = 'sticky-col col-category'; tdSubCategory.textContent = row.subCategory || '-'; tr.appendChild(tdSubCategory);
 
       // Purpose
-      const tdPurpose = document.createElement('td'); tdPurpose.textContent = row.purpose || '-'; tr.appendChild(tdPurpose);
+      const tdPurpose = document.createElement('td'); tdPurpose.className = 'sticky-col col-purpose'; tdPurpose.textContent = row.purpose || '-'; tr.appendChild(tdPurpose);
 
       // Name
-      const tdName = document.createElement('td'); tdName.className = 'col-name'; tdName.dataset.name = row.name || '';
+      const tdName = document.createElement('td'); tdName.className = 'sticky-col col-name'; tdName.dataset.name = row.name || '';
       tdName.textContent = safeName; tdName.title = `"${safeName}" 클릭하면 같은 이름 일괄 선택`; tr.appendChild(tdName);
 
       // Zipcode (hidden)
@@ -2757,18 +2904,31 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
   }
 
   // 통계 계산 (JS 1730-1811)
-  calculateStatistics(): { total: number; completed: number; pending: number; byPurpose: Record<string, any>; byMonth: Record<string, any>; byQuarter: Record<string, any>; byReceptionMethod: Record<string, any> } {
+  calculateStatistics(): { total: number; completed: number; pending: number; bySubCategory: Record<string, any>; byPurpose: Record<string, any>; byMonth: Record<string, any>; byQuarter: Record<string, any>; byReceptionMethod: Record<string, any> } {
     const total = this.sampleLogs.length;
     const completed = this.sampleLogs.filter(log => (log as any).isComplete).length;
     const pending = total - completed;
 
-    const byPurpose: Record<string, any> = {};
+    const categoryMapping: Record<string, { label: string; class: string }> = {
+      '생산물': { label: '🌾 생산물', class: 'category-product' },
+      '작물체': { label: '🌿 작물체', class: 'category-plant' },
+      '토양': { label: '🪱 토양', class: 'category-soil' }
+    };
+    const bySubCategory: Record<string, any> = {};
+    Object.entries(categoryMapping).forEach(([key, val]) => { bySubCategory[key] = { count: 0, ...val }; });
+    this.sampleLogs.forEach(log => {
+      const cat = (log as any).subCategory || '기타';
+      if (!bySubCategory[cat]) bySubCategory[cat] = { count: 0, ...(categoryMapping[cat] || { label: cat, class: 'category-other' }) };
+      bySubCategory[cat].count++;
+    });
+
     const purposeMapping: Record<string, { label: string; class: string }> = {
       '참고용': { label: '참고용', class: 'purpose-reference' }, '제출(급식)': { label: '제출(급식)', class: 'purpose-meal' },
       '인증(무농약)': { label: '인증(무농약)', class: 'purpose-nopesticide' }, '인증(유기농)': { label: '인증(유기농)', class: 'purpose-organic' },
-      '인증(GAP)': { label: '인증(GAP)', class: 'purpose-gap' }, '인증(글로벌GAP)': { label: '인증(글로벌GAP)', class: 'purpose-globalgap' },
-      '기타': { label: '기타', class: 'purpose-other' }
+      '인증(GAP)': { label: '인증(GAP)', class: 'purpose-gap' }, '인증(글로벌GAP)': { label: '인증(글로벌GAP)', class: 'purpose-globalgap' }
     };
+    const byPurpose: Record<string, any> = {};
+    Object.entries(purposeMapping).forEach(([key, val]) => { byPurpose[key] = { count: 0, ...val }; });
     this.sampleLogs.forEach(log => {
       const purpose = log.purpose || '기타';
       if (!byPurpose[purpose]) byPurpose[purpose] = { count: 0, ...(purposeMapping[purpose] || { label: purpose, class: 'purpose-other' }) };
@@ -2789,15 +2949,18 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       byQuarter[q].count += data.count; byQuarter[q].completed += data.completed; byQuarter[q].pending += data.pending;
     });
 
+    const methodMapping: Record<string, { label: string; class: string }> = { '우편': { label: '📮 우편', class: 'method-mail' }, '이메일': { label: '📧 이메일', class: 'method-email' }, '팩스': { label: '📠 팩스', class: 'method-fax' }, '직접방문': { label: '🚶 직접방문', class: 'method-visit' } };
     const byReceptionMethod: Record<string, any> = {};
-    const methodMapping: Record<string, { label: string; class: string }> = { '우편': { label: '우편', class: 'method-mail' }, '이메일': { label: '이메일', class: 'method-email' }, '팩스': { label: '팩스', class: 'method-fax' }, '직접방문': { label: '직접방문', class: 'method-visit' } };
+    Object.entries(methodMapping).forEach(([key, val]) => { byReceptionMethod[key] = { count: 0, ...val }; });
     this.sampleLogs.forEach(log => {
-      const method = log.receptionMethod || '기타';
-      if (!byReceptionMethod[method]) byReceptionMethod[method] = { count: 0, ...(methodMapping[method] || { label: method, class: 'method-mail' }) };
+      const raw = log.receptionMethod;
+      const method = (raw && raw.trim() && raw !== '-') ? raw : '기타';
+      if (method === '기타') return;
+      if (!byReceptionMethod[method]) byReceptionMethod[method] = { count: 0, ...(methodMapping[method] || { label: method, class: 'method-other' }) };
       byReceptionMethod[method].count++;
     });
 
-    return { total, completed, pending, byPurpose, byMonth, byQuarter, byReceptionMethod };
+    return { total, completed, pending, bySubCategory, byPurpose, byMonth, byQuarter, byReceptionMethod };
   }
 
   // 통계 모달 열기 (JS 1814-1830)
@@ -2808,6 +2971,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     const el = (id: string) => document.getElementById(id);
     const setTC = (id: string, v: number) => { const e = el(id); if (e) e.textContent = String(v); };
     setTC('statTotalCount', stats.total); setTC('statCompletedCount', stats.completed); setTC('statPendingCount', stats.pending);
+    this.renderBarChart('statsByCategory', stats.bySubCategory, 'category');
     this.renderBarChart('statsByPurpose', stats.byPurpose, 'purpose');
     this.renderMonthlyChart('statsByMonth', stats.byMonth);
     this.renderQuarterlySummary('statsQuarterly', stats.byQuarter);
@@ -2834,12 +2998,13 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     if (!container) return;
     const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
     const maxCount = Math.max(...entries.map(([, v]) => (v as any).count), 1);
-    const totalCount = entries.reduce((sum, [, v]) => sum + (v as any).count, 0);
-    if (totalCount === 0) { container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>'); return; }
     container.innerHTML = sanitizeHTML(`<div class="monthly-chart"><div class="monthly-bars">${entries.map(([, value]) => {
       const v = value as any; const hp = maxCount > 0 ? (v.count / maxCount) * 100 : 0; const cp = v.count > 0 ? (v.completed / v.count) * 100 : 0;
-      return `<div class="monthly-bar-group"><div class="monthly-bar-container"><div class="monthly-bar-stack" style="height: ${hp}%"><div class="monthly-bar-completed" style="height: ${cp}%" title="완료: ${v.completed}건"></div><div class="monthly-bar-pending" style="height: ${100 - cp}%" title="미완료: ${v.pending}건"></div></div>${v.count > 0 ? `<span class="monthly-bar-value">${v.count}</span>` : ''}</div><span class="monthly-bar-label">${v.label}</span></div>`;
+      return `<div class="monthly-bar-group"><div class="monthly-bar-container"><div class="monthly-bar-stack" data-h="${hp.toFixed(1)}"><div class="monthly-bar-completed" data-h="${cp.toFixed(1)}" title="완료: ${v.completed}건"></div><div class="monthly-bar-pending" data-h="${(100 - cp).toFixed(1)}" title="미완료: ${v.pending}건"></div></div>${v.count > 0 ? `<span class="monthly-bar-value">${v.count}</span>` : ''}</div><span class="monthly-bar-label">${v.label}</span></div>`;
     }).join('')}</div><div class="monthly-legend"><span class="legend-item"><span class="legend-color completed"></span> 완료</span><span class="legend-item"><span class="legend-color pending"></span> 미완료</span></div></div>`);
+    container.querySelectorAll('.monthly-bar-stack[data-h]').forEach(el => { (el as HTMLElement).style.height = el.getAttribute('data-h') + '%'; });
+    container.querySelectorAll('.monthly-bar-completed[data-h]').forEach(el => { (el as HTMLElement).style.height = el.getAttribute('data-h') + '%'; });
+    container.querySelectorAll('.monthly-bar-pending[data-h]').forEach(el => { (el as HTMLElement).style.height = el.getAttribute('data-h') + '%'; });
   }
 
   // 분기별 요약 렌더링 (JS 1903-1932)
@@ -2849,8 +3014,9 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     const totalCount = Object.values(data).reduce((sum, q: any) => sum + q.count, 0);
     container.innerHTML = sanitizeHTML(`<div class="quarterly-summary">${Object.entries(data).map(([, value]) => {
       const v = value as any; const percent = totalCount > 0 ? ((v.count / totalCount) * 100).toFixed(1) : '0'; const cr = v.count > 0 ? ((v.completed / v.count) * 100).toFixed(0) : '0';
-      return `<div class="quarterly-item"><div class="quarterly-label">${v.label}</div><div class="quarterly-stats"><span class="quarterly-count">${v.count}건</span><span class="quarterly-percent">(${percent}%)</span></div><div class="quarterly-completion"><div class="completion-bar"><div class="completion-fill" style="width: ${cr}%"></div></div><span class="completion-text">완료율 ${cr}%</span></div></div>`;
+      return `<div class="quarterly-item"><div class="quarterly-label">${v.label}</div><div class="quarterly-stats"><span class="quarterly-count">${v.count}건</span><span class="quarterly-percent">(${percent}%)</span></div><div class="quarterly-completion"><div class="completion-bar"><div class="completion-fill" data-w="${cr}"></div></div><span class="completion-text">완료율 ${cr}%</span></div></div>`;
     }).join('')}</div>`);
+    container.querySelectorAll('.completion-fill[data-w]').forEach(el => { (el as HTMLElement).style.width = el.getAttribute('data-w') + '%'; });
   }
 
   /**
@@ -2960,33 +3126,94 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     if (!tbody) return;
 
     const tr = document.createElement('tr');
-    tr.className = 'pa-detection-row';
-    const rowIdx = tbody.querySelectorAll('tr').length;
+    tr.className = 'pa-detection-row pa-detection-orig-row';
+    // Original 행만 카운트 (명시적 클래스 사용)
+    const rowIdx = tbody.querySelectorAll('.pa-detection-orig-row').length;
 
-    // No
-    const tdNo = document.createElement('td');
-    tdNo.className = 'pa-col-no';
-    tdNo.textContent = String(rowIdx + 1);
-    tr.appendChild(tdNo);
+    // 자동 계산 헬퍼
+    const createCalcInput = (prefix: string, fieldData: { raw?: string; dil?: string; val?: string }) => {
+      const rawIn = document.createElement('input');
+      rawIn.type = 'text';
+      rawIn.className = `pa-raw-input pa-${prefix}-raw`;
+      rawIn.placeholder = '-';
+      rawIn.autocomplete = 'off';
+      if (fieldData?.raw) rawIn.value = fieldData.raw;
 
-    // 분석법 선택
-    const tdMethod = document.createElement('td');
-    tdMethod.className = 'pa-col-method';
-    const selMethod = document.createElement('select');
-    selMethod.className = 'pa-method-select';
+      const dilIn = document.createElement('input');
+      dilIn.type = 'text';
+      dilIn.className = `pa-dilution-input pa-${prefix}-dil`;
+      dilIn.placeholder = '1';
+      dilIn.autocomplete = 'off';
+      dilIn.value = fieldData?.dil || '1';
+
+      const valIn = document.createElement('input');
+      valIn.type = 'text';
+      valIn.className = `pa-value-input pa-${prefix}-val`;
+      valIn.placeholder = '0.00';
+      valIn.autocomplete = 'off';
+      if (fieldData?.val) valIn.value = fieldData.val;
+
+      // 희석배수 입력 검증 (음수/0은 시각적 경고)
+      const validateDilution = () => {
+        const dilNum = parseFloat(dilIn.value);
+        if (!isNaN(dilNum) && dilNum < 1) {
+          dilIn.classList.add('pa-input-invalid');
+        } else {
+          dilIn.classList.remove('pa-input-invalid');
+        }
+      };
+
+      const calc = () => {
+        const ppb = parseFloat(rawIn.value);
+        const dilRaw = parseFloat(dilIn.value);
+        const dil = !isNaN(dilRaw) && dilRaw >= 1 ? dilRaw : 1;
+        if (isNaN(ppb)) {
+          valIn.value = '';
+          return;
+        }
+        const ppm = (ppb * dil) / 1000;
+        if (ppm === 0) {
+          valIn.value = '0';
+          return;
+        }
+        const formatted = ppm.toFixed(3).replace(/\.?0+$/, '');
+        valIn.value = formatted || '0';
+      };
+      rawIn.addEventListener('input', calc);
+      dilIn.addEventListener('input', () => { validateDilution(); calc(); });
+
+      return { rawIn, dilIn, valIn };
+    };
+
+    // === 1행: Original ===
+
+    // No (rowSpan=2)
+    const tdNo2 = document.createElement('td');
+    tdNo2.className = 'pa-col-no';
+    tdNo2.rowSpan = 2;
+    tdNo2.textContent = String(rowIdx + 1);
+    tr.appendChild(tdNo2);
+
+    // 장비 (rowSpan=2)
+    const tdEquip = document.createElement('td');
+    tdEquip.className = 'pa-col-equip';
+    tdEquip.rowSpan = 2;
+    const selEquip = document.createElement('select');
+    selEquip.className = 'pa-equip-select';
     ['GC', 'LC'].forEach(m => {
       const opt = document.createElement('option');
       opt.value = m;
       opt.textContent = m;
-      selMethod.appendChild(opt);
+      selEquip.appendChild(opt);
     });
-    if (data?.method) selMethod.value = data.method;
-    tdMethod.appendChild(selMethod);
-    tr.appendChild(tdMethod);
+    if (data?.equipment) selEquip.value = data.equipment;
+    tdEquip.appendChild(selEquip);
+    tr.appendChild(tdEquip);
 
-    // 농약명 (자동완성)
+    // 농약명 (rowSpan=2)
     const tdName = document.createElement('td');
     tdName.className = 'pa-col-name';
+    tdName.rowSpan = 2;
     const nameWrapper = document.createElement('div');
     nameWrapper.className = 'pa-autocomplete-wrapper';
     const nameInput = document.createElement('input');
@@ -2994,7 +3221,12 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     nameInput.className = 'pa-name-input';
     nameInput.placeholder = '농약명 검색...';
     nameInput.autocomplete = 'off';
-    if (data?.name) nameInput.value = data.name;
+    if (data?.name) {
+      nameInput.value = data.name;
+      const lookupName = data.engName || data.name;
+      nameInput.dataset.engName = data.engName || '';
+      nameInput.classList.toggle('pa-name-qualitative', !!window.isQualitativePesticide?.(lookupName));
+    }
 
     const sugList = document.createElement('ul');
     sugList.className = 'pa-suggestions hidden';
@@ -3004,19 +3236,28 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       const q = nameInput.value.trim();
       if (q.length < 1) { sugList.classList.add('hidden'); return; }
 
-      const searchFn = (window as any).searchPesticides;
-      const results: { engName: string }[] = searchFn ? searchFn(q, 'all', 10) : [];
+      const equip = selEquip.value || 'all';
+      const results: { engName: string }[] = window.searchPesticides
+        ? window.searchPesticides(q, equip, 10)
+        : [];
       sugList.innerHTML = '';
       if (results.length === 0) { sugList.classList.add('hidden'); return; }
 
+      const isQualFn = window.isQualitativePesticide;
       results.forEach((p: { engName: string }) => {
         const li = document.createElement('li');
         li.className = 'pa-suggestion-item';
-        li.innerHTML = `<span class="pa-sug-name">${this.escapeHTMLForSuggestion(p.engName)}</span>`;
+        const isQual = !!(isQualFn && isQualFn(p.engName));
+        // XSS 방지: createElement + textContent
+        const span = document.createElement('span');
+        span.className = 'pa-sug-name' + (isQual ? ' pa-sug-qualitative' : '');
+        span.textContent = p.engName;
+        li.appendChild(span);
         li.addEventListener('mousedown', (e: Event) => {
           e.preventDefault();
           nameInput.value = p.engName;
           nameInput.dataset.engName = p.engName;
+          nameInput.classList.toggle('pa-name-qualitative', !!(isQualFn && isQualFn(p.engName)));
           sugList.classList.add('hidden');
         });
         sugList.appendChild(li);
@@ -3039,51 +3280,31 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     tdName.appendChild(nameWrapper);
     tr.appendChild(tdName);
 
-    // 기기분석값
-    const tdRaw = document.createElement('td');
-    tdRaw.className = 'pa-col-raw';
-    const rawInput = document.createElement('input');
-    rawInput.type = 'text';
-    rawInput.className = 'pa-raw-input';
-    rawInput.placeholder = 'ppb';
-    rawInput.autocomplete = 'off';
-    if (data?.rawValue) rawInput.value = data.rawValue;
-    tdRaw.appendChild(rawInput);
-    tr.appendChild(tdRaw);
+    // Original 구분 라벨
+    const tdOrigLabel = document.createElement('td');
+    tdOrigLabel.className = 'pa-col-type pa-type-orig';
+    tdOrigLabel.textContent = 'Original';
+    tr.appendChild(tdOrigLabel);
 
-    // 검출량 (ppm = mg/kg)
-    const tdValue = document.createElement('td');
-    tdValue.className = 'pa-col-value';
-    const valInput = document.createElement('input');
-    valInput.type = 'text';
-    valInput.className = 'pa-value-input';
-    valInput.placeholder = '0.00';
-    valInput.autocomplete = 'off';
-    if (data?.value) valInput.value = data.value;
-    tdValue.appendChild(valInput);
-
-    // 기기분석값(ppb) 입력 → 검출량(ppm) 자동 계산 (÷1000)
-    rawInput.addEventListener('input', () => {
-      const ppb = parseFloat(rawInput.value);
-      if (!isNaN(ppb)) {
-        const ppm = ppb / 1000;
-        valInput.value = ppm % 1 === 0 ? String(ppm) : ppm.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
-      } else {
-        valInput.value = '';
-      }
+    // Original 입력 필드
+    const orig = createCalcInput('orig', {
+      raw: data?.origRaw || '', dil: data?.origDil || '1', val: data?.origVal || ''
     });
+    const tdOrigRaw = document.createElement('td'); tdOrigRaw.appendChild(orig.rawIn); tr.appendChild(tdOrigRaw);
+    const tdOrigDil = document.createElement('td'); tdOrigDil.appendChild(orig.dilIn); tr.appendChild(tdOrigDil);
+    const tdOrigVal = document.createElement('td'); tdOrigVal.appendChild(orig.valIn); tr.appendChild(tdOrigVal);
 
-    tr.appendChild(tdValue);
-
-    // 삭제
+    // 삭제 (rowSpan=2)
     const tdDel = document.createElement('td');
     tdDel.className = 'pa-col-del';
+    tdDel.rowSpan = 2;
     const btnDel = document.createElement('button');
     btnDel.className = 'pa-del-btn';
     btnDel.title = '삭제';
     btnDel.textContent = '\u2715';
     btnDel.addEventListener('click', () => {
       tr.remove();
+      tr2.remove();
       this.renumberDetectionRows();
       this.updateDetectionCount();
       this.toggleEmptyMsg();
@@ -3091,7 +3312,24 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
     tdDel.appendChild(btnDel);
     tr.appendChild(tdDel);
 
+    // === 2행: Acid ===
+    const tr2 = document.createElement('tr');
+    tr2.className = 'pa-detection-row pa-detection-acid-row pa-acid-row';
+
+    const tdAcidLabel = document.createElement('td');
+    tdAcidLabel.className = 'pa-col-type pa-type-acid';
+    tdAcidLabel.textContent = 'Acid';
+    tr2.appendChild(tdAcidLabel);
+
+    const acid = createCalcInput('acid', {
+      raw: data?.acidRaw || '', dil: data?.acidDil || '1', val: data?.acidVal || ''
+    });
+    const tdAcidRaw = document.createElement('td'); tdAcidRaw.appendChild(acid.rawIn); tr2.appendChild(tdAcidRaw);
+    const tdAcidDil = document.createElement('td'); tdAcidDil.appendChild(acid.dilIn); tr2.appendChild(tdAcidDil);
+    const tdAcidVal = document.createElement('td'); tdAcidVal.appendChild(acid.valIn); tr2.appendChild(tdAcidVal);
+
     tbody.appendChild(tr);
+    tbody.appendChild(tr2);
     this.updateDetectionCount();
     this.toggleEmptyMsg();
 
@@ -3111,8 +3349,9 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    * 검출 행 번호 재정렬
    */
   private renumberDetectionRows(): void {
-    const rows = document.querySelectorAll('#paDetectionsBody .pa-detection-row');
-    rows.forEach((tr, idx) => {
+    // No 셀은 Original 행(rowSpan=2)에만 있음 — acid-row 제외
+    const origRows = document.querySelectorAll('#paDetectionsBody .pa-detection-orig-row');
+    origRows.forEach((tr, idx) => {
       const noCell = tr.querySelector('.pa-col-no');
       if (noCell) noCell.textContent = String(idx + 1);
     });
@@ -3122,7 +3361,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    * 검출 건수 업데이트
    */
   private updateDetectionCount(): void {
-    const count = document.querySelectorAll('#paDetectionsBody .pa-detection-row').length;
+    const count = document.querySelectorAll('#paDetectionsBody .pa-detection-orig-row').length;
     const el = document.getElementById('paDetectionCount');
     if (el) el.textContent = `${count}건`;
   }
@@ -3170,7 +3409,7 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
    * 빈 메시지 토글
    */
   private toggleEmptyMsg(): void {
-    const count = document.querySelectorAll('#paDetectionsBody .pa-detection-row').length;
+    const count = document.querySelectorAll('#paDetectionsBody .pa-detection-orig-row').length;
     const msg = document.getElementById('paEmptyMsg');
     if (msg) msg.style.display = (count > 0 || this._paAllNd) ? 'none' : 'block';
   }
@@ -3189,16 +3428,29 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
 
     // 검출 농약 수집
     const detections: PesticideDetectionData[] = [];
-    const rows = document.querySelectorAll('#paDetectionsBody .pa-detection-row');
-    rows.forEach(tr => {
-      const method = (tr.querySelector('.pa-method-select') as HTMLSelectElement | null)?.value || 'GC';
+    // Original 행만 순회 (Acid 행은 바로 다음 형제)
+    const origRows = document.querySelectorAll('#paDetectionsBody .pa-detection-orig-row');
+    origRows.forEach(tr => {
+      const equipment = (tr.querySelector('.pa-equip-select') as HTMLSelectElement | null)?.value || 'GC';
       const name = (tr.querySelector('.pa-name-input') as HTMLInputElement | null)?.value?.trim() || '';
       const engName = (tr.querySelector('.pa-name-input') as HTMLInputElement | null)?.dataset?.engName || '';
-      const rawValue = (tr.querySelector('.pa-raw-input') as HTMLInputElement | null)?.value?.trim() || '';
-      const value = (tr.querySelector('.pa-value-input') as HTMLInputElement | null)?.value?.trim() || '';
+
+      // Original (현재 행)
+      const origRaw = (tr.querySelector('.pa-orig-raw') as HTMLInputElement | null)?.value?.trim() || '';
+      const origDil = (tr.querySelector('.pa-orig-dil') as HTMLInputElement | null)?.value?.trim() || '1';
+      const origVal = (tr.querySelector('.pa-orig-val') as HTMLInputElement | null)?.value?.trim() || '';
+
+      // Acid (다음 형제 행)
+      const acidRow = tr.nextElementSibling;
+      const acidRaw = (acidRow?.querySelector('.pa-acid-raw') as HTMLInputElement | null)?.value?.trim() || '';
+      const acidDil = (acidRow?.querySelector('.pa-acid-dil') as HTMLInputElement | null)?.value?.trim() || '1';
+      const acidVal = (acidRow?.querySelector('.pa-acid-val') as HTMLInputElement | null)?.value?.trim() || '';
+
+      // 최종 검출량: Original 우선, 없으면 Acid
+      const value = origVal || acidVal || '';
 
       if (name) {
-        detections.push({ method, name, engName, rawValue, value });
+        detections.push({ equipment, name, engName, origRaw, origDil, origVal, acidRaw, acidDil, acidVal, value });
       }
     });
 
@@ -3211,16 +3463,14 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       updatedAt: new Date().toISOString()
     };
 
-    // 판정 자동 결정: 전체 불검출이면 pass, 검출 농약 있으면 fail
-    if (this._paAllNd && detections.length === 0) {
+    // 판정: 라디오 버튼 값 사용 (전체 불검출/검출 추가 시 자동 선택됨)
+    const selectedJudgment = (document.querySelector('input[name="paJudgment"]:checked') as HTMLInputElement | null)?.value || '';
+    if (selectedJudgment) {
+      allResults[logId].judgment = selectedJudgment;
+    } else if (this._paAllNd && detections.length === 0) {
       allResults[logId].judgment = 'pass';
     } else if (detections.length > 0) {
       allResults[logId].judgment = 'fail';
-    }
-    // 수동 선택한 판정이 있으면 우선
-    const manualJudgment = (document.querySelector('input[name="paJudgment"]:checked') as HTMLInputElement | null)?.value;
-    if (manualJudgment) {
-      allResults[logId].judgment = manualJudgment;
     }
 
     this.saveAllPesticideTestResults(allResults);
@@ -3298,19 +3548,29 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
 
   /**
    * Firestore에서 분석결과 동기화 (다운로드)
+   * @param requestYear - 요청 시점의 연도 (race condition 방지). 미지정 시 검증 생략.
    */
-  private async syncPesticideTestResultsFromFirestore(): Promise<void> {
+  private async syncPesticideTestResultsFromFirestore(requestYear?: string): Promise<void> {
     if (!window.firestoreDb?.isEnabled()) return;
     try {
       const year = parseInt(this.selectedYear);
       const cloudData = await window.firestoreDb.getAll('pesticideTestResults', year);
+
+      // Race condition 방지: 요청 시점의 연도와 현재 연도가 다르면 결과 폐기
+      if (requestYear && requestYear !== this.selectedYear) {
+        (window.logger?.info ?? console.log)(`[잔류농약] 연도 변경 감지, 동기화 결과 폐기 (${requestYear} → ${this.selectedYear})`);
+        return;
+      }
+
       if (!cloudData || cloudData.length === 0) return;
 
       const cloudMap: Record<string, PesticideTestResultData> = {};
       for (const doc of cloudData) {
-        const key = (doc as any)._resultKey || doc.id;
+        const docRecord = doc as Record<string, unknown>;
+        const key = (docRecord._resultKey as string) || (docRecord.id as string);
         if (key) {
-          const { _resultKey, syncedAt, updatedAt: _, ...rest } = doc as any;
+          const { _resultKey: _rk, syncedAt: _sa, ...rest } = docRecord;
+          void _rk; void _sa;
           cloudMap[key] = rest as PesticideTestResultData;
         }
       }
@@ -3327,7 +3587,37 @@ class PesticideSampleManager extends BaseSampleManager<PesticideSampleData> {
       const lsKey = `pesticideTestResults_${this.selectedYear}`;
       localStorage.setItem(lsKey, JSON.stringify(merged));
       this._cachedPesticideResults = merged;
+
+      // 접수 데이터의 판정도 동기화 (Firestore → 접수 대장)
+      // 로컬 testResult가 비어있거나 cloud의 updatedAt이 최신일 때만 덮어씀
+      let syncCount = 0;
+      for (const [resultId, resultData] of Object.entries(merged)) {
+        const log = this.sampleLogs.find(l => String(l.id) === String(resultId));
+        const judgment = (resultData as Record<string, unknown>).judgment as string | undefined;
+        if (!log || !judgment) continue;
+
+        const logRec = log as Record<string, unknown>;
+        const localTestResult = logRec.testResult as string | undefined;
+        const localUpdatedAt = logRec.updatedAt as string | undefined;
+        const cloudUpdatedAt = (resultData as Record<string, unknown>).updatedAt as string | undefined;
+
+        // 로컬 판정 없음 → 무조건 동기화
+        // 로컬 판정 있음 → cloud가 더 최신일 때만 덮어씀
+        const shouldSync = !localTestResult ||
+          (cloudUpdatedAt && localUpdatedAt && new Date(cloudUpdatedAt) > new Date(localUpdatedAt));
+
+        if (shouldSync) {
+          logRec.testResult = judgment;
+          syncCount++;
+        }
+      }
+      if (syncCount > 0) {
+        this.saveLogs();
+        (window.logger?.info ?? console.log)(`[잔류농약] Firestore → 접수 대장 판정 동기화: ${syncCount}건`);
+      }
+
       this.filterAndRenderLogs();
+      (window.logger?.info ?? console.log)(`[잔류농약] Firestore → localStorage 동기화 완료: ${Object.keys(merged).length}건`);
     } catch (e) {
       (window.logger?.error || console.error)('잔류농약 Firestore 로드 실패:', e);
     }

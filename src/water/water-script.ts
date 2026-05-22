@@ -42,6 +42,7 @@ const GYEONGBUK_REGION_NAMES: string[] = [
 // Type imports for base class
 interface WaterSampleLog extends BaseSample {
     receptionNumber: string;
+    groupId?: string;
     date: string;
     applicantType?: string;
     birthDate?: string;
@@ -100,6 +101,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
     currentRegistrationData: WaterSampleLog | null;
     pendingMailDateIds: string[];
     isFullView: boolean;
+    editingGroupIds: string[];
     declare sampleLogs: WaterSampleLog[];
 
     // DOM 참조
@@ -137,6 +139,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         this.currentRegistrationData = null;
         this.pendingMailDateIds = [];
         this.isFullView = false;
+        this.editingGroupIds = [];
         // currentSearchFilter는 BaseSampleManager에서 초기화
 
         // DOM 참조 (init 후 설정)
@@ -414,8 +417,15 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         const sampleNames = this.getAllSampleNames();
 
         // 접수번호 파싱 (예: "1, 2, 3" -> [1, 2, 3])
-        const receptionNumberStr = String(formData.get('receptionNumber') || this.generateNextReceptionNumber());
+        const rawReceptionNumber = String(formData.get('receptionNumber') || '').trim();
+        const generatedNumber = this.generateNextReceptionNumber();
+        const receptionNumberStr = rawReceptionNumber || generatedNumber;
         const receptionNumbers = receptionNumberStr.split(',').map((n: string) => n.trim()).filter((n: string) => n);
+        // 폴백 기준값 (사용자가 빈/잘못된 값을 넣었을 때 NaN 방지)
+        const fallbackBase = parseInt(receptionNumbers[0], 10);
+        const safeBase = !isNaN(fallbackBase)
+            ? fallbackBase
+            : (parseInt(generatedNumber, 10) || 1);
 
         // 공통 데이터 (신청자 정보)
         const applicantType = String(formData.get('applicantType') || '개인');
@@ -441,13 +451,15 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
             updatedAt: new Date().toISOString()
         };
 
-        // 채취장소별로 개별 행 생성
+        // 채취장소별로 개별 행 생성 (동일 그룹 식별을 위한 groupId 부여)
+        const groupId = SampleUtils.generateUUID();
         const newLogs = [];
         for (let i = 0; i < samplingLocations.length; i++) {
             const data = {
                 ...commonData,
                 id: SampleUtils.generateUUID(),
-                receptionNumber: receptionNumbers[i] || String(parseInt(receptionNumbers[0], 10) + i),
+                groupId,
+                receptionNumber: receptionNumbers[i] || String(safeBase + i),
                 sampleName: sampleNames[i] || String(formData.get('sampleName') || '지하수'),
                 sampleCount: '1',
                 samplingLocation: samplingLocations[i] || '',
@@ -481,14 +493,53 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
     // ========================================
     // 오버라이드: 샘플 수정
     // ========================================
+    // ========================================
+    // 동일 접수 그룹 멤버 조회
+    //  - 신규: groupId 일치
+    //  - 레거시: createdAt + name + phoneNumber + date 휴리스틱 매칭
+    //  반환: receptionNumber 오름차순
+    // ========================================
+    getGroupMembers(log: WaterSampleLog | undefined): WaterSampleLog[] {
+        if (!log) return [];
+        const matchByGroupId: WaterSampleLog[] = log.groupId
+            ? this.sampleLogs.filter((l: WaterSampleLog) => l.groupId && l.groupId === log.groupId)
+            : [];
+        let members: WaterSampleLog[] = matchByGroupId;
+        if (members.length === 0) {
+            members = this.sampleLogs.filter((l: WaterSampleLog) =>
+                l.createdAt && l.createdAt === log.createdAt &&
+                (l.name || '') === (log.name || '') &&
+                (l.phoneNumber || '') === (log.phoneNumber || '') &&
+                (l.date || '') === (log.date || '')
+            );
+        }
+        if (members.length === 0) members = [log];
+        members.sort((a: WaterSampleLog, b: WaterSampleLog) => {
+            const na = parseInt(a.receptionNumber, 10) || 0;
+            const nb = parseInt(b.receptionNumber, 10) || 0;
+            return na - nb;
+        });
+        return members;
+    }
+
     editSample(id: string): void {
         const log = this.sampleLogs.find((l: WaterSampleLog) => String(l.id) === String(id));
         if (!log) return;
 
+        const groupMembers = this.getGroupMembers(log);
         this.editingId = id;
+        this.editingGroupIds = groupMembers.map((m: WaterSampleLog) => String(m.id));
 
         try {
-            if (this.receptionNumberInput) this.receptionNumberInput.value = log.receptionNumber || '';
+            const receptionNumbersStr = groupMembers
+                .map((m: WaterSampleLog) => m.receptionNumber || '')
+                .filter((v: string) => v)
+                .join(', ');
+            if (this.receptionNumberInput) {
+                this.receptionNumberInput.value = receptionNumbersStr || (log.receptionNumber || '');
+                const firstNum = parseInt((groupMembers[0]?.receptionNumber || log.receptionNumber || ''), 10);
+                this.receptionNumberInput.dataset.baseNumber = isNaN(firstNum) ? '' : String(firstNum);
+            }
             if (this.dateInput) this.dateInput.value = log.date || '';
 
             const nameEl = document.getElementById('name') as HTMLInputElement | null;
@@ -514,7 +565,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                 }
             }
             if (sampleNameEl) sampleNameEl.value = log.sampleName || '';
-            if (sampleCountEl) sampleCountEl.value = String(log.sampleCount || 1);
+            if (sampleCountEl) sampleCountEl.value = String(groupMembers.length || log.sampleCount || 1);
             if (noteEl) noteEl.value = log.note || '';
 
             // 법인여부/생년월일/법인번호 설정
@@ -534,20 +585,25 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                 }
             }
 
-            // 채취장소 및 주작목 설정
-            const crops = log.samplingCrops || [];
-            // 기존 데이터 호환: 개별 시료명 배열이 없으면 공통 sampleName으로 채움
-            const sampleNamesForRows = log.sampleNamesPerRow && Array.isArray(log.sampleNamesPerRow)
-                ? log.sampleNamesPerRow
-                : [];
-            if (log.samplingLocations && Array.isArray(log.samplingLocations)) {
-                // 개별 시료명이 없으면 공통 sampleName을 각 위치에 반복 적용
-                const names = log.samplingLocations.map((_: unknown, i: number) => sampleNamesForRows[i] || log.sampleName || '지하수');
-                this.setSamplingLocations(log.samplingLocations, crops, names);
-            } else if (log.samplingLocation) {
-                const locations = log.samplingLocation.split(',').map((s: string) => s.trim());
-                const names = locations.map((_: unknown, i: number) => sampleNamesForRows[i] || log.sampleName || '지하수');
+            // 채취장소·주작목·시료명: 그룹 멤버가 2개 이상이면 멤버별 한 줄씩 펼침
+            if (groupMembers.length > 1) {
+                const locations = groupMembers.map((m: WaterSampleLog) => m.samplingLocation || '');
+                const crops = groupMembers.map((m: WaterSampleLog) => m.mainCrop || '');
+                const names = groupMembers.map((m: WaterSampleLog) => m.sampleName || log.sampleName || '지하수');
                 this.setSamplingLocations(locations, crops, names);
+            } else {
+                const crops = log.samplingCrops || (log.mainCrop ? [log.mainCrop] : []);
+                const sampleNamesForRows = log.sampleNamesPerRow && Array.isArray(log.sampleNamesPerRow)
+                    ? log.sampleNamesPerRow
+                    : [];
+                if (log.samplingLocations && Array.isArray(log.samplingLocations)) {
+                    const names = log.samplingLocations.map((_: unknown, i: number) => sampleNamesForRows[i] || log.sampleName || '지하수');
+                    this.setSamplingLocations(log.samplingLocations, crops, names);
+                } else if (log.samplingLocation) {
+                    const locations = log.samplingLocation.split(',').map((s: string) => s.trim());
+                    const names = locations.map((_: unknown, i: number) => sampleNamesForRows[i] || log.sampleName || '지하수');
+                    this.setSamplingLocations(locations, crops, names);
+                }
             }
 
             // 통보방법 선택
@@ -558,12 +614,14 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
             }
             if (this.receptionMethodInput) this.receptionMethodInput.value = log.receptionMethod || '';
 
-            // 목적 선택
-            const purposeRadio = document.querySelector(`input[name="purpose"][value="${log.purpose}"]`) as HTMLInputElement | null;
+            // 목적 선택 (사용자 저장 데이터를 selector에 직접 삽입하지 않도록 value 비교)
+            const purposeRadio = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="purpose"]'))
+                .find(r => r.value === (log.purpose || '')) || null;
             if (purposeRadio) purposeRadio.checked = true;
 
             // 검사항목 선택
-            const testItemsRadio = document.querySelector(`input[name="testItems"][value="${log.testItems}"]`) as HTMLInputElement | null;
+            const testItemsRadio = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="testItems"]'))
+                .find(r => r.value === (log.testItems || '')) || null;
             if (testItemsRadio) {
                 testItemsRadio.checked = true;
                 if (log.testItems === '생활용수') {
@@ -646,6 +704,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
 
         // 수정 모드 해제
         this.editingId = null;
+        this.editingGroupIds = [];
 
         if (this.navSubmitBtn) {
             this.navSubmitBtn.title = '접수 등록';
@@ -659,6 +718,18 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
     setupReceptionMethod() {
         // water는 setupTypeSpecificEvents에서 직접 처리
         // base class의 .method-btn 대신 .reception-method-btn 사용
+    }
+
+    // ========================================
+    // 오버라이드: 연락처 자동 하이픈 포맷팅
+    // (base의 window.formatPhoneNumber 의존을 SampleUtils 경로로 대체)
+    // ========================================
+    setupPhoneFormatting(): void {
+        const phoneInput = document.getElementById('phoneNumber') as HTMLInputElement | null;
+        const utils = (window as unknown as { SampleUtils?: { setupPhoneNumberInput?: (el: HTMLInputElement) => void } }).SampleUtils;
+        if (phoneInput && utils?.setupPhoneNumberInput) {
+            utils.setupPhoneNumberInput(phoneInput);
+        }
     }
 
     // ========================================
@@ -740,10 +811,16 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
     updateReceptionNumberRange(count: number | string): void {
         if (!this.receptionNumberInput) return;
         const parsedCount = Math.max(1, parseInt(String(count), 10) || 1);
-        const baseNumber = parseInt(
-            this.receptionNumberInput.dataset.baseNumber || this.receptionNumberInput.value.split(',')[0].trim(),
-            10
-        );
+        // 사용자 입력값(value) 우선, 없으면 dataset.baseNumber 폴백
+        const currentFirst = this.receptionNumberInput.value.split(',')[0].trim();
+        const parsedFromValue = parseInt(currentFirst, 10);
+        let baseNumber = !isNaN(parsedFromValue)
+            ? parsedFromValue
+            : parseInt(this.receptionNumberInput.dataset.baseNumber || '', 10);
+        if (isNaN(baseNumber)) {
+            baseNumber = parseInt(this.generateNextReceptionNumber(), 10) || 1;
+        }
+        this.receptionNumberInput.dataset.baseNumber = String(baseNumber);
 
         if (parsedCount === 1) {
             this.receptionNumberInput.value = String(baseNumber);
@@ -927,50 +1004,105 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
     updateSample(): void {
         const formData = new FormData(this.form ?? undefined);
         const log = this.sampleLogs.find((l: WaterSampleLog) => l.id === this.editingId);
+        if (!log) return;
+
         const samplingLocations = this.getAllSamplingLocations();
         const samplingCrops = this.getAllSamplingCrops();
         const sampleNames = this.getAllSampleNames();
 
-        if (log) {
-            log.receptionNumber = String(formData.get('receptionNumber') || '');
-            log.date = String(formData.get('date') || '');
-            const applicantType = String(formData.get('applicantType') || '개인');
-            log.applicantType = applicantType;
-            log.birthDate = applicantType === '개인' ? String(formData.get('birthDate') || '') : '';
-            log.corpNumber = applicantType === '법인' ? String(formData.get('corpNumber') || '') : '';
-            log.name = String(formData.get('name') || '');
-            log.phoneNumber = String(formData.get('phoneNumber') || '');
-            log.address = String(formData.get('address') || '');
-            log.addressPostcode = String(formData.get('addressPostcode') || '');
-            log.addressRoad = String(formData.get('addressRoad') || '');
-            log.addressDetail = String(formData.get('addressDetail') || '');
-            log.receptionMethod = String(formData.get('receptionMethod') || '');
-            log.sampleName = sampleNames[0] || String(formData.get('sampleName') || '지하수');
-            log.sampleCount = String(formData.get('sampleCount') || '');
-            log.samplingLocations = samplingLocations;
-            log.samplingLocation = samplingLocations.join(', ');
-            log.samplingCrops = samplingCrops;
-            log.mainCrop = samplingCrops.filter((c: string) => c).join(', ');
-            log.purpose = String(formData.get('purpose') || '');
-            log.testItems = String(formData.get('testItems') || '');
-            log.note = String(formData.get('note') || '');
-            log.updatedAt = new Date().toISOString();
+        // 접수번호 파싱 (쉼표로 N개)
+        const receptionRaw = String(formData.get('receptionNumber') || '').trim();
+        const receptionNumbers = receptionRaw.split(',').map((n: string) => n.trim()).filter((n: string) => n);
+        const safeBaseParsed = parseInt(receptionNumbers[0], 10);
+        const safeBase = !isNaN(safeBaseParsed)
+            ? safeBaseParsed
+            : (parseInt(this.generateNextReceptionNumber(), 10) || 1);
 
-            this.saveLogs();
-            this.showToast('수정이 완료되었습니다.', 'success');
-            this.resetForm();
-            if (this.receptionNumberInput) {
-                this.receptionNumberInput.value = this.generateNextReceptionNumber();
+        const oldMembers: WaterSampleLog[] = (this.editingGroupIds && this.editingGroupIds.length > 0)
+            ? this.sampleLogs.filter((l: WaterSampleLog) => this.editingGroupIds.includes(String(l.id)))
+            : [log];
+        const oldById = new Map(oldMembers.map((m: WaterSampleLog) => [String(m.id), m]));
+        const groupId = log.groupId || oldMembers[0]?.groupId || SampleUtils.generateUUID();
+
+        const applicantType = String(formData.get('applicantType') || '개인');
+        const commonData = {
+            sampleType: '물',
+            date: String(formData.get('date') || ''),
+            applicantType,
+            birthDate: applicantType === '개인' ? String(formData.get('birthDate') || '') : '',
+            corpNumber: applicantType === '법인' ? String(formData.get('corpNumber') || '') : '',
+            name: String(formData.get('name') || ''),
+            phoneNumber: String(formData.get('phoneNumber') || ''),
+            address: String(formData.get('address') || ''),
+            addressPostcode: String(formData.get('addressPostcode') || ''),
+            addressRoad: String(formData.get('addressRoad') || ''),
+            addressDetail: String(formData.get('addressDetail') || ''),
+            receptionMethod: String(formData.get('receptionMethod') || ''),
+            purpose: String(formData.get('purpose') || ''),
+            testItems: String(formData.get('testItems') || ''),
+            note: String(formData.get('note') || '')
+        };
+
+        // 기존 그룹 멤버 정렬(receptionNumber 오름차순)
+        const oldOrdered = oldMembers.slice().sort((a: WaterSampleLog, b: WaterSampleLog) => {
+            const na = parseInt(a.receptionNumber, 10) || 0;
+            const nb = parseInt(b.receptionNumber, 10) || 0;
+            return na - nb;
+        });
+
+        // 로컬에서 기존 멤버 제거. Firestore 측 잔류 방지를 위해 축소분은 명시 삭제
+        this.sampleLogs = this.sampleLogs.filter((l: WaterSampleLog) => !oldById.has(String(l.id)));
+        const newSlotCount = samplingLocations.length;
+        const fdb = (window as unknown as { firestoreDb?: { isEnabled?: () => boolean; delete?: (mk: string, year: number, id: string) => Promise<unknown> } }).firestoreDb;
+        if (fdb?.isEnabled?.() && oldOrdered.length > newSlotCount) {
+            const year = parseInt(String(this.selectedYear), 10);
+            for (let i = newSlotCount; i < oldOrdered.length; i++) {
+                const rid = String(oldOrdered[i].id);
+                fdb.delete?.(this.moduleKey, year, rid)?.catch((err: unknown) => {
+                    (window.logger?.error || console.error)('Firestore 그룹 멤버 삭제 실패:', err);
+                });
             }
-            this.editingId = null;
-
-            if (this.navSubmitBtn) {
-                this.navSubmitBtn.title = '접수 등록';
-                this.navSubmitBtn.classList.remove('btn-edit-mode');
-            }
-
-            this.switchView('list');
         }
+
+        // 새 입력값으로 N개 행 재생성 (행별 createdAt/완료여부/판정 보존: index 매칭)
+        const nowIso = new Date().toISOString();
+        for (let i = 0; i < samplingLocations.length; i++) {
+            const prev = oldOrdered[i];
+            const data: WaterSampleLog = {
+                ...commonData,
+                id: prev?.id || SampleUtils.generateUUID(),
+                groupId,
+                receptionNumber: receptionNumbers[i] || String(safeBase + i),
+                sampleName: sampleNames[i] || String(formData.get('sampleName') || '지하수'),
+                sampleCount: '1',
+                samplingLocation: samplingLocations[i] || '',
+                mainCrop: samplingCrops[i] || '',
+                isComplete: prev?.isComplete || false,
+                testResult: prev?.testResult || '',
+                createdAt: prev?.createdAt || nowIso,
+                updatedAt: nowIso
+            };
+            this.sampleLogs.push(data);
+        }
+
+        this.saveLogs();
+        if (typeof this.filterAndRenderLogs === 'function') {
+            this.filterAndRenderLogs();
+        }
+        this.showToast('수정이 완료되었습니다.', 'success');
+        this.resetForm();
+        if (this.receptionNumberInput) {
+            this.receptionNumberInput.value = this.generateNextReceptionNumber();
+        }
+        this.editingId = null;
+        this.editingGroupIds = [];
+
+        if (this.navSubmitBtn) {
+            this.navSubmitBtn.title = '접수 등록';
+            this.navSubmitBtn.classList.remove('btn-edit-mode');
+        }
+
+        this.switchView('list');
     }
 
     // ========================================
@@ -1052,28 +1184,41 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         if (statPendingCount) statPendingCount.textContent = String(pending);
 
         // 시료명별
-        const byWaterType: Record<string, number> = {};
+        const byWaterType: Record<string, number> = { '지하수': 0, '지표수': 0, '기타': 0 };
         this.sampleLogs.forEach((l: WaterSampleLog) => {
-            const type = l.sampleName || '미지정';
+            const type = l.sampleName || '기타';
             byWaterType[type] = (byWaterType[type] || 0) + 1;
         });
         this.renderStatsChart('statsByWaterType', byWaterType, total);
 
         // 목적별
-        const byPurpose: Record<string, number> = {};
+        const byPurpose: Record<string, number> = { '참고용': 0, '무농약': 0, '유기농': 0, 'GAP': 0 };
         this.sampleLogs.forEach((l: WaterSampleLog) => {
-            const purpose = l.purpose || '미지정';
-            byPurpose[purpose] = (byPurpose[purpose] || 0) + 1;
+            const purpose = l.purpose || '기타';
+            if (!(purpose in byPurpose)) byPurpose[purpose] = 0;
+            byPurpose[purpose]++;
         });
         this.renderStatsChart('statsByPurpose', byPurpose, total);
 
         // 검사항목별
-        const byTestItems: Record<string, number> = {};
+        const byTestItems: Record<string, number> = { '생활용수': 0, '농업용수': 0 };
         this.sampleLogs.forEach((l: WaterSampleLog) => {
-            const items = l.testItems || '미지정';
-            byTestItems[items] = (byTestItems[items] || 0) + 1;
+            const items = l.testItems || '기타';
+            if (!(items in byTestItems)) byTestItems[items] = 0;
+            byTestItems[items]++;
         });
         this.renderStatsChart('statsByTestItems', byTestItems, total);
+
+        // 수령방법별
+        const byReceptionMethod: Record<string, number> = { '우편': 0, '이메일': 0, '팩스': 0, '방문': 0 };
+        this.sampleLogs.forEach((l: WaterSampleLog) => {
+            const raw = l.receptionMethod;
+            const method = (raw && raw.trim() && raw !== '-') ? raw : '기타';
+            if (method === '기타') return;
+            if (!(method in byReceptionMethod)) byReceptionMethod[method] = 0;
+            byReceptionMethod[method]++;
+        });
+        this.renderStatsChart('statsByReceptionMethod', byReceptionMethod, total);
 
         // 월별 집계
         const byMonth: Record<string, MonthData> = {};
@@ -1138,12 +1283,15 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                 <div class="stat-bar-item">
                     <div class="stat-bar-label">${label}</div>
                     <div class="stat-bar-wrapper">
-                        <div class="stat-bar-fill ${barClass}" style="width: ${percentage}%"></div>
+                        <div class="stat-bar-fill ${barClass}" data-w="${percentage}"></div>
                     </div>
                     <div class="stat-bar-value">${count}건 (${percentage}%)</div>
                 </div>
             `;
         }).join(''));
+        container.querySelectorAll('.stat-bar-fill[data-w]').forEach(el => {
+            (el as HTMLElement).style.width = el.getAttribute('data-w') + '%';
+        });
     }
 
     renderMonthlyChart(containerId: string, data: Record<string, MonthData>): void {
@@ -1152,12 +1300,6 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
 
         const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0])) as [string, MonthData][];
         const maxCount = Math.max(...entries.map(([, v]) => v.count), 1);
-        const totalCount = entries.reduce((sum, [, v]) => sum + v.count, 0);
-
-        if (totalCount === 0) {
-            container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
-            return;
-        }
 
         container.innerHTML = sanitizeHTML(`
             <div class="monthly-chart">
@@ -1168,9 +1310,9 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                         return `
                             <div class="monthly-bar-group">
                                 <div class="monthly-bar-container">
-                                    <div class="monthly-bar-stack" style="height: ${heightPercent}%">
-                                        <div class="monthly-bar-completed" style="height: ${completedPercent}%" title="완료: ${value.completed}건"></div>
-                                        <div class="monthly-bar-pending" style="height: ${100 - completedPercent}%" title="미완료: ${value.pending}건"></div>
+                                    <div class="monthly-bar-stack" data-h="${heightPercent.toFixed(1)}">
+                                        <div class="monthly-bar-completed" data-h="${completedPercent.toFixed(1)}" title="완료: ${value.completed}건"></div>
+                                        <div class="monthly-bar-pending" data-h="${(100 - completedPercent).toFixed(1)}" title="미완료: ${value.pending}건"></div>
                                     </div>
                     ${value.count > 0 ? `<span class="monthly-bar-value">${value.count}</span>` : ''}
                                 </div>
@@ -1185,6 +1327,15 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                 </div>
             </div>
         `);
+        container.querySelectorAll('.monthly-bar-stack[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + '%';
+        });
+        container.querySelectorAll('.monthly-bar-completed[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + '%';
+        });
+        container.querySelectorAll('.monthly-bar-pending[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + '%';
+        });
     }
 
     renderQuarterlySummary(containerId: string, data: Record<string, QuarterData>): void {
@@ -1207,7 +1358,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                             </div>
                             <div class="quarterly-completion">
                                 <div class="completion-bar">
-                                    <div class="completion-fill" style="width: ${completionRate}%"></div>
+                                    <div class="completion-fill" data-w="${completionRate}"></div>
                                 </div>
                                 <span class="completion-text">완료율 ${completionRate}%</span>
                             </div>
@@ -1216,6 +1367,9 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
                 }).join('')}
             </div>
         `);
+        container.querySelectorAll('.completion-fill[data-w]').forEach(el => {
+            (el as HTMLElement).style.width = el.getAttribute('data-w') + '%';
+        });
     }
 
     // ========================================
@@ -2043,7 +2197,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
 
     /**
      * 지하수법 시행규칙 [별표 9] 수질기준
-     * 일반오염물질 5개 + 특정유해물질 14개 = 총 19개
+     * 일반오염물질 6개 + 특정유해물질 12개 + 생활용수 전용 4개 = 총 22개
      * livingOnly: true인 항목은 생활용수에만 적용
      */
     static WATER_QUALITY_FIELDS: WaterQualityField[] = [
@@ -2058,7 +2212,8 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         { key: 'arsenic',       label: '비소',          unit: 'mg/L',       group: '유해', living: '0.05 이하',  agri: '0.05 이하',  industry: '0.1 이하' },
         { key: 'cyanide',       label: '시안',          unit: 'mg/L',       group: '유해', living: '0.01 이하',  agri: '0.01 이하',  industry: '0.2 이하' },
         { key: 'mercury',       label: '수은',          unit: 'mg/L',       group: '유해', living: '0.001 이하', agri: '0.001 이하', industry: '0.001 이하' },
-        { key: 'organophos',    label: '유기인',        unit: 'mg/L',       group: '유해', living: '0.0005 이하', agri: '0.0005 이하', industry: '0.0005 이하' },
+        { key: 'diazinon',      label: '다이아지논',    unit: 'mg/L',       group: '유해', living: '0.02 이하',  agri: '0.02 이하',  industry: '0.02 이하' },
+        { key: 'parathion',     label: '파라티온',      unit: 'mg/L',       group: '유해', living: '0.06 이하',  agri: '0.06 이하',  industry: '0.06 이하' },
         { key: 'phenol',        label: '페놀',          unit: 'mg/L',       group: '유해', living: '0.005 이하', agri: '0.005 이하', industry: '0.01 이하' },
         { key: 'lead',          label: '납',            unit: 'mg/L',       group: '유해', living: '0.1 이하',   agri: '0.1 이하',   industry: '0.2 이하' },
         { key: 'chromium6',     label: '6가크롬',       unit: 'mg/L',       group: '유해', living: '0.05 이하',  agri: '0.05 이하',  industry: '0.1 이하' },
@@ -2365,6 +2520,9 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         const judgmentRadio = document.querySelector('input[name="analysisJudgment"]:checked') as HTMLInputElement | null;
         allResults[key].judgment = judgmentRadio?.value || '';
 
+        // 수정 시각 기록
+        allResults[key].updatedAt = new Date().toISOString();
+
         // 저장
         this.saveAllTestResults(allResults);
 
@@ -2411,7 +2569,16 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
         if (!cloudResults) return;
 
         const localResults = this.loadAllTestResults();
-        const merged: Record<string, Record<string, string>> = { ...localResults, ...cloudResults };
+        const merged: Record<string, Record<string, string>> = { ...localResults };
+
+        // timestamp 기반 병합 (더 최신인 쪽 우선)
+        for (const [k, cloudVal] of Object.entries(cloudResults)) {
+            const localVal = merged[k];
+            if (!localVal || !localVal.updatedAt ||
+                (cloudVal.updatedAt && new Date(cloudVal.updatedAt) >= new Date(localVal.updatedAt))) {
+                merged[k] = cloudVal;
+            }
+        }
 
         const key = `waterTestResults_${this.selectedYear}`;
         localStorage.setItem(key, JSON.stringify(merged));
@@ -2432,6 +2599,7 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
             this.syncTestResultsToFirestore(results);
         } catch (e) {
             (window.logger?.error || console.error)('수질 검사 결과 저장 실패:', e);
+            if (window.showToast) window.showToast('검사 결과 저장에 실패했습니다. 저장소 용량을 확인하세요.', 'error');
         }
     }
 
@@ -2477,7 +2645,8 @@ class WaterSampleManager extends BaseSampleManager<WaterSampleLog> {
             for (const doc of cloudData) {
                 const key = (doc as Record<string, unknown>)._resultKey as string || (doc as Record<string, unknown>).id as string;
                 if (key) {
-                    const { _resultKey, syncedAt, updatedAt, ...rest } = doc as Record<string, unknown>;
+                    // updatedAt은 timestamp 비교 병합 로직(syncTestResultsFromFirestore)에서 필요하므로 유지
+                    const { _resultKey, syncedAt, ...rest } = doc as Record<string, unknown>;
                     resultsMap[key] = rest as Record<string, string>;
                 }
             }

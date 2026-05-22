@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:* https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:* https://t1.kakaocdn.net https://t1.daumcdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://t1.kakaocdn.net https://t1.daumcdn.net; font-src 'self' https://fonts.gstatic.com https://t1.kakaocdn.net https://t1.daumcdn.net; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.kakaocdn.net https://*.daumcdn.net; frame-src 'self' http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net;">
     <title>잔류농약 시료 접수 대장</title>
     <!-- 폰트 preconnect 및 preload로 성능 최적화 (bundle-defer-third-party) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,20 +39,20 @@
             color: #e9d5ff !important;
         }
     </style>
-  <script type="module" crossorigin src="../assets/pesticide-BuIY9m49.js"></script>
+  <script type="module" crossorigin src="../assets/pesticide-BpbVagEv.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/theme-CYakEN5j.js">
-  <link rel="modulepreload" crossorigin href="../assets/tooltip-BPBl8yZV.js">
+  <link rel="modulepreload" crossorigin href="../assets/tooltip-roMURP-E.js">
   <link rel="modulepreload" crossorigin href="../assets/xlsx-CY41JvjH.js">
-  <link rel="modulepreload" crossorigin href="../assets/excel-import-manager-BlxEKj_l.js">
+  <link rel="modulepreload" crossorigin href="../assets/excel-import-manager-Cxiil7f6.js">
   <link rel="modulepreload" crossorigin href="../assets/toast-BwdSIJOp.js">
-  <link rel="modulepreload" crossorigin href="../assets/bonghwaData-CEK_9SQP.js">
+  <link rel="modulepreload" crossorigin href="../assets/bonghwaData-BLmPB-vY.js">
   <link rel="modulepreload" crossorigin href="../assets/loading-manager-8YTLSOMM.js">
   <link rel="modulepreload" crossorigin href="../assets/storage-manager-DaJ_pg6X.js">
-  <link rel="modulepreload" crossorigin href="../assets/firestore-db-Dpfk1mg2.js">
+  <link rel="modulepreload" crossorigin href="../assets/firestore-db-DxHz-rZf.js">
   <link rel="modulepreload" crossorigin href="../assets/cropData---HVh3r7.js">
-  <link rel="stylesheet" crossorigin href="../assets/tooltip-BvFhESFD.css">
-  <link rel="stylesheet" crossorigin href="../assets/pesticide-DjeQeni3.css">
-  <link rel="stylesheet" crossorigin href="../assets/tailwind-output-uwpTj9PQ.css">
+  <link rel="stylesheet" crossorigin href="../assets/tooltip-LSJ6cXiO.css">
+  <link rel="stylesheet" crossorigin href="../assets/pesticide-CWatPFgw.css">
+  <link rel="stylesheet" crossorigin href="../assets/tailwind-output-y6Kjg-NA.css">
 </head>
 
 <body class="pesticide-page">
@@ -418,16 +418,16 @@
                 <table id="logTable" class="data-table">
                     <thead>
                         <tr>
-                            <th class="col-checkbox"><input type="checkbox" id="selectAll" title="전체 선택"></th>
-                            <th class="col-complete">완료</th>
-                            <th class="col-result">판정</th>
-                            <th>접수번호</th>
-                            <th>접수일자</th>
+                            <th class="sticky-col col-checkbox"><input type="checkbox" id="selectAll" title="전체 선택"></th>
+                            <th class="sticky-col col-complete">완료</th>
+                            <th class="sticky-col col-result">판정</th>
+                            <th class="sticky-col col-num">접수번호</th>
+                            <th class="sticky-col col-date">접수일자</th>
                             <th class="col-applicant-type col-hidden">법인여부</th>
                             <th class="col-birth-corp col-hidden">생년월일/법인번호</th>
-                            <th>구분</th>
-                            <th>목적(용도)</th>
-                            <th class="col-name">성명</th>
+                            <th class="sticky-col col-category">구분</th>
+                            <th class="sticky-col col-purpose">목적(용도)</th>
+                            <th class="sticky-col col-name">성명</th>
                             <th class="col-zipcode col-hidden">우편번호</th>
                             <th>주소</th>
                             <th>생산자 성명</th>
@@ -694,6 +694,12 @@
 
                     <!-- 상세 통계 -->
                     <div class="stats-details">
+                        <!-- 구분별 통계 -->
+                        <div class="stats-section">
+                            <h4>📂 구분별</h4>
+                            <div class="stats-chart" id="statsByCategory"></div>
+                        </div>
+
                         <!-- 목적(용도)별 통계 -->
                         <div class="stats-section">
                             <h4>🎯 목적(용도)별</h4>
@@ -890,10 +896,12 @@
                         <thead>
                             <tr>
                                 <th class="pa-col-no">No.</th>
-                                <th class="pa-col-method">분석법</th>
+                                <th class="pa-col-equip">장비</th>
                                 <th class="pa-col-name">농약명</th>
-                                <th class="pa-col-raw">기기분석값</th>
-                                <th class="pa-col-value">검출량 (mg/kg)</th>
+                                <th class="pa-col-type">구분</th>
+                                <th class="pa-col-raw">분석값(ng/kg)</th>
+                                <th class="pa-col-dilution">희석배수</th>
+                                <th class="pa-col-value">검출량(mg/kg)</th>
                                 <th class="pa-col-del"></th>
                             </tr>
                         </thead>
