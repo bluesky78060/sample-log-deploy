@@ -87,6 +87,9 @@ async function initSettingsPage(): Promise<void> {
   // Load organization name
   SettingsScript.loadOrgName();
 
+  // Load default sido (필지 검증 기준)
+  SettingsScript.loadDefaultSido();
+
   // Initialize Firebase if auth file exists
   if ((window as any).firebaseConfig?.initialize) {
     try {

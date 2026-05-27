@@ -473,11 +473,13 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const yearStorageKey = this.getStorageKey(this.selectedYear);
         this.listViewStale = true;
 
-        // ID가 없는 항목에 ID 추가
-        this.sampleLogs = this.sampleLogs.map(item => ({
-            ...item,
-            id: item.id || SampleUtils.generateUUID()
-        }));
+        // ID가 없는 항목에 ID 추가 (in-place)
+        // 배열을 새 복사본으로 교체하지 않고 제자리에서 id만 보충한다. 복사본 교체 시
+        // 외부(예: runVerificationForModal에 넘긴 newLogs)에 보관된 log 참조가 고아가 되어
+        // 이후 mutation(addressVerified 등)이 실제 sampleLogs에 반영되지 않는 문제가 있었다.
+        this.sampleLogs.forEach(item => {
+            if (!item.id) item.id = SampleUtils.generateUUID();
+        });
 
         // 로컬 저장 (Firebase는 호출자에서 개별 변경분만 저장 — Quota 절감)
         localStorage.setItem(yearStorageKey, JSON.stringify(this.sampleLogs));
@@ -3902,14 +3904,15 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 if (!inputDate) { this.showToast('날짜를 선택해주세요.', 'warning'); return; }
                 let updatedCount = 0;
                 const changedLogs: SoilLog[] = [];
-                this.sampleLogs = this.sampleLogs.map(log => {
+                // in-place 갱신: 배열을 새 참조로 교체하지 않고 매칭 log 객체를 제자리에서 수정해
+                // 외부 참조 고아화를 방지한다 (saveLogs in-place 취지와 통일)
+                this.sampleLogs.forEach(log => {
                     if (this.pendingMailDateIds.includes(String(log.id))) {
                         updatedCount++;
-                        const updated = { ...log, mailDate: inputDate, updatedAt: new Date().toISOString() };
-                        changedLogs.push(updated);
-                        return updated;
+                        (log as any).mailDate = inputDate;
+                        (log as any).updatedAt = new Date().toISOString();
+                        changedLogs.push(log);
                     }
-                    return log;
                 });
                 this.saveLogs();
                 this.firebaseSaveRecords(changedLogs);
@@ -4691,9 +4694,31 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const apiKey = (window as any).NETWORK_CONFIG?.VWORLD_API_KEY;
         if (!apiKey) return null;
 
-        // 경상북도 prefix 보정: bonghwaData 주소는 "봉화군 ..." 형식으로 저장됨
-        const SIDO_RE = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도)/;
-        const fullAddress = SIDO_RE.test(lotAddress) ? lotAddress : `경상북도 ${lotAddress}`;
+        // 시·도 결정 (전국 기관용 — 봉화군/경상북도 가정 제거)
+        //  1) 주소에 시·도가 이미 있으면(자동완성 선택 시 JUSO siNm 포함) 약어를 정식명으로 펼쳐 사용
+        //  2) 시·도가 없으면 설정의 '기본 시·도'(app_default_sido)로 prefix
+        //  3) 설정값도 없으면 시·도 미상 → null 반환(검증 스킵). 강제 prefix로 인한 오검증 방지.
+        const SIDO_RE: RegExp = (window as any).SIDO_PATTERN
+            || /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|경기도|강원도|강원특별자치도|충청북도|충청남도|전라북도|전북특별자치도|전라남도|경상북도|경상남도|제주도|제주특별자치도)\s*/;
+        const SHORT_SIDO_EXPAND: Record<string, string> = {
+            '서울': '서울특별시', '부산': '부산광역시', '대구': '대구광역시',
+            '인천': '인천광역시', '광주': '광주광역시', '대전': '대전광역시',
+            '울산': '울산광역시', '세종': '세종특별자치시',
+            '경기': '경기도', '강원': '강원특별자치도',
+            '충북': '충청북도', '충남': '충청남도',
+            '전북': '전북특별자치도', '전남': '전라남도',
+            '경북': '경상북도', '경남': '경상남도', '제주': '제주특별자치도'
+        };
+        const SHORT_SIDO_RE = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(\s)/;
+        let fullAddress: string;
+        if (SIDO_RE.test(lotAddress)) {
+            fullAddress = lotAddress.replace(SHORT_SIDO_RE, (_m, sido, sp) => (SHORT_SIDO_EXPAND[sido] || sido) + sp);
+        } else {
+            let defaultSido = '';
+            try { defaultSido = (localStorage.getItem('app_default_sido') || '').trim(); } catch { defaultSido = ''; }
+            if (!defaultSido) return null; // 시·도 미상 → 검증 스킵(오검증 방지)
+            fullAddress = `${defaultSido} ${lotAddress}`;
+        }
 
         // Electron: main process IPC 경유 (Origin 헤더 없음 → 도메인 제한 우회)
         if ((window as any).electronAPI?.vworldGeocode) {
@@ -4757,6 +4782,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             results.forEach((r, idx) => {
                 if (r.status === 'fulfilled' && r.value !== null) {
                     (batch[idx] as any).addressVerified = r.value;
+                    // 안전망: saveLogs는 in-place라 고아 참조가 생기지 않지만, 전달된 log가 실제
+                    // this.sampleLogs 항목과 다른 참조이면 id로 찾아 동기화(동일 참조면 스킵).
+                    const liveLog = this.sampleLogs.find(l => String(l.id) === String(batch[idx].id));
+                    if (liveLog && liveLog !== batch[idx]) (liveLog as any).addressVerified = r.value;
                     changed = true;
                 }
             });

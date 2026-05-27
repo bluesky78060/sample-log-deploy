@@ -3688,7 +3688,7 @@ const MAX_AUTOCOMPLETE_RESULTS: number = 30;
 window.MAX_AUTOCOMPLETE_RESULTS = MAX_AUTOCOMPLETE_RESULTS;
 
 // 시도 제거 패턴 (주소 표시용)
-const SIDO_PATTERN: RegExp = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주도|제주특별자치도)\s*/;
+const SIDO_PATTERN: RegExp = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|경기도|강원도|강원특별자치도|충청북도|충청남도|전라북도|전북특별자치도|전라남도|경상북도|경상남도|제주도|제주특별자치도)\s*/;
 window.SIDO_PATTERN = SIDO_PATTERN;
 
 // 지역명 매핑 (재사용을 위해 상수로 분리)

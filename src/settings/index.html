@@ -72,7 +72,8 @@
             margin-bottom: 0.5rem;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             width: 100%;
             padding: 0.75rem 1rem;
             border: 1.5px solid #E8E4DF;
@@ -82,7 +83,8 @@
             background: #FAFAF9;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #7C9082;
             box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12);
@@ -365,13 +367,15 @@
             color: #A8A29E;
         }
 
-        [data-theme="dark"] .form-group input {
+        [data-theme="dark"] .form-group input,
+        [data-theme="dark"] .form-group select {
             background: #1C1917;
             border-color: #57534E;
             color: #E7E5E4;
         }
 
-        [data-theme="dark"] .form-group input:focus {
+        [data-theme="dark"] .form-group input:focus,
+        [data-theme="dark"] .form-group select:focus {
             border-color: #7C9082;
         }
 
@@ -980,6 +984,49 @@
 
             <p class="help-text">
                 메인 페이지 하단과 각 시료 페이지에 표시되는 기관명을 변경할 수 있습니다.
+            </p>
+        </div>
+
+        <!-- 기본 시·도 설정 (필지 주소 검증용) -->
+        <div class="settings-card">
+            <h2>
+                <span>🗺️</span>
+                기본 시·도 설정
+            </h2>
+
+            <div class="form-group">
+                <label for="defaultSido">기본 시·도 (필지 주소 검증 기준)</label>
+                <select id="defaultSido">
+                    <option value="">선택 안 함 (시·도 없는 주소는 검증 건너뜀)</option>
+                    <option value="서울특별시">서울특별시</option>
+                    <option value="부산광역시">부산광역시</option>
+                    <option value="대구광역시">대구광역시</option>
+                    <option value="인천광역시">인천광역시</option>
+                    <option value="광주광역시">광주광역시</option>
+                    <option value="대전광역시">대전광역시</option>
+                    <option value="울산광역시">울산광역시</option>
+                    <option value="세종특별자치시">세종특별자치시</option>
+                    <option value="경기도">경기도</option>
+                    <option value="강원특별자치도">강원특별자치도</option>
+                    <option value="충청북도">충청북도</option>
+                    <option value="충청남도">충청남도</option>
+                    <option value="전북특별자치도">전북특별자치도</option>
+                    <option value="전라남도">전라남도</option>
+                    <option value="경상북도">경상북도</option>
+                    <option value="경상남도">경상남도</option>
+                    <option value="제주특별자치도">제주특별자치도</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button type="button" id="saveDefaultSidoBtn" class="btn btn-primary">저장</button>
+                <span id="defaultSidoSaveStatus" style="font-size: 0.8rem; color: #16a34a; display: none;">저장됨</span>
+            </div>
+
+            <p class="help-text">
+                필지 주소를 시·도 없이 "리+지번"으로 입력했을 때, VWORLD 검증에 사용할 기관 소재 시·도입니다.
+                자동완성으로 선택한 주소는 해당 주소의 시·도를 우선 사용합니다.
+                "선택 안 함"이면 시·도가 없는 주소는 오검증을 막기 위해 검증을 건너뜁니다.
             </p>
         </div>
 

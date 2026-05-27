@@ -756,6 +756,47 @@ function loadOrgName(): void {
 }
 
 // ========================================
+// 기본 시·도 설정 (필지 주소 검증용)
+// ========================================
+const DEFAULT_SIDO_KEY = 'app_default_sido';
+
+/**
+ * Load default sido setting and wire save button
+ */
+function loadDefaultSido(): void {
+  const sel = getElement<HTMLSelectElement>('defaultSido');
+  if (sel) sel.value = localStorage.getItem(DEFAULT_SIDO_KEY) || '';
+
+  const saveBtn = getElement<HTMLButtonElement>('saveDefaultSidoBtn');
+  if (saveBtn && !(saveBtn as any)._sidoWired) {
+    (saveBtn as any)._sidoWired = true;
+    saveBtn.addEventListener('click', () => {
+      const value = getElement<HTMLSelectElement>('defaultSido')?.value || '';
+      if (value) {
+        localStorage.setItem(DEFAULT_SIDO_KEY, value);
+      } else {
+        localStorage.removeItem(DEFAULT_SIDO_KEY);
+      }
+      const statusEl = getElement<HTMLElement>('defaultSidoSaveStatus');
+      if (statusEl) {
+        statusEl.style.display = 'inline';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+      }
+    });
+  }
+}
+
+// settings-entry의 async 초기화(checkAuthFileStatus 등)가 비-Electron 환경에서 지연돼도
+// 저장 버튼이 동작하도록 DOM 준비 시점에 독립적으로 와이어링한다(_sidoWired 가드로 멱등).
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadDefaultSido);
+  } else {
+    loadDefaultSido();
+  }
+}
+
+// ========================================
 // Storage Mode UI
 // ========================================
 
@@ -2961,6 +3002,7 @@ export {
   initNetworkAccessUI,
   // Organization settings
   loadOrgName,
+  loadDefaultSido,
   // Storage mode
   initStorageModeUI,
   updateStorageModeStatus,
