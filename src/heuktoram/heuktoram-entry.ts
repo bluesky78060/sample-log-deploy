@@ -14,5 +14,8 @@ import '../shared/theme';
 import '../shared/tooltip';
 import '../shared/logger';
 
+// 결과 가져오기 모달 (Phase 1.5: 파일 + 텍스트)
+import './heuktoram-result-importer.js';
+
 // Main script
 import './heuktoram-script';

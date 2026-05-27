@@ -70,6 +70,7 @@ interface SoilTestResult {
 interface HeuktoramRow {
   key: string;
   displayNumber: string;
+  baseReceptionNumber?: string;  // 부번 제거된 본 접수번호 (예: '468-1' → '468')
   log: SoilLog;
   parcel: SoilParcel | null;
   parcelIdx: number;
@@ -263,11 +264,59 @@ class HeuktoramManager {
     this.bindEvents();
     this.loadData();
     this.render();
+    this.setupResultImporter();
 
     if (window.ThemeManager) {
       window.ThemeManager.init();
       this.setupThemeToggle();
     }
+  }
+
+  /**
+   * 엑셀 결과 가져오기 모달 (Phase 1.5 — 파일 업로드 + 텍스트 붙여넣기) 연결
+   * 설계: docs-internal/HEUKTORAM_RESULT_EXCEL_IMPORT_MODAL_DESIGN.md (메인 프로젝트)
+   */
+  private setupResultImporter(): void {
+    const ImporterCtor = (window as unknown as { HeuktoramResultImporter?: new (cfg: unknown) => { init: () => void; open: () => void } }).HeuktoramResultImporter;
+    if (!ImporterCtor) return;
+
+    const fieldLabels: Partial<Record<keyof SoilTestResult, string>> = {
+      pH: 'pH', organicMatter: '유기물', availableP: '유효인산',
+      exK: '치환성칼륨(K)', exCa: '치환성칼슘(Ca)', exMg: '치환성마그네슘(Mg)',
+      silica: '유효규산', ec: 'EC', limeReq: '석회요구량', cec: 'CEC',
+    };
+
+    // 흙토람 표준 default 소수점 자리수 (사용자가 모달에서 변경 가능)
+    const fieldDecimals: Partial<Record<keyof SoilTestResult, number>> = {
+      pH: 1, organicMatter: 0, availableP: 0,
+      exK: 2, exCa: 2, exMg: 2,
+      silica: 0, ec: 2, limeReq: 0, cec: 0,
+    };
+
+    // 모달 매핑 UI 제외 필드 (도구바 일괄적용 또는 입력 대상 외)
+    const IMPORTER_EXCLUDED_FIELDS = new Set<string>(['testDate', 'NO3N', 'NH4N', 'usageCode', 'soiling', 'clay']);
+    const importerFields = this.resultFields.filter(f => !IMPORTER_EXCLUDED_FIELDS.has(f as string));
+
+    const importer = new ImporterCtor({
+      resultFields: importerFields,
+      fieldLabels,
+      fieldDecimals,
+      fieldRanges: this.fieldRanges,
+      getFlatRows:    () => this.flatRows,
+      getTestResults: () => this.testResults,
+      applyResult:    (rowKey: string, field: string, value: unknown) => {
+        if (!this.testResults[rowKey]) this.testResults[rowKey] = {} as SoilTestResult;
+        (this.testResults[rowKey] as Record<string, unknown>)[field] = value;
+      },
+      syncToSiblings: (rowKey: string, field: string, value: unknown) =>
+        this.syncToSiblings(rowKey, field as keyof SoilTestResult, value as never),
+      saveTestResults: () => this.saveTestResults(),
+      rerender: () => {
+        this.render();
+        this.validateAllRanges();
+      },
+    });
+    importer.init();
   }
 
   private cacheElements(): void {
@@ -406,10 +455,14 @@ class HeuktoramManager {
       if (!data) return [];
       const parsed: unknown = JSON.parse(data);
       if (!Array.isArray(parsed)) return [];
+      // 접수번호 오름차순 정렬 (숫자 우선, F접두사 포함, -N 접미사 포함)
       return (parsed as SoilLog[]).sort((a, b) => {
         const toNum = (s: string | undefined): number => {
           if (!s) return Infinity;
-          const n = parseFloat(String(s).replace(/^F/i, ''));
+          const str = String(s).replace(/^F/i, '');
+          const match = str.match(/^(\d+(?:\.\d+)?)-(\d+)$/);
+          if (match) return parseFloat(match[1]) + parseInt(match[2], 10) * 0.001;
+          const n = parseFloat(str);
           return isNaN(n) ? Infinity : n;
         };
         return toNum(a.receptionNumber) - toNum(b.receptionNumber);
@@ -453,28 +506,35 @@ class HeuktoramManager {
 
     for (const log of logsToProcess) {
       if (!log.parcels || log.parcels.length === 0) {
+        // 접수번호에 '-숫자' 패턴이 있으면 하위필지로 인식 (예: 468-1)
+        const rNum = String(log.receptionNumber ?? '');
+        const subLotMatch = rNum.match(/^(.+)-(\d+)$/);
         this.flatRows.push({
           key: `${log.id}_0_0`,
           displayNumber: log.receptionNumber ?? '',
+          baseReceptionNumber: subLotMatch ? subLotMatch[1] : rNum,
           log,
           parcel: null,
           parcelIdx: 0,
           subLot: null,
           subLotIdx: -1,
-          isSubLot: false
+          isSubLot: !!subLotMatch
         });
         continue;
       }
 
+      // 첫 번째 필지 첫 작물이 '필지', 이후 모든 항목(다른 필지 포함)은 '하위필지'
+      // 접수번호에 '-숫자' 패턴이 있으면 (예: 468-1) 전체가 하위필지
+      const hasSubLotNumber = /^.+-\d+$/.test(String(log.receptionNumber ?? ''));
+      let entryCounter = 0; // 접수 건 전체 카운터 (0=필지, 1+=하위필지)
       for (let pi = 0; pi < log.parcels.length; pi++) {
         const parcel = log.parcels[pi];
         const crops: SoilCrop[] = parcel.crops ?? [{ name: '', area: '', code: '' }];
-        let entryCounter = 0;
 
         for (let ci = 0; ci < crops.length; ci++) {
           this.flatRows.push({
             key: `${log.id}_${pi}_c${ci}`,
-            displayNumber: entryCounter === 0
+            displayNumber: (hasSubLotNumber || entryCounter === 0)
               ? (log.receptionNumber ?? '')
               : `${log.receptionNumber}-${entryCounter}`,
             log,
@@ -484,7 +544,7 @@ class HeuktoramManager {
             cropIdx: ci,
             subLot: null,
             subLotIdx: -1,
-            isSubLot: entryCounter > 0
+            isSubLot: hasSubLotNumber || entryCounter > 0
           });
           entryCounter++;
         }
@@ -495,7 +555,7 @@ class HeuktoramManager {
             const sub: SoilSubLot = typeof rawSub === 'string'
               ? { lotAddress: rawSub, crops: [] }
               : rawSub;
-            const subCrops: SoilCrop[] = sub.crops ?? [{ name: '', area: '', code: '' }];
+            const subCrops: SoilCrop[] = (sub.crops && sub.crops.length > 0) ? sub.crops : [{ name: '', area: '', code: '' }];
 
             for (let sci = 0; sci < subCrops.length; sci++) {
               this.flatRows.push({
@@ -607,13 +667,14 @@ class HeuktoramManager {
     // 경지구분
     const tdCat = document.createElement('td');
     tdCat.className = 'col-category sticky-col';
-    tdCat.textContent = row.parcel?.category ?? row.log.subCategory ?? '';
+    // ?? 는 빈 문자열을 통과시키므로 || 사용 (빈 값일 때 다음 fallback으로 진행)
+    tdCat.textContent = row.parcel?.category || row.log.subCategory || '';
     tr.appendChild(tdCat);
 
     // 용도
     const tdPurpose = document.createElement('td');
     tdPurpose.className = 'col-purpose sticky-col';
-    tdPurpose.textContent = row.parcel?.purpose ?? row.log.purpose ?? '';
+    tdPurpose.textContent = row.parcel?.purpose || row.log.purpose || '';
     tr.appendChild(tdPurpose);
 
     // 면적 (평→㎡ 변환)
@@ -635,8 +696,8 @@ class HeuktoramManager {
 
     // 경지구분/작물에 따라 필수 입력 필드 결정
     const requiredFields = this.getRequiredFields(
-      row.parcel?.category ?? row.log.subCategory ?? '',
-      row.crop?.name ?? ''
+      row.parcel?.category || row.log.subCategory || '',
+      row.crop?.name || ''
     );
 
     // 검정 결과 필드들 (편집 가능)
@@ -770,10 +831,38 @@ class HeuktoramManager {
 
   private handleCellEdit(key: string, field: string, value: string): void {
     if (!this.testResults[key]) this.testResults[key] = {};
-    this.testResults[key][field] = value;
-    this.syncToSiblings(key, field, value);
+
+    let sanitized = value;
+
+    // 최소값 미만/음수 입력 시 min으로 자동 보정
+    const range = this.fieldRanges[field];
+    if (range && sanitized.trim() !== '') {
+      const num = parseFloat(sanitized);
+      if (!isNaN(num) && num < range.min) {
+        const original = num;
+        sanitized = String(range.min);
+        const rowIdx = this.flatRows.findIndex(r => r.key === key);
+        const colIdx = this.resultFields.indexOf(field as keyof SoilTestResult);
+        const cell = this.tableBody?.querySelector(
+          `td[data-row="${rowIdx}"][data-col="${colIdx}"]`
+        ) as HTMLElement | null;
+        if (cell && cell.textContent !== sanitized) {
+          cell.textContent = sanitized;
+        }
+        const unitText = range.unit ? ` ${range.unit}` : '';
+        if ((window as any).showToast) {
+          (window as any).showToast(
+            `ℹ️ ${range.label}: ${original}${unitText} → 최소값 ${range.min}${unitText}으로 보정됨`,
+            'info'
+          );
+        }
+      }
+    }
+
+    this.testResults[key][field] = sanitized;
+    this.syncToSiblings(key, field, sanitized);
     this.saveTestResults();
-    this.validateFieldRange(key, field, value);
+    this.validateFieldRange(key, field, sanitized);
   }
 
   private validateFieldRange(key: string, field: string, value: string): void {
@@ -821,15 +910,20 @@ class HeuktoramManager {
   }
 
   /**
-   * 같은 접수번호의 모든 행에 검정 결과 동기화
+   * 같은 접수번호의 모든 행(본필지 + 하위필지)에 검정 결과 동기화
+   * 같은 log.id이거나, base 접수번호(468-1 → 468)가 같은 log도 sibling으로 처리
    */
   private syncToSiblings(key: string, field: string, value: string): void {
     const editedRow = this.flatRows.find(r => r.key === key);
     if (!editedRow) return;
 
-    const siblingRows = this.flatRows.filter(r =>
-      r.log.id === editedRow.log.id && r.key !== key
-    );
+    const editedBase = String(editedRow.log.receptionNumber ?? '').replace(/-\d+$/, '');
+    const siblingRows = this.flatRows.filter(r => {
+      if (r.key === key) return false;
+      if (r.log.id === editedRow.log.id) return true;
+      const rBase = String(r.log.receptionNumber ?? '').replace(/-\d+$/, '');
+      return !!editedBase && rBase === editedBase;
+    });
     for (const sibling of siblingRows) {
       if (!this.testResults[sibling.key]) this.testResults[sibling.key] = {};
       this.testResults[sibling.key][field] = value;
@@ -1331,8 +1425,8 @@ class HeuktoramManager {
       if (isMountain) lotParsed.isMountain = true;
 
       const personAddr = this.parsePersonAddress(row.log.address ?? '', row.log.addressDetail);
-      const category = row.parcel?.category ?? row.log.subCategory ?? '';
-      const purpose = row.parcel?.purpose ?? row.log.purpose ?? '';
+      const category = row.parcel?.category || row.log.subCategory || '';
+      const purpose = row.parcel?.purpose || row.log.purpose || '';
       const usageCode = this.getUsageCode(purpose, result.usageCode, this.bulkUsageCodeSelect?.value);
       const soiling = (result.soiling === '해당' || category === '성토') ? '해당' : '미해당';
 
@@ -1356,7 +1450,8 @@ class HeuktoramManager {
       dataRow[5]  = this.getCategoryCode(category);
       dataRow[6]  = usageLabels[usageCode] ?? '일반적인토양검정-0';
       dataRow[7]  = this.getBeforeAfter(usageCode);
-      dataRow[8]  = row.log.receptionNumber ?? '';
+      // 하위필지(-1, -2 등)도 본 접수번호로 정규화
+      dataRow[8]  = row.baseReceptionNumber ?? String(row.log.receptionNumber ?? '').replace(/-\d+$/, '') ?? '';
       dataRow[9]  = lotParsed.sido;
       dataRow[10] = lotParsed.sigungu;
       dataRow[11] = lotParsed.eupmyeondong;
