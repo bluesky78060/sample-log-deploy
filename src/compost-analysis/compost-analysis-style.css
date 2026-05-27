@@ -1,0 +1,630 @@
+/* ========================================
+   퇴·액비 분석결과 조회 전용 스타일
+   ======================================== */
+
+/* 테마 색상 (갈색/오렌지 계열 — 퇴비) */
+:root {
+    --ca-primary: #D97706;
+    --ca-primary-hover: #B45309;
+    --ca-primary-light: #FDE68A;
+    --ca-primary-dark: #92400E;
+    --ca-gradient: linear-gradient(135deg, #D97706, #B45309);
+}
+
+/* 네비게이션 바 */
+.ca-analysis-navbar {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-bottom: 1px solid #fde68a;
+}
+
+.ca-analysis-navbar .brand-icon {
+    font-size: 1.15rem;
+}
+
+.ca-analysis-navbar .brand-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #2D2D2D;
+    margin-left: 0.25rem;
+}
+
+/* 뒤로가기 버튼 */
+.ca-analysis-page .back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: white;
+    color: #2D2D2D;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-right: 0.35rem;
+    border: 1px solid #E8E4DF;
+    transition: all 0.2s ease;
+}
+
+.ca-analysis-page .back-btn:hover {
+    background: #FEF3C7;
+    color: var(--ca-primary);
+}
+
+/* ========================================
+   툴바 스타일
+   ======================================== */
+
+.ca-analysis-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+}
+
+.toolbar-field {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.toolbar-field label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+.toolbar-select,
+.toolbar-input {
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #E8E4DF;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    background: white;
+    color: #2D2D2D;
+    transition: all 0.2s ease;
+}
+
+.toolbar-select:focus,
+.toolbar-input:focus {
+    border-color: var(--ca-primary);
+    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+    outline: none;
+}
+
+.toolbar-input[type="date"] {
+    width: 130px;
+}
+
+.toolbar-btn-small {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: white;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.toolbar-btn-small:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+/* 내보내기 버튼 강조 */
+.export-btn {
+    background: var(--ca-gradient) !important;
+    color: white !important;
+    border-radius: 6px !important;
+    border: none !important;
+}
+
+.export-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* 완료된 행 */
+.ca-analysis-table tr.row-completed td {
+    background: #f0fdf4 !important;
+    color: #6b7280;
+}
+
+.ca-analysis-table tr.row-completed td.sticky-col {
+    background: #e8faf0 !important;
+}
+
+/* ========================================
+   안내 바
+   ======================================== */
+
+.ca-analysis-info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-bottom: 1px solid #FDE68A;
+    font-size: 0.8rem;
+    color: var(--ca-primary-dark);
+}
+
+.ca-analysis-info-bar .info-text {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ca-analysis-info-bar .record-count {
+    font-weight: 600;
+    background: var(--ca-primary);
+    color: white;
+    padding: 0.15rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+}
+
+/* ========================================
+   테이블 스타일
+   ======================================== */
+
+.table-wrapper {
+    overflow: auto;
+    flex: 1;
+    position: relative;
+}
+
+.ca-analysis-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+/* 헤더 그룹 */
+.header-group-label {
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+    letter-spacing: 0.05em;
+}
+
+.header-group-label.group-info {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    color: var(--ca-primary-dark);
+    border-bottom: 2px solid var(--ca-primary-light);
+}
+
+.header-group-label.group-common {
+    background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+    color: #713F12;
+    border-bottom: 2px solid #FEF08A;
+}
+
+.header-group-label.group-fields {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    color: #7C2D12;
+    border-bottom: 2px solid #FED7AA;
+}
+
+.header-group-label.group-result {
+    background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+    color: #991b1b;
+    border-bottom: 2px solid #fca5a5;
+}
+
+/* 테이블 헤더 */
+.ca-analysis-table thead tr:last-child th {
+    position: sticky;
+    top: 0;
+    background: #faf9f7;
+    padding: 0.5rem 0.4rem;
+    font-weight: 600;
+    font-size: 0.7rem;
+    color: #44403C;
+    border-bottom: 2px solid #E8E4DF;
+    white-space: nowrap;
+    z-index: 10;
+    text-align: center;
+}
+
+/* 분석항목 헤더/데이터 셀 (오렌지 계열) */
+.ca-analysis-table thead tr:last-child th.col-field {
+    background: #fff7ed;
+    color: #7C2D12;
+}
+
+.ca-analysis-table tbody td.col-field {
+    background-color: rgba(255, 247, 237, 0.5);
+}
+
+/* 고정 컬럼 */
+.sticky-col {
+    position: sticky;
+    background: inherit;
+    z-index: 5;
+}
+
+.ca-analysis-table thead tr:last-child .sticky-col {
+    z-index: 15;
+}
+
+.col-checkbox   { left: 0; min-width: 36px; width: 36px; }
+.col-num        { left: 36px; min-width: 60px; }
+.col-name       { left: 96px; min-width: 70px; }
+.col-animaltype { left: 166px; min-width: 80px; }
+.col-sampletype { left: 246px; min-width: 100px; }
+.col-date       { left: 346px; min-width: 90px; }
+
+/* 테이블 바디 */
+.ca-analysis-table tbody td {
+    padding: 0.35rem 0.4rem;
+    border-bottom: 1px solid #f0eeeb;
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.ca-analysis-table tbody td.sticky-col {
+    background: white;
+    border-right: 1px solid #f0eeeb;
+}
+
+.ca-analysis-table tbody td.col-name {
+    font-weight: 500;
+}
+
+/* 행 호버 */
+.ca-analysis-table tbody tr:hover td {
+    background-color: rgba(217, 119, 6, 0.05);
+}
+
+.ca-analysis-table tbody tr:hover td.col-field {
+    background-color: rgba(124, 45, 18, 0.08);
+}
+
+.ca-analysis-table tbody tr:hover td.sticky-col {
+    background-color: rgba(217, 119, 6, 0.08);
+}
+
+/* ========================================
+   편집 가능한 셀
+   ======================================== */
+
+.editable-cell {
+    cursor: text;
+    min-width: 70px;
+    transition: all 0.15s ease;
+    outline: none;
+}
+
+.editable-cell:hover {
+    background-color: rgba(217, 119, 6, 0.06) !important;
+}
+
+.editable-cell.focused {
+    background-color: rgba(217, 119, 6, 0.1) !important;
+    box-shadow: inset 0 0 0 2px var(--ca-primary);
+    border-radius: 2px;
+}
+
+/* 셀렉트 셀 (부숙도) */
+.select-cell {
+    min-width: 100px;
+    padding: 0 !important;
+}
+
+.cell-select {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 0.78rem;
+    font-family: inherit;
+    padding: 0.3rem 0.4rem;
+    color: inherit;
+    cursor: pointer;
+    outline: none;
+    text-align: center;
+}
+
+.cell-select:focus {
+    background-color: rgba(217, 119, 6, 0.1);
+    box-shadow: inset 0 0 0 2px var(--ca-primary);
+}
+
+/* 판정 셀 */
+.col-judgment {
+    min-width: 60px;
+    cursor: pointer !important;
+    font-weight: 600;
+}
+
+.judgment-pass {
+    color: #059669 !important;
+    background-color: rgba(5, 150, 105, 0.08) !important;
+}
+
+.judgment-fail {
+    color: #dc2626 !important;
+    background-color: rgba(220, 38, 38, 0.08) !important;
+}
+
+/* 붙여넣기 하이라이트 */
+.paste-highlight {
+    animation: pasteFlash 1.5s ease;
+}
+
+@keyframes pasteFlash {
+    0% { background-color: rgba(217, 119, 6, 0.3); }
+    100% { background-color: transparent; }
+}
+
+/* 컬럼 구분선 */
+.col-testdate { min-width: 90px; border-right: 1px solid #fde68a; }
+.col-field    { min-width: 80px; border-right: 1px solid #fed7aa; }
+
+/* ========================================
+   빈 상태
+   ======================================== */
+
+.empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: #78716C;
+    gap: 0.5rem;
+}
+
+.empty-state .empty-icon {
+    font-size: 3rem;
+}
+
+.empty-state p {
+    font-size: 1rem;
+}
+
+.empty-state .empty-sub {
+    font-size: 0.85rem;
+    color: #A8A29E;
+}
+
+/* ========================================
+   체크박스 테마
+   ======================================== */
+
+.ca-analysis-table input[type="checkbox"] {
+    accent-color: var(--ca-primary);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+/* ========================================
+   다크 모드
+   ======================================== */
+
+[data-theme="dark"] .ca-analysis-navbar {
+    background: rgba(41, 37, 36, 0.95);
+    border-bottom: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+[data-theme="dark"] .ca-analysis-navbar .brand-text {
+    color: #D6D3D1;
+}
+
+[data-theme="dark"] .ca-analysis-page .back-btn {
+    background: rgba(217, 119, 6, 0.1);
+    color: #D6D3D1;
+    border-color: rgba(217, 119, 6, 0.25);
+}
+
+[data-theme="dark"] .ca-analysis-page .back-btn:hover {
+    background: rgba(217, 119, 6, 0.2);
+    color: #fcd34d;
+}
+
+[data-theme="dark"] .toolbar-field label {
+    color: #A8A29E;
+}
+
+[data-theme="dark"] .toolbar-btn-small {
+    background: #292524;
+    border-color: #57534e;
+    color: #a8a29e;
+}
+
+[data-theme="dark"] .toolbar-btn-small:hover {
+    background: #451a03;
+    border-color: #dc2626;
+    color: #fca5a5;
+}
+
+[data-theme="dark"] .toolbar-select,
+[data-theme="dark"] .toolbar-input {
+    background: #292524;
+    color: #e5e7eb;
+    border-color: #57534E;
+}
+
+[data-theme="dark"] .toolbar-select:focus,
+[data-theme="dark"] .toolbar-input:focus {
+    border-color: var(--ca-primary);
+    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2);
+}
+
+/* 안내 바 다크 모드 */
+[data-theme="dark"] .ca-analysis-info-bar {
+    background: linear-gradient(135deg, rgba(146, 64, 14, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%);
+    border-bottom-color: rgba(217, 119, 6, 0.2);
+    color: #fcd34d;
+}
+
+/* 헤더 그룹 다크 모드 */
+[data-theme="dark"] .header-group-label.group-info {
+    background: linear-gradient(135deg, rgba(146, 64, 14, 0.3) 0%, rgba(217, 119, 6, 0.2) 100%);
+    color: #fcd34d;
+    border-bottom-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="dark"] .header-group-label.group-common {
+    background: linear-gradient(135deg, rgba(113, 63, 18, 0.2) 0%, rgba(161, 98, 7, 0.15) 100%);
+    color: #fcd34d;
+    border-bottom-color: rgba(253, 224, 71, 0.3);
+}
+
+[data-theme="dark"] .header-group-label.group-fields {
+    background: linear-gradient(135deg, rgba(124, 45, 18, 0.3) 0%, rgba(194, 65, 12, 0.2) 100%);
+    color: #fdba74;
+    border-bottom-color: rgba(253, 186, 116, 0.3);
+}
+
+[data-theme="dark"] .header-group-label.group-result {
+    background: linear-gradient(135deg, rgba(153, 27, 27, 0.3) 0%, rgba(239, 68, 68, 0.15) 100%);
+    color: #fca5a5;
+    border-bottom-color: rgba(252, 165, 165, 0.3);
+}
+
+/* 테이블 헤더 다크 모드 */
+[data-theme="dark"] .ca-analysis-table thead tr:last-child th {
+    background: #292524;
+    color: #D6D3D1;
+    border-bottom-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="dark"] .ca-analysis-table thead tr:last-child th.col-field {
+    background: rgba(124, 45, 18, 0.25);
+    color: #fdba74;
+}
+
+[data-theme="dark"] .ca-analysis-table tbody td.col-field {
+    background-color: rgba(124, 45, 18, 0.1);
+}
+
+/* 테이블 바디 다크 모드 */
+[data-theme="dark"] .ca-analysis-table tbody td {
+    border-bottom-color: rgba(217, 119, 6, 0.1);
+    color: #e5e7eb;
+}
+
+[data-theme="dark"] .ca-analysis-table tbody td.sticky-col {
+    background: #1C1917;
+    border-right-color: rgba(217, 119, 6, 0.1);
+}
+
+[data-theme="dark"] .ca-analysis-table tr.row-completed td {
+    background: #052e16 !important;
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .ca-analysis-table tr.row-completed td.sticky-col {
+    background: #071f10 !important;
+}
+
+[data-theme="dark"] .ca-analysis-table tbody tr:hover td {
+    background-color: rgba(217, 119, 6, 0.1);
+}
+
+[data-theme="dark"] .ca-analysis-table tbody tr:hover td.sticky-col {
+    background-color: rgba(217, 119, 6, 0.15);
+}
+
+/* 편집 가능 셀 다크 모드 */
+[data-theme="dark"] .editable-cell:hover {
+    background-color: rgba(217, 119, 6, 0.12) !important;
+}
+
+[data-theme="dark"] .editable-cell.focused {
+    background-color: rgba(217, 119, 6, 0.2) !important;
+    box-shadow: inset 0 0 0 2px #fcd34d;
+}
+
+[data-theme="dark"] .cell-select {
+    background: transparent;
+    color: #e5e7eb;
+}
+
+[data-theme="dark"] .cell-select:focus {
+    background-color: rgba(217, 119, 6, 0.2);
+    box-shadow: inset 0 0 0 2px #fcd34d;
+}
+
+[data-theme="dark"] .judgment-pass {
+    color: #6ee7b7 !important;
+    background-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+[data-theme="dark"] .judgment-fail {
+    color: #fca5a5 !important;
+    background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* 컬럼 구분선 다크 모드 */
+[data-theme="dark"] .col-testdate { border-right-color: #78350f; }
+[data-theme="dark"] .col-field    { border-right-color: #7c2d12; }
+
+/* 빈 상태 다크 모드 */
+[data-theme="dark"] .empty-state {
+    color: #A8A29E;
+}
+
+[data-theme="dark"] .empty-state .empty-sub {
+    color: #78716C;
+}
+
+/* ========================================
+   스크롤바
+   ======================================== */
+
+.table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: #f5f3ef;
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: var(--ca-primary-light);
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--ca-primary);
+}
+
+[data-theme="dark"] .table-wrapper::-webkit-scrollbar-track {
+    background: #292524;
+}
+
+[data-theme="dark"] .table-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="dark"] .table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(217, 119, 6, 0.5);
+}
+
+/* ========================================
+   반응형
+   ======================================== */
+
+@media (max-width: 1200px) {
+    .ca-analysis-toolbar {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+}

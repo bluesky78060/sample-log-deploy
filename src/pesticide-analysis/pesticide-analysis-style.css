@@ -71,10 +71,28 @@
 .col-purpose { left: 325px; min-width: 60px; }
 .col-test-date { min-width: 90px; }
 .col-detection-count { min-width: 65px; }
-.col-det-name { min-width: 180px; text-align: left !important; }
-.col-det-value { min-width: 100px; }
-.col-det-method { min-width: 60px; }
+.col-det-equip { min-width: 40px; }
+.col-det-name { min-width: 150px; text-align: left !important; }
+.col-det-raw { min-width: 80px; }
+.col-det-dil { min-width: 60px; }
+.col-det-value { min-width: 80px; }
+.col-det-type { min-width: 55px; font-size: 0.7rem; font-weight: 600; }
+.col-det-val { text-align: right; }
 .col-judgment { min-width: 60px; }
+
+/* Original/Acid 구분 라벨 */
+.pa-type-orig { color: #065f46; background: rgba(236,253,245,0.5); }
+.pa-type-acid { color: #92400e; background: rgba(254,243,199,0.5); }
+
+/* Acid 행 하단 구분선 */
+.det-acid-row td { border-bottom: 2px solid #e2e8f0 !important; }
+
+[data-theme="dark"] .pa-type-orig { color: #6ee7b7; background: rgba(6,95,70,0.15); }
+[data-theme="dark"] .pa-type-acid { color: #fcd34d; background: rgba(146,64,14,0.15); }
+[data-theme="dark"] .det-acid-row td { border-bottom-color: #334155 !important; }
+
+.pa-table tbody td.det-name-qualitative { color: #1d4ed8 !important; font-weight: 700 !important; }
+[data-theme="dark"] .pa-table tbody td.det-name-qualitative { color: #60a5fa !important; }
 
 .pa-table tbody td {
     padding: 0.4rem 0.6rem; border-bottom: 1px solid #f0eeeb;

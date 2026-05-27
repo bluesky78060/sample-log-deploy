@@ -1499,3 +1499,388 @@
 [data-theme="dark"] .col-name:hover {
     background-color: rgba(248, 113, 113, 0.15);
 }
+
+/* ========================================
+   잔류농약 분석결과 모달
+   ======================================== */
+
+/* 분석결과 조회 버튼 (툴바) */
+.pa-view-btn {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+    color: white !important; border: none !important; border-radius: 6px !important;
+}
+.pa-view-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.pa-view-btn .material-icons-outlined { color: white !important; }
+.pa-view-btn .util-btn-label { color: white !important; }
+
+/* 분석결과 버튼 (테이블 행) */
+.btn-analysis-open {
+    background: none;
+    border: 1px solid #dc2626;
+    color: #dc2626;
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.btn-analysis-open:hover { background: #dc2626; color: white; }
+.btn-analysis-open.has-result {
+    background: #f0fdf4; border-color: #22c55e; color: #16a34a;
+}
+.btn-analysis-open.has-result:hover { background: #22c55e; color: white; }
+
+/* 모달 크기 */
+.modal-pesticide-analysis {
+    max-width: 780px;
+    width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.pesticide-analysis-header {
+    background: linear-gradient(135deg, #fef2f2, #fecaca);
+    border-bottom: 2px solid #fca5a5;
+    padding: 0.75rem 1rem;
+}
+.pesticide-analysis-header h3 {
+    color: #991b1b;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.pesticide-analysis-body {
+    overflow-y: auto;
+    overflow-x: visible;
+    padding: 1rem;
+    padding-bottom: 12rem;
+    flex: 1;
+}
+
+/* 시료 정보 */
+.pa-sample-info {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.75rem;
+}
+.pa-sample-info .info-row {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.35rem;
+}
+.pa-sample-info .info-row:last-child { margin-bottom: 0; }
+.pa-sample-info .info-label { font-size: 0.7rem; font-weight: 600; color: #64748b; min-width: 50px; }
+.pa-sample-info .info-value { font-size: 0.8rem; font-weight: 500; color: #1e293b; margin-right: 1rem; }
+
+/* 검사일자 + 판정 행 */
+.pa-meta-row {
+    display: flex; align-items: center; gap: 1.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;
+}
+.pa-field { display: flex; align-items: center; gap: 0.5rem; }
+.pa-field label { font-size: 0.8rem; font-weight: 600; color: #334155; }
+.pa-input {
+    padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px;
+    font-size: 0.8rem; font-family: inherit; color: #1e293b;
+}
+.pa-input:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15); outline: none; }
+
+/* 판정 칩 (수질 모달과 동일 스타일 재사용) */
+.pesticide-analysis-body .judgment-options { display: flex; gap: 0.5rem; }
+.pesticide-analysis-body .judgment-option { cursor: pointer; }
+.pesticide-analysis-body .judgment-option input[type="radio"] { display: none; }
+.pesticide-analysis-body .judgment-chip {
+    display: inline-block; padding: 0.3rem 0.8rem; border-radius: 16px;
+    font-size: 0.8rem; font-weight: 500; border: 2px solid #e2e8f0; color: #64748b; transition: all 0.2s;
+}
+.pesticide-analysis-body .judgment-option input:checked + .judgment-chip { border-color: #94a3b8; background: #f1f5f9; color: #334155; }
+.pesticide-analysis-body .judgment-option input:checked + .chip-pass { border-color: #22c55e; background: #f0fdf4; color: #16a34a; }
+.pesticide-analysis-body .judgment-option input:checked + .chip-fail { border-color: #ef4444; background: #fef2f2; color: #dc2626; }
+
+/* 검출 농약 헤더 */
+.pa-detections-header {
+    display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;
+}
+.pa-detections-title { font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+.pa-detections-count {
+    background: #dc2626; color: white; padding: 0.1rem 0.5rem;
+    border-radius: 10px; font-size: 0.7rem; font-weight: 600;
+}
+.pa-nd-all-btn {
+    margin-left: auto; display: flex; align-items: center; gap: 2px;
+    background: none; border: 1px solid #16a34a; color: #16a34a;
+    border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.75rem;
+    cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.pa-nd-all-btn:hover { background: #16a34a; color: white; }
+
+.pa-add-btn {
+    display: flex; align-items: center; gap: 2px;
+    background: none; border: 1px solid #dc2626; color: #dc2626;
+    border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.75rem;
+    cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.pa-add-btn:hover { background: #dc2626; color: white; }
+.pa-add-btn:disabled { opacity: 0.4; cursor: default; }
+.pa-add-btn:disabled:hover { background: none; color: #dc2626; }
+
+/* 전체 불검출 상태 표시 */
+.pa-nd-status {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 1rem; text-align: center; justify-content: center;
+    color: #16a34a; font-size: 0.9rem; font-weight: 600;
+}
+.pa-nd-status.hidden { display: none; }
+.pa-cancel-nd-btn {
+    background: none; border: 1px solid #94a3b8; color: #64748b;
+    border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.7rem;
+    cursor: pointer; font-family: inherit; margin-left: 0.5rem;
+}
+.pa-cancel-nd-btn:hover { border-color: #dc2626; color: #dc2626; }
+
+[data-theme="dark"] .pa-nd-all-btn { border-color: #22c55e; color: #86efac; }
+[data-theme="dark"] .pa-nd-all-btn:hover { background: #16a34a; color: white; }
+[data-theme="dark"] .pa-nd-status { color: #86efac; }
+[data-theme="dark"] .pa-cancel-nd-btn { border-color: #64748b; color: #94a3b8; }
+[data-theme="dark"] .pa-cancel-nd-btn:hover { border-color: #fca5a5; color: #fca5a5; }
+
+/* 검출 테이블 */
+.pa-detections-wrapper {
+    border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 0.5rem;
+}
+.pa-detections-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.pa-detections-table thead th {
+    background: #f1f5f9; padding: 0.4rem 0.5rem; font-weight: 600;
+    font-size: 0.7rem; color: #475569; text-align: center; border-bottom: 2px solid #e2e8f0;
+}
+.pa-detections-table tbody td {
+    padding: 0.2rem 0.25rem; border-bottom: 1px solid #f1f5f9;
+    text-align: center; vertical-align: middle;
+}
+.pa-detections-table tbody tr:hover { background: #f8fafc; }
+
+.pa-col-no { width: 22px; }
+.pa-col-equip { width: 50px; }
+.pa-col-name { width: 180px; }
+.pa-col-type { width: 48px; font-size: 0.7rem; font-weight: 600; }
+
+/* Original/Acid 구분 라벨 */
+.pa-type-orig { color: #065f46; background: rgba(236,253,245,0.5); }
+.pa-type-acid { color: #92400e; background: rgba(254,243,199,0.5); }
+
+/* Acid 행 구분선 */
+.pa-acid-row td { border-bottom: 2px solid #e2e8f0 !important; }
+
+[data-theme="dark"] .pa-type-orig { color: #6ee7b7; background: rgba(6,95,70,0.15); }
+[data-theme="dark"] .pa-type-acid { color: #fcd34d; background: rgba(146,64,14,0.15); }
+[data-theme="dark"] .pa-acid-row td { border-bottom-color: #334155 !important; }
+.pa-col-nd { width: 50px; }
+.pa-col-del { width: 35px; }
+
+.pa-dilution-input {
+    width: 30px; padding: 0.3rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 5px;
+    font-size: 0.8rem; font-family: inherit; text-align: center; color: #1e293b;
+}
+.pa-dilution-input:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12); outline: none; }
+[data-theme="dark"] .pa-dilution-input { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+
+/* 입력 검증 실패 (희석배수 < 1) */
+.pa-input-invalid {
+    border-color: #dc2626 !important;
+    background: rgba(254, 226, 226, 0.5) !important;
+}
+[data-theme="dark"] .pa-input-invalid {
+    border-color: #ef4444 !important;
+    background: rgba(127, 29, 29, 0.3) !important;
+}
+
+.pa-raw-input {
+    width: 50px; padding: 0.3rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 5px;
+    font-size: 0.8rem; font-family: inherit; text-align: center; color: #1e293b;
+}
+.pa-raw-input:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12); outline: none; }
+[data-theme="dark"] .pa-raw-input { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+
+/* 장비/분석법 셀렉트 */
+.pa-equip-select {
+    padding: 0.25rem 0.3rem; border: 1px solid #cbd5e1; border-radius: 4px;
+    font-size: 0.75rem; font-family: inherit; background: white; color: #1e293b;
+    width: 48px; text-align: center;
+}
+.pa-equip-select:focus { border-color: #dc2626; outline: none; }
+[data-theme="dark"] .pa-equip-select { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+
+.pa-method-select {
+    padding: 0.25rem 0.3rem; border: 1px solid #cbd5e1; border-radius: 4px;
+    font-size: 0.7rem; font-family: inherit; background: white; color: #1e293b;
+    width: 65px; text-align: center;
+}
+.pa-method-select:focus { border-color: #dc2626; outline: none; }
+
+/* 농약명 자동완성 */
+.pa-autocomplete-wrapper { position: relative; }
+.pa-name-input {
+    width: 100%; padding: 0.3rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 5px;
+    font-size: 0.8rem; font-family: inherit; color: #1e293b; box-sizing: border-box;
+}
+.pa-name-input:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12); outline: none; }
+
+.pa-suggestions {
+    position: fixed; z-index: 10000;
+    background: white; border: 1px solid #e2e8f0; border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 200px; overflow-y: auto;
+    list-style: none; padding: 0; margin: 2px 0 0 0;
+    width: 250px;
+}
+.pa-suggestions.hidden { display: none; }
+.pa-suggestion-item {
+    padding: 0.4rem 0.6rem; cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+.pa-suggestion-item:last-child { border-bottom: none; }
+.pa-suggestion-item:hover { background: #fef2f2; }
+.pa-sug-name { font-weight: 500; color: #1e293b; }
+.pa-sug-qualitative { color: #1d4ed8 !important; font-weight: 700 !important; }
+.pa-name-qualitative { color: #1d4ed8 !important; font-weight: 700 !important; }
+[data-theme="dark"] .pa-sug-qualitative { color: #60a5fa !important; }
+[data-theme="dark"] .pa-name-qualitative { color: #60a5fa !important; }
+.pa-sug-eng { font-size: 0.7rem; color: #94a3b8; }
+.pa-sug-method {
+    font-size: 0.6rem; font-weight: 600; padding: 0.1rem 0.3rem;
+    border-radius: 3px; background: #f1f5f9; color: #64748b;
+}
+
+/* 검출량 입력 */
+.pa-value-input {
+    width: 50px; padding: 0.3rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 5px;
+    font-size: 0.8rem; font-family: inherit; text-align: center; color: #1e293b;
+}
+.pa-value-input:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12); outline: none; }
+.pa-value-input:disabled {
+    background: #f1f5f9; color: #6366f1; font-weight: 600; border-color: #c7d2fe;
+}
+
+/* 불검출 체크박스 */
+.pa-nd-label { display: flex; align-items: center; gap: 2px; cursor: pointer; justify-content: center; }
+.pa-nd-check { width: 14px; height: 14px; accent-color: #6366f1; cursor: pointer; margin: 0; }
+.pa-nd-text { font-size: 0.65rem; font-weight: 600; color: #6366f1; user-select: none; }
+
+/* 삭제 버튼 */
+.pa-del-btn {
+    background: none; border: none; color: #94a3b8; cursor: pointer;
+    font-size: 0.9rem; padding: 0.2rem; border-radius: 4px; transition: all 0.2s;
+}
+.pa-del-btn:hover { color: #dc2626; background: #fef2f2; }
+
+/* 빈 메시지 */
+.pa-empty-msg {
+    text-align: center; padding: 1.5rem; color: #94a3b8; font-size: 0.85rem;
+}
+
+/* 모달 footer */
+.pesticide-analysis-footer {
+    border-top: 1px solid #e2e8f0; padding: 0.6rem 1rem;
+    display: flex; justify-content: flex-end; gap: 0.5rem;
+    position: relative; z-index: 1;
+}
+.btn-pa-save { background: linear-gradient(135deg, #dc2626, #b91c1c) !important; color: white !important; }
+
+/* ========================================
+   잔류농약 모달 다크 모드
+   ======================================== */
+
+[data-theme="dark"] .pesticide-analysis-header {
+    background: linear-gradient(135deg, rgba(153,27,27,0.2), rgba(220,38,38,0.1));
+    border-bottom-color: rgba(220,38,38,0.3);
+}
+[data-theme="dark"] .pesticide-analysis-header h3 { color: #fca5a5; }
+[data-theme="dark"] .pa-sample-info { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .pa-sample-info .info-label { color: #94a3b8; }
+[data-theme="dark"] .pa-sample-info .info-value { color: #e2e8f0; }
+[data-theme="dark"] .pa-input,
+[data-theme="dark"] .pa-method-select,
+[data-theme="dark"] .pa-name-input,
+[data-theme="dark"] .pa-value-input {
+    background: #1e293b; border-color: #475569; color: #e2e8f0;
+}
+[data-theme="dark"] .pa-detections-wrapper { border-color: #334155; }
+[data-theme="dark"] .pa-detections-table thead th { background: #1e293b; color: #94a3b8; border-bottom-color: #334155; }
+[data-theme="dark"] .pa-detections-table tbody td { border-bottom-color: #1e293b; color: #e2e8f0; }
+[data-theme="dark"] .pa-detections-table tbody tr:hover { background: rgba(220,38,38,0.05); }
+[data-theme="dark"] .pa-suggestions { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .pa-suggestion-item:hover { background: rgba(220,38,38,0.1); }
+[data-theme="dark"] .pa-sug-name { color: #e2e8f0; }
+[data-theme="dark"] .pa-value-input:disabled { background: #1e1b4b; color: #a5b4fc; border-color: #4338ca; }
+[data-theme="dark"] .pa-nd-text { color: #a5b4fc; }
+[data-theme="dark"] .pesticide-analysis-footer { border-top-color: #334155; }
+[data-theme="dark"] .pa-detections-title { color: #e2e8f0; }
+[data-theme="dark"] .pa-field label { color: #cbd5e1; }
+[data-theme="dark"] .pa-empty-msg { color: #64748b; }
+[data-theme="dark"] .btn-analysis-open { border-color: #dc2626; color: #fca5a5; }
+[data-theme="dark"] .btn-analysis-open:hover { background: #dc2626; color: white; }
+[data-theme="dark"] .btn-analysis-open.has-result { background: rgba(34,197,94,0.1); border-color: #22c55e; color: #86efac; }
+[data-theme="dark"] .btn-analysis-open.has-result:hover { background: #22c55e; color: white; }
+[data-theme="dark"] .pesticide-analysis-body .judgment-option input:checked + .chip-pass { border-color: #22c55e; background: rgba(34,197,94,0.15); color: #86efac; }
+[data-theme="dark"] .pesticide-analysis-body .judgment-option input:checked + .chip-fail { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #fca5a5; }
+
+/* ========================================
+   목록 테이블 고정 컬럼 (성명까지)
+   ======================================== */
+
+.data-table .sticky-col {
+    position: sticky;
+    background: white;
+    z-index: 2;
+}
+
+.data-table thead .sticky-col {
+    z-index: 12;
+}
+
+/* 고정 컬럼 left 위치 */
+.data-table .col-checkbox { left: 0; min-width: 40px; width: 40px; }
+.data-table .col-complete { left: 40px; min-width: 45px; width: 45px; }
+.data-table .col-result   { left: 85px; min-width: 50px; }
+.data-table .col-num      { left: 135px; min-width: 65px; }
+.data-table .col-date     { left: 200px; min-width: 90px; }
+.data-table .col-category { left: 290px; min-width: 55px; }
+.data-table .col-purpose  { left: 345px; min-width: 70px; }
+.data-table .col-name     { left: 415px; min-width: 70px; border-right: 2px solid #fecaca; }
+
+/* 고정 컬럼 행 배경 (tbody) */
+.data-table tbody td.sticky-col {
+    background: white;
+}
+
+.data-table tbody tr:hover td.sticky-col {
+    background-color: #fef2f2;
+}
+
+.data-table tbody tr.row-completed td.sticky-col {
+    background: #f0fdf4;
+}
+
+/* 다크 모드 */
+[data-theme="dark"] .data-table .sticky-col {
+    background: #1C1917;
+}
+
+[data-theme="dark"] .data-table thead .sticky-col {
+    background: #292524;
+}
+
+[data-theme="dark"] .data-table tbody td.sticky-col {
+    background: #1C1917;
+}
+
+[data-theme="dark"] .data-table tbody tr:hover td.sticky-col {
+    background-color: rgba(220, 38, 38, 0.08);
+}
+
+[data-theme="dark"] .data-table .col-name {
+    border-right-color: #7f1d1d;
+}

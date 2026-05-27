@@ -130,6 +130,15 @@ interface ElectronAPI {
   // Water analysis popup
   openWaterAnalysis?(): Promise<boolean>;
 
+  // Pesticide analysis popup
+  openPesticideAnalysis?(): Promise<boolean>;
+
+  // Compost analysis popup
+  openCompostAnalysis?(): Promise<boolean>;
+
+  // Heavy metal analysis popup
+  openHeavyMetalAnalysis?(): Promise<boolean>;
+
   // VWORLD geocoding (IPC via main process, no Origin restriction)
   vworldGeocode?(address: string, apiKey: string): Promise<boolean | null>;
 }
@@ -784,6 +793,8 @@ interface Window {
   getPesticidesByMethod?: (method: string) => import('../shared/pesticide-data').PesticideDataItem[];
   searchPesticides?: (query: string, method?: string, limit?: number) => import('../shared/pesticide-data').PesticideDataItem[];
   getPesticideStats?: () => import('../shared/pesticide-data').PesticideStats;
+  QUALITATIVE_PESTICIDES?: Set<string>;
+  isQualitativePesticide?: (name: string) => boolean;
 
   // Allow dynamic property access
   [key: string]: unknown;

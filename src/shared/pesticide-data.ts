@@ -585,3 +585,35 @@ window.PESTICIDE_ANALYSIS_DATA = PESTICIDE_ANALYSIS_DATA;
 window.getPesticidesByMethod = getPesticidesByMethod;
 window.searchPesticides = searchPesticides;
 window.getPesticideStats = getPesticideStats;
+
+/**
+ * 정성 분석 항목 (464종 분석체계 중 정성 항목)
+ */
+export const QUALITATIVE_PESTICIDES = new Set<string>([
+    // 다성분 40종
+    'Abamectin B1a', 'Acequinocyl', 'BioResmethrin', 'Bispyribac-sodium',
+    'Bitertanol', 'Carbofuran', '3-hydroxycarbofuran', 'Furathiocarb',
+    'Foramsulfuron', 'Gibberellic acid', 'Haloxyfop', 'Lepimectin',
+    'Mecoprop-P', 'Methomyl', 'Thiodicarb', 'Nicosulfuron', 'Novaluron',
+    'Propargite', 'Pyridate', 'Pyriproxyfen', 'Spirotetramat-enol',
+    'Tefuryltrione', 'Triclopyr', 'Triforine', 'Tetramethrin',
+    '2.6-DIPN', 'Acetochlor', 'EMA', 'HEMA',
+    'Acrinathrin', 'Chinomethionat', 'Chlorothalonil', 'Cyfluthrin',
+    'Cyhalothrin-γ', 'Cyhalothrin-λ', 'Cypermethrin',
+    'DDT-op', 'DDT-pp', 'DDD-pp', 'DDE-pp',
+    'Dimethipin', 'Dimethomorph E', 'Dimethomorph Z', 'Edifenphos', 'Fenvalerate',
+    'Fluvalinate', 'Iprodione', '2-phenyl phenol',
+    'Prochloraz', '2,4,6-trichlorophenol', 'Acibenzolar acid',
+    // 단성분 6종
+    'Amitraz', 'Cyromazine', 'Dichlofluanid', 'Folpet',
+    'Pymetrozine', 'Trinexapac-ethyl',
+]);
+
+export function isQualitativePesticide(name: string): boolean {
+    if (!name) return false;
+    return QUALITATIVE_PESTICIDES.has(name);
+}
+
+// Window globals for backward compat
+(window as any).QUALITATIVE_PESTICIDES = QUALITATIVE_PESTICIDES;
+(window as any).isQualitativePesticide = isQualitativePesticide;

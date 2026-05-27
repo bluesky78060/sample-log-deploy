@@ -1082,6 +1082,120 @@ ipcMain.handle('open-pesticide-analysis', async () => {
 });
 
 // ========================================
+// 퇴·액비 분석결과 조회 팝업 윈도우
+// ========================================
+
+let compostAnalysisWindow: BrowserWindow | null = null;
+
+ipcMain.handle('open-compost-analysis', async () => {
+  if (compostAnalysisWindow && !compostAnalysisWindow.isDestroyed()) {
+    compostAnalysisWindow.focus();
+    return true;
+  }
+
+  compostAnalysisWindow = new BrowserWindow({
+    width: 1400,
+    height: 850,
+    minWidth: 1000,
+    minHeight: 600,
+    title: '퇴·액비 분석결과 조회',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  compostAnalysisWindow.on('closed', () => { compostAnalysisWindow = null; });
+
+  const compostAnalysisPath = path.join(__dirname, '..', 'docs', 'compost-analysis', 'index.html');
+
+  if (!app.isPackaged) {
+    const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3005';
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = http.get(VITE_DEV_SERVER_URL, { timeout: 1000 }, (res) => {
+          res.destroy();
+          resolve();
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      compostAnalysisWindow.loadURL(`${VITE_DEV_SERVER_URL}/compost-analysis/`);
+      return true;
+    } catch {
+      // 개발 서버 없으면 파일 로드로 폴백
+    }
+  }
+
+  if (fs.existsSync(compostAnalysisPath)) {
+    compostAnalysisWindow.loadFile(compostAnalysisPath);
+  } else {
+    dialog.showErrorBox('오류', '퇴·액비 분석결과 페이지를 찾을 수 없습니다. 먼저 빌드를 실행해 주세요.');
+    compostAnalysisWindow.close();
+    return false;
+  }
+  return true;
+});
+
+// ========================================
+// 토양 중금속 분석결과 조회 팝업 윈도우
+// ========================================
+
+let heavyMetalAnalysisWindow: BrowserWindow | null = null;
+
+ipcMain.handle('open-heavy-metal-analysis', async () => {
+  if (heavyMetalAnalysisWindow && !heavyMetalAnalysisWindow.isDestroyed()) {
+    heavyMetalAnalysisWindow.focus();
+    return true;
+  }
+
+  heavyMetalAnalysisWindow = new BrowserWindow({
+    width: 1400,
+    height: 850,
+    minWidth: 1000,
+    minHeight: 600,
+    title: '토양 중금속 분석결과 조회',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  heavyMetalAnalysisWindow.on('closed', () => { heavyMetalAnalysisWindow = null; });
+
+  const heavyMetalAnalysisPath = path.join(__dirname, '..', 'docs', 'heavy-metal-analysis', 'index.html');
+
+  if (!app.isPackaged) {
+    const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3005';
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = http.get(VITE_DEV_SERVER_URL, { timeout: 1000 }, (res) => {
+          res.destroy();
+          resolve();
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      heavyMetalAnalysisWindow.loadURL(`${VITE_DEV_SERVER_URL}/heavy-metal-analysis/`);
+      return true;
+    } catch {
+      // 개발 서버 없으면 파일 로드로 폴백
+    }
+  }
+
+  if (fs.existsSync(heavyMetalAnalysisPath)) {
+    heavyMetalAnalysisWindow.loadFile(heavyMetalAnalysisPath);
+  } else {
+    dialog.showErrorBox('오류', '토양 중금속 분석결과 페이지를 찾을 수 없습니다. 먼저 빌드를 실행해 주세요.');
+    heavyMetalAnalysisWindow.close();
+    return false;
+  }
+  return true;
+});
+
+// ========================================
 // Firebase Auth File IPC Handlers
 // ========================================
 

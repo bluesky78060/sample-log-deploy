@@ -69,6 +69,25 @@ declare global {
     }
 }
 
+// Heavy metal analysis types
+interface HeavyMetalField {
+    key: string;
+    label: string;
+    unit: string;
+    standard1: number;
+    standard2: number;
+    standard3: number;
+}
+
+interface HeavyMetalTestResult {
+    id: string;
+    testDate?: string;
+    judgment?: string;
+    updatedAt?: string;
+    _resultKey?: string;
+    [key: string]: string | undefined;
+}
+
 // Helper function for type-safe element access
 function getInput(id: string): HTMLInputElement | null {
     return document.getElementById(id) as HTMLInputElement | null;
@@ -92,6 +111,26 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
     currentRegistrationData: HeavyMetalSample | null;
     pendingMailDateIndices: string[];
     GYEONGBUK_REGION_NAMES: string[];
+    _hmLogId: string | null;
+    _hmRegion: number;
+    _cachedHeavyMetalResults: Record<string, HeavyMetalTestResult> | null;
+
+    /**
+     * 분석 항목 정의 (토양오염우려기준, mg/kg)
+     * 1지역: 전/답/과수원
+     * 2지역: 임야/학교/공원/주거
+     * 3지역: 공장/도로 등
+     */
+    static HEAVY_METAL_FIELDS: HeavyMetalField[] = [
+        { key: 'cadmium', label: '카드뮴(Cd)', unit: 'mg/kg', standard1: 4, standard2: 10, standard3: 60 },
+        { key: 'copper', label: '구리(Cu)', unit: 'mg/kg', standard1: 150, standard2: 500, standard3: 2000 },
+        { key: 'arsenic', label: '비소(As)', unit: 'mg/kg', standard1: 25, standard2: 50, standard3: 200 },
+        { key: 'mercury', label: '수은(Hg)', unit: 'mg/kg', standard1: 4, standard2: 10, standard3: 20 },
+        { key: 'lead', label: '납(Pb)', unit: 'mg/kg', standard1: 200, standard2: 400, standard3: 700 },
+        { key: 'chromium6', label: '6가크롬(Cr6+)', unit: 'mg/kg', standard1: 5, standard2: 15, standard3: 40 },
+        { key: 'zinc', label: '아연(Zn)', unit: 'mg/kg', standard1: 300, standard2: 600, standard3: 2000 },
+        { key: 'nickel', label: '니켈(Ni)', unit: 'mg/kg', standard1: 100, standard2: 200, standard3: 500 },
+    ];
     declare sampleLogs: HeavyMetalSample[];
     declare form: HTMLFormElement | null;
     declare tableBody: HTMLTableSectionElement | null;
@@ -117,6 +156,9 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
         // currentSearchFilter는 BaseSampleManager에서 초기화
         this.currentRegistrationData = null;
         this.pendingMailDateIndices = [];
+        this._hmLogId = null;
+        this._hmRegion = 1;
+        this._cachedHeavyMetalResults = null;
 
         // 경상북도 지역명
         this.GYEONGBUK_REGION_NAMES = [
@@ -293,7 +335,24 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
         tdMailDate.textContent = item.mailDate || '-';
         tr.appendChild(tdMailDate);
 
-        // 19. Action buttons
+        // 19. Analysis result button
+        const tdAnalysis = document.createElement('td');
+        tdAnalysis.className = 'col-analysis';
+        const btnAnalysis = document.createElement('button');
+        btnAnalysis.className = 'btn-analysis-open';
+        btnAnalysis.dataset.id = item.id;
+        btnAnalysis.title = '분석결과 입력/수정';
+        const existingResult = this.loadHeavyMetalTestResult(item.id);
+        if (existingResult && Object.keys(existingResult).some(k => !['id', 'testDate', 'judgment', 'updatedAt', '_resultKey'].includes(k) && existingResult[k])) {
+            btnAnalysis.classList.add('has-result');
+            btnAnalysis.textContent = '결과확인';
+        } else {
+            btnAnalysis.textContent = '결과입력';
+        }
+        tdAnalysis.appendChild(btnAnalysis);
+        tr.appendChild(tdAnalysis);
+
+        // 20. Action buttons
         const tdActions = document.createElement('td');
         const actionDiv = document.createElement('div');
         actionDiv.className = 'action-btns';
@@ -596,6 +655,12 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
                 return;
             }
 
+            // 분석결과 버튼
+            if (target.closest('.btn-analysis-open')) {
+                this.openHeavyMetalAnalysisModal(id);
+                return;
+            }
+
             // 수정 버튼
             if (target.closest('.btn-edit')) {
                 this.editSample(id);
@@ -760,10 +825,11 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
         this.renderBarChart('statsByAnalysisItem', byAnalysisItem);
 
         // 목적별 통계
-        const byPurpose: Record<string, number> = {};
+        const byPurpose: Record<string, number> = { '일반재배': 0, '무농약': 0, '유기농': 0, 'GAP': 0, '저탄소': 0 };
         this.sampleLogs.forEach(log => {
-            const p = log.purpose || '미지정';
-            byPurpose[p] = (byPurpose[p] || 0) + 1;
+            const p = log.purpose || '기타';
+            if (!(p in byPurpose)) byPurpose[p] = 0;
+            byPurpose[p]++;
         });
         this.renderBarChart('statsByPurpose', byPurpose);
 
@@ -814,10 +880,13 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
         this.renderQuarterlySummary('statsQuarterly', byQuarter);
 
         // 수령방법별 통계
-        const byMethod: Record<string, number> = {};
+        const byMethod: Record<string, number> = { '직접방문': 0, '우편': 0, '이메일': 0, '팩스': 0 };
         this.sampleLogs.forEach(log => {
-            const m = log.receptionMethod || '미지정';
-            byMethod[m] = (byMethod[m] || 0) + 1;
+            const raw = log.receptionMethod;
+            const m = (raw && raw.trim() && raw !== '-') ? raw : '기타';
+            if (m === '기타') return;
+            if (!(m in byMethod)) byMethod[m] = 0;
+            byMethod[m]++;
         });
         this.renderBarChart('statsByReceptionMethod', byMethod);
     }
@@ -828,12 +897,6 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
 
         const entries = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0]));
         const maxCount = Math.max(...entries.map(([, v]) => (v as any).count), 1);
-        const totalCount = entries.reduce((sum, [, v]) => sum + (v as any).count, 0);
-
-        if (totalCount === 0) {
-            container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
-            return;
-        }
 
         container.innerHTML = sanitizeHTML(`
             <div class="monthly-chart">
@@ -845,9 +908,9 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
                         return `
                             <div class="monthly-bar-group">
                                 <div class="monthly-bar-container">
-                                    <div class="monthly-bar-stack" style="height: ${heightPercent}%">
-                                        <div class="monthly-bar-completed" style="height: ${completedPercent}%" title="완료: ${val.completed}건"></div>
-                                        <div class="monthly-bar-pending" style="height: ${100 - completedPercent}%" title="미완료: ${val.pending}건"></div>
+                                    <div class="monthly-bar-stack" data-h="${heightPercent.toFixed(1)}">
+                                        <div class="monthly-bar-completed" data-h="${completedPercent.toFixed(1)}" title="완료: ${val.completed}건"></div>
+                                        <div class="monthly-bar-pending" data-h="${(100 - completedPercent).toFixed(1)}" title="미완료: ${val.pending}건"></div>
                                     </div>
                                     ${val.count > 0 ? `<span class="monthly-bar-value">${val.count}</span>` : ''}
                                 </div>
@@ -862,6 +925,9 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
                 </div>
             </div>
         `);
+        container.querySelectorAll('.monthly-bar-stack[data-h]').forEach(el => { (el as HTMLElement).style.height = el.getAttribute('data-h') + '%'; });
+        container.querySelectorAll('.monthly-bar-completed[data-h]').forEach(el => { (el as HTMLElement).style.height = el.getAttribute('data-h') + '%'; });
+        container.querySelectorAll('.monthly-bar-pending[data-h]').forEach(el => { (el as HTMLElement).style.height = el.getAttribute('data-h') + '%'; });
     }
 
     renderQuarterlySummary(containerId: string, byQuarter: any): void {
@@ -870,11 +936,6 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
 
         const entries = Object.entries(byQuarter).sort((a, b) => a[0].localeCompare(b[0]));
         const totalCount = entries.reduce((sum, [, v]) => sum + (v as any).count, 0);
-
-        if (totalCount === 0) {
-            container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
-            return;
-        }
 
         container.innerHTML = sanitizeHTML(`
             <div class="quarterly-summary">
@@ -918,16 +979,18 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
 
         container.innerHTML = sanitizeHTML(entries.map(([label, value]) => {
             const barClass = analysisClassMap[label] || purposeClassMap[label] || methodClassMap[label] || '';
+            const widthPct = ((Number(value) / maxVal) * 100).toFixed(1);
             return `
-                <div class="stat-bar-row">
+                <div class="stat-bar-item">
                     <span class="stat-bar-label">${label}</span>
-                    <div class="stat-bar-track">
-                        <div class="stat-bar-fill ${barClass}" style="width: ${(Number(value) / maxVal) * 100}%"></div>
+                    <div class="stat-bar-wrapper">
+                        <div class="stat-bar-fill ${barClass}" data-w="${widthPct}"></div>
                     </div>
                     <span class="stat-bar-value">${value}</span>
                 </div>
             `;
         }).join(''));
+        container.querySelectorAll('.stat-bar-fill[data-w]').forEach(el => { (el as HTMLElement).style.width = el.getAttribute('data-w') + '%'; });
     }
 
     // ========================================
@@ -1942,6 +2005,349 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
             }
         });
         excelImporter.init();
+
+        // 분석결과 모달 초기화
+        this.initHeavyMetalAnalysisModal();
+        // Firestore 동기화
+        this.syncHeavyMetalTestResultsFromFirestore();
+
+        // 분석결과 조회 버튼
+        const heavyMetalAnalysisViewBtn = document.getElementById('heavyMetalAnalysisViewBtn');
+        if (heavyMetalAnalysisViewBtn) heavyMetalAnalysisViewBtn.addEventListener('click', () => {
+            localStorage.setItem('heavyMetalAnalysis_year', this.selectedYear);
+            const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => (cb as HTMLInputElement).dataset.id).filter(Boolean);
+            localStorage.setItem('heavyMetalAnalysis_selected_ids', JSON.stringify(selectedIds));
+
+            const isElectron = (window as any).electronAPI?.isElectron === true;
+            if (isElectron) {
+                (window as any).electronAPI.openHeavyMetalAnalysis();
+            } else {
+                const popup = window.open('../heavy-metal-analysis/index.html', '_blank');
+                if (!popup) window.location.href = '../heavy-metal-analysis/index.html';
+            }
+        });
+    }
+
+    // ========================================
+    // 토양 중금속 분석결과 모달
+    // ========================================
+
+    /**
+     * 용도(목적)에 따라 적용할 기준 지역 결정
+     * 1지역: 전, 답, 과수원, 일반재배, 무농약, 유기농, GAP, 저탄소
+     * 기본값: 1지역
+     */
+    getStandardRegion(_purpose: string): number {
+        return 1;
+    }
+
+    getStandardValue(field: HeavyMetalField, region: number): number {
+        if (region === 3) return field.standard3;
+        if (region === 2) return field.standard2;
+        return field.standard1;
+    }
+
+    getStandardLabel(field: HeavyMetalField, region: number): string {
+        const val = this.getStandardValue(field, region);
+        return `${val.toLocaleString()} 이하`;
+    }
+
+    initHeavyMetalAnalysisModal(): void {
+        const modal = document.getElementById('heavyMetalAnalysisModal');
+        if (!modal) return;
+
+        const closeModal = (): void => { modal.classList.add('hidden'); this._hmLogId = null; };
+        document.getElementById('closeHeavyMetalAnalysisModal')?.addEventListener('click', closeModal);
+        document.getElementById('cancelHeavyMetalAnalysisBtn')?.addEventListener('click', closeModal);
+        modal.querySelector('.modal-overlay')?.addEventListener('click', closeModal);
+        modal.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); });
+
+        document.getElementById('saveHeavyMetalAnalysisBtn')?.addEventListener('click', () => this.saveHeavyMetalAnalysis());
+    }
+
+    openHeavyMetalAnalysisModal(logId: string): void {
+        const log = this.sampleLogs.find(l => String(l.id) === String(logId));
+        if (!log) return;
+
+        const modal = document.getElementById('heavyMetalAnalysisModal');
+        if (!modal) return;
+
+        this._hmLogId = logId;
+
+        // 시료 정보
+        const hmReceptionNumber = document.getElementById('hmReceptionNumber');
+        const hmDate = document.getElementById('hmDate');
+        const hmName = document.getElementById('hmName');
+        const hmLocation = document.getElementById('hmLocation');
+        const hmPurpose = document.getElementById('hmPurpose');
+        if (hmReceptionNumber) hmReceptionNumber.textContent = log.receptionNumber || '-';
+        if (hmDate) hmDate.textContent = log.date || '-';
+        if (hmName) hmName.textContent = log.name || '-';
+        if (hmLocation) hmLocation.textContent = log.samplingLocation || '-';
+        if (hmPurpose) hmPurpose.textContent = log.purpose || '-';
+
+        // 용도 기반 기준지역 결정
+        const region = this.getStandardRegion(log.purpose);
+        this._hmRegion = region;
+
+        const fields = HeavyMetalSampleManager.HEAVY_METAL_FIELDS;
+        this.renderHeavyMetalFields(fields, region);
+
+        // 기존 결과 로드
+        const existing = this.loadHeavyMetalTestResult(logId);
+        if (existing) {
+            const hmTestDate = document.getElementById('hmTestDate') as HTMLInputElement | null;
+            if (hmTestDate) hmTestDate.value = existing.testDate || '';
+            for (const field of fields) {
+                const input = document.getElementById(`hm_${field.key}`) as HTMLInputElement | null;
+                if (input) input.value = existing[field.key] || '';
+                // 상태 업데이트
+                const statusEl = document.getElementById(`hm_status_${field.key}`);
+                if (input && statusEl) this.checkHeavyMetalFieldStatus(field, input.value, statusEl, region);
+            }
+            const judgment = existing.judgment || '';
+            if (['', 'pass', 'fail'].includes(judgment)) {
+                const radio = document.querySelector(`input[name="hmJudgment"][value="${judgment}"]`) as HTMLInputElement | null;
+                if (radio) radio.checked = true;
+            }
+        } else {
+            const hmTestDate = document.getElementById('hmTestDate') as HTMLInputElement | null;
+            if (hmTestDate) hmTestDate.value = '';
+            for (const field of fields) {
+                const input = document.getElementById(`hm_${field.key}`) as HTMLInputElement | null;
+                if (input) input.value = '';
+            }
+            const defaultRadio = document.querySelector('input[name="hmJudgment"][value=""]') as HTMLInputElement | null;
+            if (defaultRadio) defaultRadio.checked = true;
+        }
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            const firstInput = modal.querySelector('.hm-result-input') as HTMLInputElement | null;
+            if (firstInput) firstInput.focus();
+        }, 100);
+    }
+
+    renderHeavyMetalFields(fields: HeavyMetalField[], region: number): void {
+        const tbody = document.getElementById('hmFieldsBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        fields.forEach(field => {
+            const tr = document.createElement('tr');
+
+            const tdName = document.createElement('td');
+            tdName.className = 'hm-col-name';
+            tdName.textContent = field.label;
+            tr.appendChild(tdName);
+
+            const tdUnit = document.createElement('td');
+            tdUnit.className = 'hm-col-unit';
+            tdUnit.textContent = field.unit || '-';
+            tr.appendChild(tdUnit);
+
+            // 기준값 (지역별)
+            const tdStandard = document.createElement('td');
+            tdStandard.className = 'hm-col-standard';
+            tdStandard.textContent = this.getStandardLabel(field, region);
+            tr.appendChild(tdStandard);
+
+            const tdValue = document.createElement('td');
+            tdValue.className = 'hm-col-value';
+
+            const tdStatus = document.createElement('td');
+            tdStatus.className = 'hm-col-status';
+            tdStatus.id = `hm_status_${field.key}`;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'hm-result-input';
+            input.id = `hm_${field.key}`;
+            input.placeholder = field.unit || '-';
+            input.autocomplete = 'off';
+            input.addEventListener('input', () => {
+                this.checkHeavyMetalFieldStatus(field, input.value, tdStatus, region);
+            });
+            input.addEventListener('keydown', (e: KeyboardEvent) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const nextRow = tr.nextElementSibling;
+                    if (nextRow) {
+                        const nextInput = nextRow.querySelector('.hm-result-input') as HTMLInputElement | null;
+                        if (nextInput) nextInput.focus();
+                    }
+                }
+            });
+            tdValue.appendChild(input);
+
+            tr.appendChild(tdValue);
+            tr.appendChild(tdStatus);
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    checkHeavyMetalFieldStatus(field: HeavyMetalField, value: string, statusEl: HTMLElement | null, region: number): void {
+        if (!value || !statusEl) {
+            if (statusEl) statusEl.textContent = '';
+            return;
+        }
+
+        const num = parseFloat(value.replace(/,/g, ''));
+        if (isNaN(num)) { if (statusEl) statusEl.textContent = ''; return; }
+
+        const standardVal = this.getStandardValue(field, region);
+        const isOk = num <= standardVal;
+
+        statusEl.textContent = '';
+        const span = document.createElement('span');
+        span.style.color = isOk ? '#16a34a' : '#dc2626';
+        span.textContent = isOk ? '\u2713' : '\u2715';
+        statusEl.appendChild(span);
+    }
+
+    autoJudgeHeavyMetal(result: HeavyMetalTestResult, region: number): string {
+        const fields = HeavyMetalSampleManager.HEAVY_METAL_FIELDS;
+        for (const field of fields) {
+            const val = result[field.key];
+            if (val) {
+                const num = parseFloat(String(val).replace(/,/g, ''));
+                if (!isNaN(num) && num > this.getStandardValue(field, region)) {
+                    return 'fail';
+                }
+            }
+        }
+        return 'pass';
+    }
+
+    saveHeavyMetalAnalysis(): void {
+        const logId = this._hmLogId;
+        if (!logId) return;
+
+        const log = this.sampleLogs.find(l => String(l.id) === String(logId));
+        if (!log) return;
+
+        const fields = HeavyMetalSampleManager.HEAVY_METAL_FIELDS;
+        const allResults = this.loadAllHeavyMetalTestResults();
+        const region = this._hmRegion || 1;
+
+        const result: HeavyMetalTestResult = {
+            id: logId,
+            testDate: (document.getElementById('hmTestDate') as HTMLInputElement)?.value || '',
+            judgment: (document.querySelector('input[name="hmJudgment"]:checked') as HTMLInputElement)?.value || '',
+            updatedAt: new Date().toISOString()
+        };
+
+        for (const field of fields) {
+            const input = document.getElementById(`hm_${field.key}`) as HTMLInputElement | null;
+            if (input) result[field.key] = input.value.trim();
+        }
+
+        // 자동 판정: 모든 항목이 기준 이내이면 적합, 하나라도 초과면 부적합
+        const autoJudgment = this.autoJudgeHeavyMetal(result, region);
+        if (!result.judgment) result.judgment = autoJudgment;
+
+        allResults[logId] = result;
+        this.saveAllHeavyMetalTestResults(allResults);
+
+        // 접수 데이터에 판정 동기화
+        log.testResult = (result.judgment || '') as 'pass' | 'fail' | '';
+        this.saveLogs();
+
+        document.getElementById('heavyMetalAnalysisModal')?.classList.add('hidden');
+        this._hmLogId = null;
+        this.filterAndRenderLogs();
+        this.showToast('분석결과가 저장되었습니다.', 'success');
+    }
+
+    // === 분석결과 데이터 저장/로드 ===
+
+    loadHeavyMetalTestResult(logId: string): HeavyMetalTestResult | null {
+        if (!this._cachedHeavyMetalResults) {
+            this._cachedHeavyMetalResults = this.loadAllHeavyMetalTestResults();
+        }
+        return this._cachedHeavyMetalResults[logId] || null;
+    }
+
+    loadAllHeavyMetalTestResults(): Record<string, HeavyMetalTestResult> {
+        const key = `heavyMetalTestResults_${this.selectedYear}`;
+        try {
+            const data = localStorage.getItem(key);
+            if (!data) return {};
+            return JSON.parse(data) || {};
+        } catch (e) {
+            (window.logger?.error || console.error)('중금속 검사 결과 로드 실패:', e);
+            return {};
+        }
+    }
+
+    saveAllHeavyMetalTestResults(results: Record<string, HeavyMetalTestResult>): void {
+        const key = `heavyMetalTestResults_${this.selectedYear}`;
+        try {
+            localStorage.setItem(key, JSON.stringify(results));
+            this._cachedHeavyMetalResults = results;
+            this.syncHeavyMetalTestResultsToFirestore(results);
+        } catch (e) {
+            (window.logger?.error || console.error)('중금속 검사 결과 저장 실패:', e);
+        }
+    }
+
+    async syncHeavyMetalTestResultsToFirestore(results: Record<string, HeavyMetalTestResult>): Promise<void> {
+        if (!(window as any).firestoreDb?.isEnabled()) return;
+        try {
+            const year = parseInt(this.selectedYear);
+            const entries = Object.entries(results);
+            if (entries.length === 0) return;
+            const documents = entries.map(([docKey, data]) => ({ ...data, id: docKey, _resultKey: docKey }));
+            await (window as any).firestoreDb.batchSave('heavyMetalTestResults', year, documents);
+        } catch (e) {
+            (window.logger?.error || console.error)('중금속 Firestore 동기화 실패:', e);
+        }
+    }
+
+    async syncHeavyMetalTestResultsFromFirestore(): Promise<void> {
+        if (!(window as any).firestoreDb?.isEnabled()) return;
+        try {
+            const year = parseInt(this.selectedYear);
+            const cloudData = await (window as any).firestoreDb.getAll('heavyMetalTestResults', year);
+            if (!cloudData || cloudData.length === 0) return;
+
+            const cloudMap: Record<string, HeavyMetalTestResult> = {};
+            for (const doc of cloudData) {
+                const key = doc._resultKey || doc.id;
+                if (key) {
+                    const { _resultKey, syncedAt, ...rest } = doc;
+                    cloudMap[key] = rest;
+                }
+            }
+
+            const localResults = this.loadAllHeavyMetalTestResults();
+            const merged: Record<string, HeavyMetalTestResult> = { ...localResults };
+            for (const [key, cloudVal] of Object.entries(cloudMap)) {
+                const localVal = merged[key];
+                if (!localVal || !localVal.updatedAt || new Date(cloudVal.updatedAt || '') >= new Date(localVal.updatedAt)) {
+                    merged[key] = cloudVal;
+                }
+            }
+
+            const lsKey = `heavyMetalTestResults_${this.selectedYear}`;
+            localStorage.setItem(lsKey, JSON.stringify(merged));
+            this._cachedHeavyMetalResults = merged;
+
+            // 접수 데이터 판정 동기화
+            let syncCount = 0;
+            for (const [resultId, resultData] of Object.entries(merged)) {
+                const log = this.sampleLogs.find(l => String(l.id) === String(resultId));
+                if (log) {
+                    if (resultData.judgment) log.testResult = resultData.judgment as 'pass' | 'fail' | '';
+                    syncCount++;
+                }
+            }
+            if (syncCount > 0) this.saveLogs();
+            this.filterAndRenderLogs();
+        } catch (e) {
+            (window.logger?.error || console.error)('중금속 Firestore 로드 실패:', e);
+        }
     }
 }
 

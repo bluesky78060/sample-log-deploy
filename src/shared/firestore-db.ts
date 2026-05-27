@@ -114,7 +114,9 @@ const COLLECTION_MAP: Record<string, string> = {
     'heavy-metal': 'heavyMetalSamples',
     'pesticide': 'pesticideSamples',
     'waterTestResults': 'waterTestResults',
-    'pesticideTestResults': 'pesticideTestResults'
+    'pesticideTestResults': 'pesticideTestResults',
+    'compostTestResults': 'compostTestResults',
+    'heavyMetalTestResults': 'heavyMetalTestResults'
 };
 
 /**

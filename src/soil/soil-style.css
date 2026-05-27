@@ -1247,3 +1247,319 @@ tr.farm-separator:hover {
     from { opacity: 0; transform: scale(0.8); }
     to { opacity: 1; transform: scale(1); }
 }
+
+/* ========================================
+   토양 분석결과 입력 모달
+   ======================================== */
+
+.modal-soil-analysis {
+    width: 680px;
+    max-width: 96vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.soil-analysis-header {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.soil-analysis-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.soil-analysis-header .modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0.8;
+    line-height: 1;
+}
+.soil-analysis-header .modal-close:hover { opacity: 1; }
+
+.soil-analysis-body {
+    overflow-y: auto;
+    padding: 16px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 접수 정보 요약 */
+.soil-analysis-sample-info {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+[data-theme="dark"] .soil-analysis-sample-info {
+    background: rgba(22, 163, 74, 0.08);
+    border-color: rgba(22, 163, 74, 0.25);
+}
+.soil-analysis-sample-info .info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.soil-analysis-sample-info .info-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    white-space: nowrap;
+}
+.soil-analysis-sample-info .info-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+    margin-right: 10px;
+}
+[data-theme="dark"] .soil-analysis-sample-info .info-value { color: #e5e7eb; }
+
+/* 검사일자 */
+.soil-analysis-test-date-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+[data-theme="dark"] .soil-analysis-test-date-row { color: #d1d5db; }
+.soil-analysis-input {
+    padding: 5px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    color: #111827;
+}
+[data-theme="dark"] .soil-analysis-input {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+/* 분석 항목 테이블 */
+.soil-analysis-fields-wrapper {
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+[data-theme="dark"] .soil-analysis-fields-wrapper { border-color: #374151; }
+.soil-analysis-fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.soil-analysis-fields-table thead tr {
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+[data-theme="dark"] .soil-analysis-fields-table thead tr {
+    background: #1f2937;
+    border-bottom-color: #374151;
+}
+.soil-analysis-fields-table th {
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    white-space: nowrap;
+}
+.soil-analysis-fields-table td {
+    padding: 5px 8px;
+    text-align: center;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: middle;
+}
+[data-theme="dark"] .soil-analysis-fields-table td { border-bottom-color: #2d3748; }
+.soil-analysis-fields-table tbody tr:last-child td { border-bottom: none; }
+.soil-analysis-fields-table tbody tr:hover td { background: #f0fdf4; }
+[data-theme="dark"] .soil-analysis-fields-table tbody tr:hover td { background: rgba(22, 163, 74, 0.06); }
+
+/* 컬럼 너비 */
+.sa-col-no   { width: 36px; }
+.sa-col-name { width: 130px; text-align: left !important; }
+.sa-col-unit { width: 80px; }
+.sa-col-range{ width: 90px; font-size: 11px; color: #6b7280; }
+.sa-col-value{ width: 140px; }
+.sa-col-status { width: 50px; }
+
+/* 결과 입력 필드 */
+.sa-result-input {
+    width: 80px;
+    padding: 4px 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 13px;
+    text-align: center;
+    background: white;
+    color: #111827;
+    transition: border-color 0.15s;
+}
+.sa-result-input:focus {
+    outline: none;
+    border-color: #16a34a;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15);
+}
+[data-theme="dark"] .sa-result-input {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+.sa-result-input.out-of-range {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+[data-theme="dark"] .sa-result-input.out-of-range {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* 상태 아이콘 */
+.sa-status-ok   { color: #16a34a; font-size: 14px; font-weight: 700; }
+.sa-status-warn { color: #ef4444; font-size: 14px; font-weight: 700; }
+.sa-status-empty{ color: #9ca3af; font-size: 14px; }
+
+/* 판정 */
+.soil-analysis-judgment-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    padding-top: 4px;
+}
+[data-theme="dark"] .soil-analysis-judgment-row { color: #d1d5db; }
+.judgment-options {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.judgment-option {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+}
+.judgment-option input[type="radio"] { display: none; }
+.judgment-chip {
+    padding: 4px 14px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: white;
+    user-select: none;
+}
+.judgment-option input:checked + .judgment-chip {
+    border-color: #94a3b8;
+    background: #f1f5f9;
+    color: #334155;
+}
+.judgment-chip.chip-pass {
+    border-color: #bbf7d0;
+    color: #15803d;
+    background: #f0fdf4;
+}
+.judgment-option input:checked + .judgment-chip.chip-pass {
+    background: #16a34a;
+    border-color: #16a34a;
+    color: white;
+}
+.judgment-chip.chip-fail {
+    border-color: #fecaca;
+    color: #dc2626;
+    background: #fef2f2;
+}
+.judgment-option input:checked + .judgment-chip.chip-fail {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: white;
+}
+[data-theme="dark"] .judgment-chip {
+    background: #1f2937;
+    border-color: #374151;
+    color: #9ca3af;
+}
+
+/* 모달 푸터 */
+.soil-analysis-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+[data-theme="dark"] .soil-analysis-footer { border-top-color: #374151; }
+.btn-soil-analysis-save {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.btn-soil-analysis-save:hover { opacity: 0.88; }
+
+/* 분석결과 버튼 */
+.btn-analysis-result {
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    border: 1px solid #16a34a;
+    background: white;
+    color: #16a34a;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+}
+.btn-analysis-result:hover {
+    background: #16a34a;
+    color: white;
+}
+.btn-analysis-result.has-result {
+    background: #f0fdf4;
+    border-color: #86efac;
+    color: #15803d;
+}
+.btn-analysis-result.has-result:hover {
+    background: #16a34a;
+    color: white;
+}
+[data-theme="dark"] .btn-analysis-result {
+    background: transparent;
+    border-color: #22c55e;
+    color: #22c55e;
+}
+[data-theme="dark"] .btn-analysis-result:hover,
+[data-theme="dark"] .btn-analysis-result.has-result:hover {
+    background: #16a34a;
+    color: white;
+}

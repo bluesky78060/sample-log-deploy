@@ -90,6 +90,23 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     mailDateModal: HTMLElement | null;
     regionSelectionModal: HTMLElement | null;
 
+    // 토양 분석결과 모달 상태
+    private _soilAnalysisLogId: string | null = null;
+    private _cachedSoilTestResults: Record<string, Record<string, string>> | null = null;
+
+    // 토양 분석 항목 정의
+    static SOIL_ANALYSIS_FIELDS = [
+        { key: 'pH',            label: 'pH',              unit: '',            min: 3.5,  max: 9.5   },
+        { key: 'organicMatter', label: '유기물(OM)',       unit: 'g/kg',        min: 1,    max: 300   },
+        { key: 'availableP',    label: '유효인산',         unit: 'mg/kg',       min: 1,    max: 9999  },
+        { key: 'exK',           label: '교환성 칼륨',      unit: 'cmol⁺/kg',    min: 0.01, max: 15    },
+        { key: 'exCa',          label: '교환성 칼슘',      unit: 'cmol⁺/kg',    min: 0.1,  max: 35    },
+        { key: 'exMg',          label: '교환성 마그네슘',  unit: 'cmol⁺/kg',    min: 0.1,  max: 25    },
+        { key: 'silica',        label: '유효규산',         unit: 'mg/kg',       min: 5,    max: 2000  },
+        { key: 'ec',            label: '전기전도도(EC)',    unit: 'dS/m',        min: 0.01, max: 30    },
+        { key: 'limeReq',       label: '석회소요량',       unit: 'kg/10a',      min: 0,    max: 99999 },
+    ];
+
     constructor() {
         super({
             moduleKey: 'soil',
@@ -337,7 +354,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     updateRecordCount() {
         if (this.recordCountEl) {
-            this.recordCountEl.textContent = `${this.sampleLogs.length}건`;
+            const total = this.sampleLogs.length;
+            const incomplete = this.sampleLogs.filter(log => !log.isComplete).length;
+            this.recordCountEl.textContent = incomplete > 0
+                ? `${total}건 (미완료 ${incomplete}건)`
+                : `${total}건`;
         }
     }
 
@@ -2345,7 +2366,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const completed = this.sampleLogs.filter(log => log.isComplete).length;
         const pending = total - completed;
 
-        const bySubCategory = {};
         const categoryMapping = {
             '논': { label: '🌾 논', class: 'category-rice' },
             '밭': { label: '🥬 밭', class: 'category-field' },
@@ -2355,16 +2375,19 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             '성토': { label: '🏗️ 성토', class: 'category-fill' },
             '기타': { label: '📦 기타', class: 'category-other' }
         };
+        const bySubCategory: Record<string, any> = {};
+        ['논', '밭', '과수', '시설', '임야', '성토'].forEach(key => {
+            bySubCategory[key] = { count: 0, ...categoryMapping[key] };
+        });
 
         this.sampleLogs.forEach(log => {
             const category = log.subCategory || '기타';
             if (!bySubCategory[category]) {
-                bySubCategory[category] = { count: 0, ...categoryMapping[category] || categoryMapping['기타'] };
+                bySubCategory[category] = { count: 0, ...categoryMapping['기타'] };
             }
             bySubCategory[category].count++;
         });
 
-        const byPurpose = {};
         const purposeMapping = {
             '일반재배': { label: '🌾 일반재배', class: 'purpose-general' },
             '유기': { label: '♻️ 유기', class: 'purpose-organic' },
@@ -2372,6 +2395,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             'GAP': { label: '✅ GAP', class: 'purpose-gap' },
             '저탄소': { label: '🌱 저탄소', class: 'purpose-lowcarbon' }
         };
+        const byPurpose: Record<string, any> = {};
+        Object.entries(purposeMapping).forEach(([key, val]) => {
+            byPurpose[key] = { count: 0, ...val };
+        });
 
         this.sampleLogs.forEach(log => {
             const purpose = log.purpose || '기타';
@@ -2415,17 +2442,23 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             byQuarter[quarter].pending += data.pending;
         });
 
-        const byReceptionMethod = {};
         const methodMapping = {
             '우편': { label: '📮 우편', class: 'method-mail' },
             '이메일': { label: '📧 이메일', class: 'method-email' },
             '팩스': { label: '📠 팩스', class: 'method-fax' },
-            '직접방문': { label: '🚶 직접방문', class: 'method-visit' }
+            '직접방문': { label: '🚶 직접방문', class: 'method-visit' },
+            '기타': { label: '📦 기타', class: 'method-other' }
         };
+        const byReceptionMethod: Record<string, any> = {};
+        ['우편', '이메일', '팩스', '직접방문'].forEach(key => {
+            byReceptionMethod[key] = { count: 0, ...methodMapping[key] };
+        });
         this.sampleLogs.forEach(log => {
-            const method = log.receptionMethod || '기타';
+            const raw = log.receptionMethod;
+            const method = (raw && raw.trim() && raw !== '-') ? raw : '기타';
+            if (method === '기타') return;
             if (!byReceptionMethod[method]) {
-                byReceptionMethod[method] = { count: 0, ...methodMapping[method] || { label: method, class: 'method-mail' } };
+                byReceptionMethod[method] = { count: 0, ...(methodMapping[method] || { label: method, class: 'method-other' }) };
             }
             byReceptionMethod[method].count++;
         });
@@ -2436,40 +2469,100 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     openStatisticsModal() {
         if (!this.statisticsModal) return;
         const stats = this.calculateStatistics();
-        document.getElementById('statTotalCount').textContent = stats.total;
-        document.getElementById('statCompletedCount').textContent = stats.completed;
-        document.getElementById('statPendingCount').textContent = stats.pending;
-        this.renderBarChart('statsByCategory', stats.bySubCategory, 'category');
+
+        document.getElementById('statTotalCount').textContent = String(stats.total);
+        document.getElementById('statCompletedCount').textContent = String(stats.completed);
+        document.getElementById('statPendingCount').textContent = String(stats.pending);
+
+        const totalBadge = document.getElementById('statTotalBadge');
+        if (totalBadge) totalBadge.textContent = `${stats.total}건`;
+
+        const completedRate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+        const pendingRate = stats.total > 0 ? (stats.pending / stats.total) * 100 : 0;
+        const completedRateEl = document.getElementById('statCompletedRate');
+        if (completedRateEl) completedRateEl.textContent = `${completedRate.toFixed(1)}%`;
+        const pendingRateEl = document.getElementById('statPendingRate');
+        if (pendingRateEl) pendingRateEl.textContent = `${pendingRate.toFixed(1)}%`;
+
+        const currentYear = new Date().getFullYear();
+        const monthRangeEl = document.getElementById('statsMonthRange');
+        if (monthRangeEl) monthRangeEl.textContent = `${currentYear}년 1월 ~ 12월`;
+
+        this.renderVerticalBarChart('statsByCategory', stats.bySubCategory);
         this.renderBarChart('statsByPurpose', stats.byPurpose, 'purpose');
         this.renderMonthlyChart('statsByMonth', stats.byMonth);
         this.renderQuarterlySummary('statsQuarterly', stats.byQuarter);
-        this.renderBarChart('statsByReceptionMethod', stats.byReceptionMethod, 'method');
+        this.renderMethodCards('statsByReceptionMethod', stats.byReceptionMethod);
         this.statisticsModal.classList.remove('hidden');
+    }
+
+    renderVerticalBarChart(containerId, data) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const entries = Object.entries(data)
+            .sort((a: any, b: any) => b[1].count - a[1].count);
+        if (entries.length === 0) {
+            container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
+            return;
+        }
+        const maxCount = Math.max(...entries.map(([, v]: [string, any]) => v.count));
+        const CHART_H = 130;
+        container.innerHTML = sanitizeHTML(`
+            <div class="vertical-bars">
+                ${entries.map(([, value]: [string, any]) => {
+                    const heightPx = maxCount > 0 ? Math.max(Math.round((value.count / maxCount) * CHART_H), 4) : 4;
+                    return `
+                        <div class="vertical-bar-group">
+                            <div class="vertical-bar-container">
+                                <div class="vertical-bar ${value.class}" data-h="${heightPx}"></div>
+                            </div>
+                            <span class="vertical-bar-label">${value.label}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `);
+        container.querySelectorAll('.vertical-bar[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + 'px';
+        });
+    }
+
+    renderMethodCards(containerId, data) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const entries = Object.entries(data).sort((a: any, b: any) => b[1].count - a[1].count);
+        container.innerHTML = sanitizeHTML(entries.map(([, value]: [string, any]) => `
+            <div class="method-card">
+                <span class="method-card-name">${value.label}</span>
+                <span class="method-card-count">${value.count}</span>
+            </div>
+        `).join(''));
     }
 
     renderBarChart(containerId, data, prefix) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        const entries = Object.entries(data).sort((a, b) => b[1].count - a[1].count);
+        const entries = Object.entries(data).sort((a: any, b: any) => b[1].count - a[1].count);
         if (entries.length === 0) {
             container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
             return;
         }
-        const maxCount = Math.max(...entries.map(([, v]) => v.count));
-        container.innerHTML = sanitizeHTML(entries.map(([key, value]) => {
-            const percent = maxCount > 0 ? (value.count / maxCount) * 100 : 0;
-            const showInside = percent > 20;
+        const maxCount = Math.max(...entries.map(([, v]: [string, any]) => v.count), 1);
+        container.innerHTML = sanitizeHTML(entries.map(([, value]: [string, any]) => {
+            const barPercent = maxCount > 0 ? (value.count / maxCount) * 100 : 0;
             return `
                 <div class="stat-bar-item">
                     <span class="stat-bar-label">${value.label}</span>
                     <div class="stat-bar-wrapper">
-                        <div class="stat-bar ${value.class}" style="width: ${percent}%"></div>
-                        ${showInside ? `<span class="stat-bar-count">${value.count}건</span>` : ''}
+                        <div class="stat-bar ${value.class}" data-w="${barPercent.toFixed(1)}"></div>
                     </div>
-                    ${!showInside ? `<span style="font-size: 0.75rem; color: #6b7280; min-width: 40px;">${value.count}건</span>` : ''}
+                    <span class="stat-bar-value-right">${value.count}</span>
                 </div>
             `;
         }).join(''));
+        container.querySelectorAll('.stat-bar[data-w]').forEach(el => {
+            (el as HTMLElement).style.width = el.getAttribute('data-w') + '%';
+        });
     }
 
     renderMonthlyChart(containerId, data) {
@@ -2477,11 +2570,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         if (!container) return;
         const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
         const maxCount = Math.max(...entries.map(([, v]) => v.count), 1);
-        const totalCount = entries.reduce((sum, [, v]) => sum + v.count, 0);
-        if (totalCount === 0) {
-            container.innerHTML = sanitizeHTML('<div class="stats-empty">데이터가 없습니다</div>');
-            return;
-        }
         container.innerHTML = sanitizeHTML(`
             <div class="monthly-chart">
                 <div class="monthly-bars">
@@ -2491,9 +2579,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                         return `
                             <div class="monthly-bar-group">
                                 <div class="monthly-bar-container">
-                                    <div class="monthly-bar-stack" style="height: ${heightPercent}%">
-                                        <div class="monthly-bar-completed" style="height: ${completedPercent}%" title="완료: ${value.completed}건"></div>
-                                        <div class="monthly-bar-pending" style="height: ${100 - completedPercent}%" title="미완료: ${value.pending}건"></div>
+                                    <div class="monthly-bar-stack" data-h="${heightPercent.toFixed(1)}">
+                                        <div class="monthly-bar-completed" data-h="${completedPercent.toFixed(1)}" title="완료: ${value.completed}건"></div>
+                                        <div class="monthly-bar-pending" data-h="${(100 - completedPercent).toFixed(1)}" title="미완료: ${value.pending}건"></div>
                                     </div>
                                     ${value.count > 0 ? `<span class="monthly-bar-value">${value.count}</span>` : ''}
                                 </div>
@@ -2508,6 +2596,15 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 </div>
             </div>
         `);
+        container.querySelectorAll('.monthly-bar-stack[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + '%';
+        });
+        container.querySelectorAll('.monthly-bar-completed[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + '%';
+        });
+        container.querySelectorAll('.monthly-bar-pending[data-h]').forEach(el => {
+            (el as HTMLElement).style.height = el.getAttribute('data-h') + '%';
+        });
     }
 
     renderQuarterlySummary(containerId, data) {
@@ -2528,7 +2625,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                             </div>
                             <div class="quarterly-completion">
                                 <div class="completion-bar">
-                                    <div class="completion-fill" style="width: ${completionRate}%"></div>
+                                    <div class="completion-fill" data-w="${completionRate}"></div>
                                 </div>
                                 <span class="completion-text">완료율 ${completionRate}%</span>
                             </div>
@@ -2537,6 +2634,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 }).join('')}
             </div>
         `);
+        container.querySelectorAll('.completion-fill[data-w]').forEach(el => {
+            (el as HTMLElement).style.width = el.getAttribute('data-w') + '%';
+        });
     }
 
     // ========================================
@@ -2592,14 +2692,14 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         return Array.from(checkedBoxes).map(cb => cb.dataset.id);
     }
 
-    selectByName(name) {
+    selectByName(farmerKey) {
         const rowCheckboxes = this.tableBody.querySelectorAll('.row-checkbox');
         const targetCheckboxes = [];
 
         rowCheckboxes.forEach(cb => {
             const tr = cb.closest('tr');
             const nameCell = tr?.querySelector('.col-name');
-            if (nameCell && nameCell.dataset.name === name) {
+            if (nameCell && nameCell.dataset.farmerKey === farmerKey) {
                 targetCheckboxes.push(cb);
             }
         });
@@ -3037,12 +3137,13 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             tdPurpose.textContent = row._parcelPurpose || row.purpose || '-';
             tr.appendChild(tdPurpose);
 
-            // 성명 (클릭 시 같은 이름 일괄 선택)
+            // 성명 (클릭 시 같은 이름+전화번호 일괄 선택 — 동명이인 구분)
             const tdName = document.createElement('td');
             tdName.className = 'col-name';
             tdName.dataset.name = row.name;
+            tdName.dataset.farmerKey = `${row.name}|${row.phoneNumber || ''}`;
             tdName.textContent = row.name;
-            tdName.title = `"${row.name}" 클릭하면 같은 이름 일괄 선택`;
+            tdName.title = `"${row.name}" 클릭하면 같은 이름+전화번호 일괄 선택`;
             tr.appendChild(tdName);
 
             // 우편번호
@@ -3122,8 +3223,16 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             btnDelete.className = 'btn-delete';
             btnDelete.dataset.id = row.id;
             btnDelete.textContent = '삭제';
+            // 분석결과 버튼
+            const existingResult = this.loadSoilTestResult(row.id);
+            const btnAnalysis = document.createElement('button');
+            btnAnalysis.className = `btn-analysis-result${existingResult ? ' has-result' : ''}`;
+            btnAnalysis.dataset.id = row.id;
+            btnAnalysis.textContent = existingResult ? '결과확인' : '결과입력';
+            btnAnalysis.title = '토양 분석결과 입력/확인';
             actionsDiv.appendChild(btnEdit);
             actionsDiv.appendChild(btnDelete);
+            actionsDiv.appendChild(btnAnalysis);
             tdAction.appendChild(actionsDiv);
             tr.appendChild(tdAction);
             fragment.appendChild(tr);
@@ -3253,6 +3362,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     setupTypeSpecificEvents() {
         const self = this;
+
+        // 토양 분석결과 모달 초기화
+        this.initSoilAnalysisModal();
+        // Firestore에서 분석결과 동기화 (비동기)
+        this.syncSoilTestResultsFromFirestore().catch(() => {});
 
         // 시료 타입 네비게이션 선택
         const sampleTypeBtns = document.querySelectorAll('.type-btn');
@@ -3512,6 +3626,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 if (editBtn) {
                     this.editSample(editBtn.dataset.id);
                 }
+
+                const analysisBtn = e.target.closest('.btn-analysis-result');
+                if (analysisBtn) {
+                    this.openSoilAnalysisModal(analysisBtn.dataset.id);
+                }
             });
 
             // 체크박스 이벤트
@@ -3533,12 +3652,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             });
         }
 
-        // 성명 클릭 시 같은 이름 일괄 선택
+        // 성명 클릭 시 같은 이름+전화번호(farmerKey) 일괄 선택
         if (this.tableBody) {
             this.tableBody.addEventListener('click', (e) => {
                 const nameCell = e.target.closest('.col-name');
-                if (nameCell && nameCell.dataset.name) {
-                    this.selectByName(nameCell.dataset.name);
+                if (nameCell && nameCell.dataset.farmerKey) {
+                    this.selectByName(nameCell.dataset.farmerKey);
                 }
             });
         }
@@ -3707,30 +3826,53 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             btnBulkComplete.addEventListener('click', () => {
                 const selectedIds = this.getSelectedIds();
                 if (selectedIds.length === 0) { alert('완료 처리할 항목을 선택해주세요.'); return; }
-                if (!confirm(`선택한 ${selectedIds.length}건을 완료 처리하시겠습니까?`)) return;
-                // 선택된 ID + 같은 base 접수번호의 연관 행도 처리
-                const baseNumbers = new Set(
-                    selectedIds.map(id => {
-                        const log = this.sampleLogs.find(l => String(l.id) === id);
-                        return log ? (log.receptionNumber || '').split('-')[0] : null;
-                    }).filter(Boolean)
+
+                // 연관 접수번호(같은 base 번호) 포함한 실제 처리 대상 사전 계산
+                // 성토(F접두사)와 일반 시료는 분리하여 그룹핑
+                const selectedGroups = selectedIds.map(id => {
+                    const log = this.sampleLogs.find(l => String(l.id) === id);
+                    const rec = log?.receptionNumber || '';
+                    return { base: rec.replace(/^F/, '').split('-')[0], isFill: rec.startsWith('F') };
+                }).filter(g => g.base);
+                const targetIds = new Set(
+                    this.sampleLogs
+                        .filter(log => {
+                            if (selectedIds.includes(String(log.id))) return true;
+                            const rec = log.receptionNumber || '';
+                            const base = rec.replace(/^F/, '').split('-')[0];
+                            const isFill = rec.startsWith('F');
+                            return base && selectedGroups.some(g => g.base === base && g.isFill === isFill);
+                        })
+                        .map(log => String(log.id))
                 );
-                let updatedCount = 0;
+                // 선택 대상이 모두 완료 상태면 → 일괄 해제, 아니면 → 일괄 완료
+                const allComplete = [...targetIds].every(id => {
+                    const log = this.sampleLogs.find(l => String(l.id) === id);
+                    return log?.isComplete === true;
+                });
+                const newStatus = !allComplete;
+                const actionLabel = newStatus ? '완료 처리' : '완료 해제';
+
+                const extraCount = targetIds.size - selectedIds.length;
+                const confirmMsg = extraCount > 0
+                    ? `선택한 ${selectedIds.length}건 + 연관 접수번호 ${extraCount}건 포함\n총 ${targetIds.size}건을 ${actionLabel}하시겠습니까?`
+                    : `선택한 ${selectedIds.length}건을 ${actionLabel}하시겠습니까?`;
+                if (!confirm(confirmMsg)) return;
+
+                const now = new Date().toISOString();
                 const changedLogs: SoilLog[] = [];
-                this.sampleLogs = this.sampleLogs.map(log => {
-                    const base = (log.receptionNumber || '').split('-')[0];
-                    if (baseNumbers.has(base) && !log.isComplete) {
-                        updatedCount++;
-                        const updated = { ...log, isComplete: true, updatedAt: new Date().toISOString() };
-                        changedLogs.push(updated);
-                        return updated;
+                this.sampleLogs.forEach(log => {
+                    if (targetIds.has(String(log.id))) {
+                        log.isComplete = newStatus;
+                        log.updatedAt = now;
+                        changedLogs.push(log);
                     }
-                    return log;
                 });
                 this.saveLogs();
                 this.firebaseSaveRecords(changedLogs);
                 this.filterAndRenderLogs();
-                this.showToast(`${updatedCount}건이 완료 처리되었습니다.`, 'success');
+                if (this.selectAllCheckbox) { this.selectAllCheckbox.checked = false; this.selectAllCheckbox.indeterminate = false; }
+                this.showToast(`${changedLogs.length}건이 ${actionLabel}되었습니다.`, 'success');
             });
         }
 
@@ -4243,6 +4385,300 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         }
 
         this.log('토양 시료 접수 페이지 초기화 완료');
+    }
+
+    // ========================================
+    // 토양 분석결과 입력 모달
+    // ========================================
+
+    initSoilAnalysisModal(): void {
+        const modal = document.getElementById('soilAnalysisModal');
+        if (!modal) return;
+
+        const closeModal = (): void => {
+            modal.classList.add('hidden');
+            this._soilAnalysisLogId = null;
+        };
+
+        document.getElementById('closeSoilAnalysisModal')?.addEventListener('click', closeModal);
+        document.getElementById('cancelSoilAnalysisBtn')?.addEventListener('click', closeModal);
+        modal.querySelector('.modal-overlay')?.addEventListener('click', closeModal);
+        modal.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        document.getElementById('saveSoilAnalysisBtn')?.addEventListener('click', () => this.saveSoilAnalysisResult());
+    }
+
+    openSoilAnalysisModal(logId: string): void {
+        const log = this.sampleLogs.find(l => String(l.id) === String(logId));
+        if (!log) return;
+
+        const modal = document.getElementById('soilAnalysisModal');
+        if (!modal) return;
+
+        this._soilAnalysisLogId = logId;
+
+        // 접수 정보 채우기
+        const set = (id: string, text: string): void => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        set('saReceptionNumber', log.receptionNumber || '-');
+        set('saDate', log.date || '-');
+        set('saName', log.name || '-');
+        set('saPurpose', log.purpose || '-');
+
+        // 첫 번째 필지 주소
+        const firstParcel = (log as any).parcels?.[0];
+        const lotAddress = firstParcel?.lotAddress || (log as any).lotAddress || '-';
+        set('saLotAddress', lotAddress);
+
+        // 분석 항목 렌더
+        const fields = SoilSampleManager.SOIL_ANALYSIS_FIELDS;
+        this.renderSoilAnalysisFields(fields);
+
+        // 기존 결과 로드
+        const existing = this.loadSoilTestResult(logId);
+        if (existing) {
+            const testDateInput = document.getElementById('saTestDate') as HTMLInputElement | null;
+            if (testDateInput) testDateInput.value = existing.testDate || '';
+            for (const field of fields) {
+                const input = document.getElementById(`sa_${field.key}`) as HTMLInputElement | null;
+                if (input) input.value = existing[field.key] || '';
+            }
+            const judgment = existing.judgment || '';
+            if (['', 'pass', 'fail'].includes(judgment)) {
+                const radio = document.querySelector(`input[name="saJudgment"][value="${judgment}"]`) as HTMLInputElement | null;
+                if (radio) radio.checked = true;
+            }
+        } else {
+            const testDateInput = document.getElementById('saTestDate') as HTMLInputElement | null;
+            if (testDateInput) testDateInput.value = '';
+            document.querySelectorAll<HTMLInputElement>('input[name="saJudgment"]').forEach(r => r.checked = false);
+            const defaultRadio = document.querySelector('input[name="saJudgment"][value=""]') as HTMLInputElement | null;
+            if (defaultRadio) defaultRadio.checked = true;
+        }
+
+        modal.classList.remove('hidden');
+
+        setTimeout(() => {
+            const firstInput = modal.querySelector('.sa-result-input') as HTMLInputElement | null;
+            if (firstInput) firstInput.focus();
+        }, 100);
+    }
+
+    renderSoilAnalysisFields(fields: typeof SoilSampleManager.SOIL_ANALYSIS_FIELDS): void {
+        const tbody = document.getElementById('saFieldsBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        fields.forEach((field, idx) => {
+            const tr = document.createElement('tr');
+
+            // No
+            const tdNo = document.createElement('td');
+            tdNo.className = 'sa-col-no';
+            tdNo.textContent = String(idx + 1);
+            tr.appendChild(tdNo);
+
+            // 항목명
+            const tdName = document.createElement('td');
+            tdName.className = 'sa-col-name';
+            tdName.textContent = field.label;
+            tr.appendChild(tdName);
+
+            // 단위
+            const tdUnit = document.createElement('td');
+            tdUnit.className = 'sa-col-unit';
+            tdUnit.textContent = field.unit || '-';
+            tr.appendChild(tdUnit);
+
+            // 유효 범위
+            const tdRange = document.createElement('td');
+            tdRange.className = 'sa-col-range';
+            tdRange.textContent = `${field.min}~${field.max}`;
+            tr.appendChild(tdRange);
+
+            // 결과값 입력
+            const tdValue = document.createElement('td');
+            tdValue.className = 'sa-col-value';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'sa-result-input';
+            input.id = `sa_${field.key}`;
+            input.placeholder = '-';
+            input.autocomplete = 'off';
+
+            input.addEventListener('input', () => {
+                this.checkSoilAnalysisRange(input, field);
+            });
+
+            input.addEventListener('keydown', (e: KeyboardEvent) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const nextRow = tr.nextElementSibling;
+                    if (nextRow) {
+                        const nextInput = nextRow.querySelector('.sa-result-input') as HTMLInputElement | null;
+                        if (nextInput) nextInput.focus();
+                    }
+                }
+            });
+
+            tdValue.appendChild(input);
+            tr.appendChild(tdValue);
+
+            // 상태
+            const tdStatus = document.createElement('td');
+            tdStatus.className = 'sa-col-status';
+            tdStatus.id = `sa_status_${field.key}`;
+            tdStatus.innerHTML = '<span class="sa-status-empty">\u25CB</span>';
+            tr.appendChild(tdStatus);
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    checkSoilAnalysisRange(input: HTMLInputElement, field: { key: string; min: number; max: number }): void {
+        const statusEl = document.getElementById(`sa_status_${field.key}`);
+        const val = input.value.trim();
+
+        if (!val) {
+            input.classList.remove('out-of-range');
+            if (statusEl) statusEl.innerHTML = '<span class="sa-status-empty">\u25CB</span>';
+            return;
+        }
+
+        const num = parseFloat(val.replace(/,/g, ''));
+        if (isNaN(num)) {
+            input.classList.remove('out-of-range');
+            if (statusEl) statusEl.innerHTML = '<span class="sa-status-empty">\u25CB</span>';
+            return;
+        }
+
+        const isOk = num >= field.min && num <= field.max;
+        input.classList.toggle('out-of-range', !isOk);
+        if (statusEl) {
+            statusEl.innerHTML = isOk
+                ? '<span class="sa-status-ok">\u2713</span>'
+                : '<span class="sa-status-warn">\u2715</span>';
+        }
+    }
+
+    saveSoilAnalysisResult(): void {
+        const logId = this._soilAnalysisLogId;
+        if (!logId) return;
+
+        const fields = SoilSampleManager.SOIL_ANALYSIS_FIELDS;
+        const allResults = this.loadAllSoilTestResults();
+
+        if (!allResults[logId]) allResults[logId] = {};
+
+        // 검사일자
+        allResults[logId].testDate = (document.getElementById('saTestDate') as HTMLInputElement | null)?.value || '';
+
+        // 각 필드 값
+        for (const field of fields) {
+            const input = document.getElementById(`sa_${field.key}`) as HTMLInputElement | null;
+            if (input) allResults[logId][field.key] = input.value.trim();
+        }
+
+        // 판정
+        const judgmentRadio = document.querySelector('input[name="saJudgment"]:checked') as HTMLInputElement | null;
+        allResults[logId].judgment = judgmentRadio?.value || '';
+
+        // 저장
+        this.saveAllSoilTestResults(allResults);
+
+        // 모달 닫기 + 목록 갱신
+        document.getElementById('soilAnalysisModal')?.classList.add('hidden');
+        this._soilAnalysisLogId = null;
+        this.filterAndRenderLogs();
+
+        if (window.showToast) window.showToast('토양 분석결과가 저장되었습니다.', 'success');
+        else this.showToast?.('토양 분석결과가 저장되었습니다.', 'success');
+    }
+
+    loadSoilTestResult(logId: string): Record<string, string> | null {
+        if (!this._cachedSoilTestResults) {
+            this._cachedSoilTestResults = this.loadAllSoilTestResults();
+        }
+        return this._cachedSoilTestResults[logId] || null;
+    }
+
+    loadAllSoilTestResults(): Record<string, Record<string, string>> {
+        const key = `test_soilTestResults_${this.selectedYear}`;
+        try {
+            const data = localStorage.getItem(key);
+            if (!data) return {};
+            return JSON.parse(data) || {};
+        } catch (e) {
+            (window.logger?.error || console.error)('토양 분석결과 로드 실패:', e);
+            return {};
+        }
+    }
+
+    saveAllSoilTestResults(results: Record<string, Record<string, string>>): void {
+        const key = `test_soilTestResults_${this.selectedYear}`;
+        try {
+            localStorage.setItem(key, JSON.stringify(results));
+            this._cachedSoilTestResults = results;
+            this.syncSoilTestResultsToFirestore(results);
+        } catch (e) {
+            (window.logger?.error || console.error)('토양 분석결과 저장 실패:', e);
+        }
+    }
+
+    async syncSoilTestResultsToFirestore(results: Record<string, Record<string, string>>): Promise<void> {
+        if (!window.firestoreDb?.isEnabled()) return;
+
+        try {
+            const year = parseInt(this.selectedYear);
+            const entries = Object.entries(results);
+            if (entries.length === 0) return;
+
+            const documents = entries.map(([docKey, data]) => ({
+                ...data,
+                id: docKey,
+                _resultKey: docKey,
+            }));
+
+            await window.firestoreDb.batchSave('soilTestResults', year, documents as unknown as Record<string, unknown>[]);
+            (window.logger?.info || console.log)(`[토양분석] Firestore 동기화 완료: ${documents.length}건`);
+        } catch (e) {
+            (window.logger?.error || console.error)('토양 분석결과 Firestore 동기화 실패:', e);
+        }
+    }
+
+    async syncSoilTestResultsFromFirestore(): Promise<void> {
+        if (!window.firestoreDb?.isEnabled()) return;
+
+        try {
+            const year = parseInt(this.selectedYear);
+            const cloudData = await window.firestoreDb.getAll('soilTestResults', year);
+            if (!cloudData || cloudData.length === 0) return;
+
+            const resultsMap: Record<string, Record<string, string>> = {};
+            for (const doc of cloudData) {
+                const key = (doc as Record<string, unknown>)._resultKey as string || (doc as Record<string, unknown>).id as string;
+                if (key) {
+                    const { _resultKey, syncedAt, updatedAt, ...rest } = doc as Record<string, unknown>;
+                    resultsMap[key] = rest as Record<string, string>;
+                }
+            }
+
+            const localResults = this.loadAllSoilTestResults();
+            const merged: Record<string, Record<string, string>> = { ...localResults, ...resultsMap };
+
+            const storageKey = `test_soilTestResults_${this.selectedYear}`;
+            localStorage.setItem(storageKey, JSON.stringify(merged));
+            this._cachedSoilTestResults = merged;
+
+            this.filterAndRenderLogs();
+            (window.logger?.info || console.log)('[토양분석] Firestore -> localStorage 동기화 완료');
+        } catch (e) {
+            (window.logger?.error || console.error)('토양 분석결과 Firestore 로드 실패:', e);
+        }
     }
 
     // ========================================

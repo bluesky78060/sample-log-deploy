@@ -132,11 +132,20 @@ interface SoilParcel {
   /** Sub-lots (multiple lots per parcel) */
   subLots?: SubLot[];
 
-  /** Crops and areas */
+  /** Crops and areas (실제 사용 필드) */
+  crops?: CropArea[];
+
+  /** @deprecated 코드에서는 crops 사용 — alias로만 유지 */
   cropAreas?: CropArea[];
 
-  /** Purpose of soil test */
+  /** 경지구분 (논·밭·과수·시설·임야·성토) */
+  category?: string;
+
+  /** Purpose of soil test (용도/목적) */
   purpose?: string;
+
+  /** Lot address (필지 전체 주소 텍스트) */
+  lotAddress?: string;
 }
 
 /**
