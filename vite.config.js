@@ -28,7 +28,9 @@ export default defineConfig({
         heuktoram: resolve(__dirname, 'src/heuktoram/index.html'),
         release: resolve(__dirname, 'src/release/index.html'),
         waterAnalysis: resolve(__dirname, 'src/water-analysis/index.html'),
-        pesticideAnalysis: resolve(__dirname, 'src/pesticide-analysis/index.html')
+        pesticideAnalysis: resolve(__dirname, 'src/pesticide-analysis/index.html'),
+        heavyMetalAnalysis: resolve(__dirname, 'src/heavy-metal-analysis/index.html'),
+        compostAnalysis: resolve(__dirname, 'src/compost-analysis/index.html')
       }
     }
   }
