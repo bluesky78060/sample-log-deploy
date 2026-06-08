@@ -30,8 +30,14 @@ interface MergeResult {
     deleted: number;
 }
 
+/**
+ * 클라우드 로드 시 안전 병합 결과 — smartMerge 결과 + 로컬 전용(미업로드) 항목 목록
+ */
+type MergeCloudResult = MergeResult & { localOnly: DataItem[] };
+
 interface SyncUtilsAPI {
     smartMerge: <T extends { id: string }>(localData: T[], cloudData: T[]) => T[];
+    mergeCloudData: (localData: DataItem[], cloudData: DataItem[]) => MergeCloudResult;
     getTimestamp: (updatedAt: TimestampInput) => number;
     normalizeId: (id: string | number | null | undefined) => string | null;
     getItemId: (item: DataItem | null | undefined) => string | null;
@@ -181,12 +187,38 @@ function smartMerge(localData: DataItem[], cloudData: DataItem[]): MergeResult {
     return { data: merged, hasChanges, updated, added, deleted };
 }
 
+/**
+ * 클라우드 로드 시 안전 병합 — smartMerge 결과에 로컬 전용(미업로드) 항목 목록을 추가로 반환
+ * loadYearData의 무병합 덮어쓰기(데이터 유실)를 대체하기 위한 함수
+ * @param {Array} localData - 로컬 데이터 배열
+ * @param {Array} cloudData - 클라우드 데이터 배열
+ * @returns {Object} { data, hasChanges, updated, added, deleted, localOnly }
+ *   localOnly: 클라우드에 없어서 재업로드가 필요한 로컬 항목 배열
+ */
+function mergeCloudData(localData: DataItem[], cloudData: DataItem[]): MergeCloudResult {
+    const result = smartMerge(localData, cloudData);
+
+    const cloudIds = new Set<string>();
+    (cloudData || []).forEach(item => {
+        const id = getItemId(item);
+        if (id) cloudIds.add(id);
+    });
+
+    const localOnly = result.data.filter(item => {
+        const id = getItemId(item);
+        return id && !cloudIds.has(id);
+    });
+
+    return { ...result, localOnly };
+}
+
 // ========================================
 // 전역 내보내기
 // ========================================
 
 window.SyncUtils = {
     smartMerge,
+    mergeCloudData,
     getTimestamp,
     normalizeId,
     getItemId
@@ -194,6 +226,7 @@ window.SyncUtils = {
 
 export {
     smartMerge,
+    mergeCloudData,
     getTimestamp,
     normalizeId,
     getItemId
@@ -202,6 +235,7 @@ export {
 export type {
     DataItem,
     MergeResult,
+    MergeCloudResult,
     TimestampInput,
     FirestoreTimestamp
 };

@@ -394,8 +394,9 @@ async function deleteDocument(
             }
 
             if (querySnapshot.empty) {
-                logFirestore(`삭제 대상 없음: ${collectionName}/${stringDocId}`);
-                return false;
+                // 멱등 삭제: 대상이 이미 없음 = 삭제 목표 달성 (미업로드 항목 삭제 시 거짓 실패 방지)
+                logFirestore(`삭제 대상 없음(멱등 성공): ${collectionName}/${stringDocId}`);
+                return true;
             }
 
             // 찾은 문서 삭제

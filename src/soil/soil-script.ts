@@ -508,10 +508,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             .filter(log => log.id)
             .map(log => window.firestoreDb!.save('soil', year, String(log.id), log as unknown as Record<string, unknown>));
         Promise.allSettled(promises).then(results => {
-            const failed = results.filter(r => r.status === 'rejected');
+            // firestoreDb.save는 실패 시 throw가 아닌 false resolve → value 검사 필수
+            const failed = results.filter(r => r.status === 'rejected' || r.value === false);
             if (failed.length > 0) {
                 (window.logger?.error || console.error)('Firebase 저장 실패:', failed.length, '건');
-                this.showToast(`클라우드 동기화 ${failed.length}건 실패`, 'warning');
+                this._handleCloudSyncFailure();
             }
         });
     }
@@ -522,9 +523,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const year = parseInt(this.selectedYear);
         const promises = arr.map(id => window.firestoreDb!.delete('soil', year, String(id)));
         Promise.allSettled(promises).then(results => {
-            const failed = results.filter(r => r.status === 'rejected');
+            const failed = results.filter(r => r.status === 'rejected' || r.value === false);
             if (failed.length > 0) {
                 (window.logger?.error || console.error)('Firebase 삭제 실패:', failed.length, '건');
+                this._handleCloudSyncFailure();
             }
         });
     }
@@ -532,12 +534,28 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     firebaseBatchSync(): void {
         if (!window.firestoreDb?.isEnabled()) return;
         const snapshot = [...this.sampleLogs];
+        if (snapshot.length === 0) return; // 빈 배열은 batchSave가 false를 반환하므로 호출 생략
         window.firestoreDb.batchSave('soil', parseInt(this.selectedYear), snapshot as unknown as Record<string, unknown>[])
-            .then(() => this.log('Firebase 전체 동기화 완료:', snapshot.length, '건'))
+            .then((ok: boolean) => {
+                if (ok) {
+                    this._clearCloudSyncFailure();
+                    this.log('Firebase 전체 동기화 완료:', snapshot.length, '건');
+                } else {
+                    this._handleCloudSyncFailure();
+                }
+            })
             .catch((err: unknown) => {
                 (window.logger?.error || console.error)('Firebase 전체 동기화 실패:', err);
-                this.showToast('클라우드 전체 동기화 실패', 'warning');
+                this._handleCloudSyncFailure();
             });
+    }
+
+    /**
+     * L2: soil의 saveLogs는 로컬 전용이므로 online 복귀 재시도는 전체 동기화로 수행
+     */
+    protected override _retryCloudSyncAction(): void {
+        this.saveLogs();          // 로컬 상태 저장 (멱등)
+        this.firebaseBatchSync(); // 클라우드 전체 동기화
     }
 
     // ========================================
