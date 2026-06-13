@@ -178,6 +178,8 @@ class HeuktoramManager {
   private selectedYear: string;
   private sampleLogs: SoilLog[];
   private testResults: Record<string, SoilTestResult>;
+  /** 진행 중인 IDB 저장 promise (fire-and-forget 갭 차단용) */
+  private _pendingIdbSave: Promise<void> | null = null;
   private flatRows: HeuktoramRow[];
   private selectedKeys: Set<string>;
   private focusedCell: FocusedCell | null;
@@ -257,12 +259,16 @@ class HeuktoramManager {
   // 초기화
   // ========================================
 
-  private init(): void {
+  private async init(): Promise<void> {
     this.cacheElements();
     this.setDefaultYear();
     this.restoreFromSoilPage();
     this.bindEvents();
-    this.loadData();
+    // 분석결과 IDB 초기화 + localStorage 자동 마이그레이션(멱등)
+    try { await window.AnalysisDB?.init(); } catch (e) {
+      (window.logger?.warn ?? console.warn)('AnalysisDB 초기화 실패(LS 폴백):', e);
+    }
+    await this.loadData();
     this.render();
     this.setupResultImporter();
 
@@ -395,8 +401,7 @@ class HeuktoramManager {
     this.yearSelect?.addEventListener('change', () => {
       this.selectedYear = this.yearSelect!.value;
       this.preSelectedLogIds = null;
-      this.loadData();
-      this.render();
+      void this.loadData().then(() => this.render());
     });
 
     this.selectAllCheckbox?.addEventListener('change', () => {
@@ -442,9 +447,9 @@ class HeuktoramManager {
   // 데이터 로드/저장
   // ========================================
 
-  private loadData(): void {
+  private async loadData(): Promise<void> {
     this.sampleLogs = this.loadSampleLogs();
-    this.testResults = this.loadTestResults();
+    this.testResults = await this.loadTestResults();
     this.buildFlatRows();
   }
 
@@ -473,8 +478,31 @@ class HeuktoramManager {
     }
   }
 
-  private loadTestResults(): Record<string, SoilTestResult> {
+  private async loadTestResults(): Promise<Record<string, SoilTestResult>> {
     const key = `${STORAGE_PREFIX}soilTestResults_${this.selectedYear}`;
+    // IDB 우선 (init에서 마이그레이션 완료 보장)
+    if (window.AnalysisDB?.isReady?.()) {
+      try {
+        // fire-and-forget IDB write의 갭 차단: 진행 중 저장 완료까지 대기
+        if (this._pendingIdbSave) { await this._pendingIdbSave.catch(() => {}); }
+        const map = await window.AnalysisDB.getMap('soil', this.selectedYear);
+        const typed = (map as Record<string, SoilTestResult>) || {};
+        if (Object.keys(typed).length > 0) return typed;
+        // IDB 비어 있음 → LS 자가복구 폴백
+        (window.logger?.warn ?? console.warn)('[AnalysisDB] soil IDB 빈 맵, LS 자가복구 시도 year=', this.selectedYear);
+        const lsData = localStorage.getItem(key);
+        if (!lsData) return {};
+        const lsParsed = (JSON.parse(lsData) as Record<string, SoilTestResult>) || {};
+        if (Object.keys(lsParsed).length > 0) {
+          this._pendingIdbSave = window.AnalysisDB.saveMap('soil', this.selectedYear, lsParsed)
+            .catch(e2 => { (window.logger?.error ?? console.error)('IDB 자가복구 저장 실패:', e2); });
+        }
+        return lsParsed;
+      } catch (e) {
+        (window.logger?.warn ?? console.warn)('IDB 검정 결과 로드 실패, LS 폴백:', e);
+      }
+    }
+    // 폴백: localStorage (IDB 미초기화 또는 오류 시)
     try {
       const data = localStorage.getItem(key);
       if (!data) return {};
@@ -487,10 +515,22 @@ class HeuktoramManager {
 
   private saveTestResults(): void {
     const key = `${STORAGE_PREFIX}soilTestResults_${this.selectedYear}`;
+    // 깊은 복사 스냅샷: 이후 this.testResults 변경이 IDB 비동기 write에 영향 주지 않도록
+    let snapshot: Record<string, SoilTestResult>;
+    try { snapshot = JSON.parse(JSON.stringify(this.testResults || {})); }
+    catch { snapshot = { ...(this.testResults || {}) }; }
+    // LS 백업 미러 (rollback 안전 + 동기 폴백 지원)
     try {
-      localStorage.setItem(key, JSON.stringify(this.testResults));
+      localStorage.setItem(key, JSON.stringify(snapshot));
     } catch (e) {
-      (window.logger?.error ?? console.error)('검정 결과 저장 실패:', e);
+      (window.logger?.warn ?? console.warn)('LS 백업 실패(IDB는 계속):', e);
+    }
+    // IDB 영속 저장 — 진행 중 promise 보관해 loadTestResults에서 await(갭 차단)
+    if (window.AnalysisDB?.isReady?.()) {
+      this._pendingIdbSave = window.AnalysisDB.saveMap('soil', this.selectedYear, snapshot)
+        .catch(e => {
+          (window.logger?.error ?? console.error)('IDB 검정 결과 저장 실패:', e);
+        });
     }
   }
 
@@ -1275,14 +1315,16 @@ class HeuktoramManager {
 
   private getBeforeAfter(usageCode: string): string {
     if (usageCode === '0' || usageCode === '') return '';
-    return this.bulkBeforeAfterSelect?.value ?? 'N';
+    // bulkBeforeAfterSelect 값('N'/'Y')을 BC3/BD3 범례 표기('전-N'/'후-Y')와 일치
+    const v = this.bulkBeforeAfterSelect?.value ?? 'N';
+    return v === 'Y' ? '후-Y' : '전-N';
   }
 
   // ========================================
   // 흙토람 서식 내보내기
   // ========================================
 
-  private exportToHeuktoram(): void {
+  private async exportToHeuktoram(): Promise<void> {
     let targetRows = this.flatRows;
     if (this.selectedKeys.size > 0) {
       targetRows = this.flatRows.filter(r => this.selectedKeys.has(r.key));
@@ -1308,13 +1350,40 @@ class HeuktoramManager {
       const ws = XLSX.utils.aoa_to_sheet(wsData);
 
       ws['!cols'] = this.getColumnWidths();
-      this.applyHeaderMerges(ws);
       this.applyHeaderStyles(ws, wsData);
+      this.applyHeaderMerges(ws);
+
+      // 1행(제목)·2행(안내문) 행 높이 + 셀 스타일 (서식.xlsx 원본 기준)
+      const wsRec = ws as Record<string, unknown>;
+      const rowsArr = (wsRec['!rows'] as Array<{ hpt?: number }> | undefined) ?? [];
+      rowsArr[0] = { hpt: 30 };
+      rowsArr[1] = { hpt: 369.5 };
+      wsRec['!rows'] = rowsArr;
+
+      const cellA1 = (wsRec as Record<string, { v?: unknown; s?: unknown }>)['A1'];
+      if (cellA1) {
+        cellA1.s = {
+          alignment: { horizontal: 'left' },
+          font: { bold: true, sz: 20, name: '맑은 고딕' }
+        };
+      }
+      const cellA2 = (wsRec as Record<string, { v?: unknown; s?: unknown }>)['A2'];
+      if (cellA2) {
+        cellA2.s = {
+          alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+          font: { sz: 11, name: '맑은 고딕' }
+        };
+      }
 
       XLSX.utils.book_append_sheet(wb, ws, '일괄등록양식');
 
+      // xlsx-js-style은 dataValidation 출력 미지원이므로 JSZip 후처리
+      const arrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+      const validations = this.buildDataValidations(targetRows.length);
+      const patchedBuffer = await this.injectDataValidations(arrayBuffer, validations);
+
       const fileName = `흙토람_토양검정_${this.selectedYear}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      this.downloadBuffer(patchedBuffer, fileName);
 
       window.showToast?.(`${targetRows.length}건 흙토람 서식으로 내보냈습니다.`, 'success');
     } catch (e) {
@@ -1323,66 +1392,172 @@ class HeuktoramManager {
     }
   }
 
-  /** 48컬럼 데이터 배열 생성 (헤더 4행 + 데이터) */
+  /** 데이터 유효성 검사 규칙 빌드 (G·H·AH 컬럼 드롭다운) */
+  private buildDataValidations(dataRowCount: number): Array<{ sqref: string; options: string[] }> {
+    if (dataRowCount <= 0) return [];
+    const startRow = 5;
+    const endRow = 4 + dataRowCount;
+    return [
+      {
+        sqref: `G${startRow}:G${endRow}`,
+        options: ['일반적인토양검정-0', '토양개량제 규산-1', '토양개량제 석회질-2', '녹비작물-3']
+      },
+      {
+        sqref: `H${startRow}:H${endRow}`,
+        options: ['전-N', '후-Y']
+      },
+      {
+        sqref: `AH${startRow}:AH${endRow}`,
+        options: ['미해당', '해당']
+      }
+    ];
+  }
+
+  /** JSZip으로 sheet1.xml에 <dataValidations> XML 삽입 (SheetJS Community 미지원 우회) */
+  private async injectDataValidations(arrayBuffer: ArrayBuffer, validations: Array<{ sqref: string; options: string[] }>): Promise<ArrayBuffer> {
+    if (!validations || validations.length === 0) return arrayBuffer;
+    const JSZipCtor = (window as Window & { JSZip?: unknown }).JSZip as (new () => unknown) & { loadAsync?: (data: ArrayBuffer) => Promise<unknown> } | undefined;
+    if (!JSZipCtor || typeof JSZipCtor.loadAsync !== 'function') {
+      (window.logger?.warn ?? console.warn)('JSZip 미사용. 드롭다운 적용 생략.');
+      return arrayBuffer;
+    }
+
+    const zip = await JSZipCtor.loadAsync(arrayBuffer) as {
+      file: (path: string, data?: string) => { async: (type: string) => Promise<string> } | null;
+      generateAsync: (opts: { type: string }) => Promise<ArrayBuffer>;
+    };
+    const sheetXmlPath = 'xl/worksheets/sheet1.xml';
+    const sheetFile = zip.file(sheetXmlPath);
+    if (!sheetFile) return arrayBuffer;
+
+    let xml = await sheetFile.async('string');
+    const dvXml = this.buildDataValidationsXml(validations);
+
+    if (xml.indexOf('</mergeCells>') !== -1) {
+      xml = xml.replace('</mergeCells>', '</mergeCells>' + dvXml);
+    } else if (xml.indexOf('</sheetData>') !== -1) {
+      xml = xml.replace('</sheetData>', '</sheetData>' + dvXml);
+    }
+
+    zip.file(sheetXmlPath, xml);
+    return await zip.generateAsync({ type: 'arraybuffer' });
+  }
+
+  /** dataValidations XML 빌드 */
+  private buildDataValidationsXml(validations: Array<{ sqref: string; options: string[] }>): string {
+    const parts = validations.map(v => {
+      const list = v.options.join(',');
+      return (
+        '<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1"'
+        + ` sqref="${v.sqref}">`
+        + `<formula1>&quot;${list}&quot;</formula1>`
+        + '</dataValidation>'
+      );
+    });
+    return `<dataValidations count="${validations.length}">${parts.join('')}</dataValidations>`;
+  }
+
+  /** ArrayBuffer → Blob 다운로드 */
+  private downloadBuffer(arrayBuffer: ArrayBuffer, fileName: string): void {
+    const blob = new Blob([arrayBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** 56컬럼 데이터 배열 생성 (서식.xlsx 원본 일치: 48 데이터 + 빈 AW/AX + 코드 범례 AY~BD) */
   private buildWorksheetData(rows: HeuktoramRow[]): (string | number)[][] {
     const data: (string | number)[][] = [];
-    const COL = 50;
+    const COL_HEADER = 56;
+    const COL_DATA = 50;
     const collectYear = this.collectYearInput?.value ?? this.selectedYear;
     const collector = this.collectorInput?.value ?? '';
 
-    // 1행: 제목
-    const row1 = new Array(COL).fill('') as string[];
+    // 1행: 제목 (A1:AV1 병합)
+    const row1 = new Array(COL_HEADER).fill('') as string[];
     row1[0] = '토양검정 일괄입력 양식';
     data.push(row1);
 
-    // 2행: 안내
-    const row2 = new Array(COL).fill('') as string[];
-    row2[0] = '※ 300건 이하로 입력해주세요. 주소매핑여부와 기타주소 컬럼은 빈값으로 두세요.';
+    // 2행: 안내문 (A2:AV2 병합) — 서식.xlsx 원본과 동일
+    const row2 = new Array(COL_HEADER).fill('') as string[];
+    row2[0] = '아래 형식과 같이 입력되어야만 일괄입력을 할 수 있습니다. \n'
+      + '  - 필지구분은 "필지" 또는 "하위필지" 로 입력 (1,2,3,4 = 필지) (1-1, 2-1, 2-2 = 하위필지)\n'
+      + '  - 하위필지는 반드시 대표필지 아래에 연속으로 입력하고 채취년도,경지구분,시료번호,검정대상지 시도 및 시군구 주소를 대표필지와 일치\n'
+      + '  - 채취년도는 숫자(4자리)를 입력\n'
+      + '  - 경지구분은 1차와 2차를 나눠 입력\n'
+      + "  - 분석의뢰일(접수일자)는 숫자(4)-숫자(2)-숫자(2)로 정의하며 '-'로 구분하며, 필수 입력\n"
+      + '  - 검정 대상지는 시도, 시군구, 읍면동, 리를 나눠 입력\n'
+      + '  - 지번구분은 일반은 빈공백으로 산은 산이라고 명시하며 검정대상지번은 지번1과 지번2로 나눠 입력(지번2가 없을 경우 비워놓음)\n'
+      + '  - 주소매핑여부는 자동으로 체크 됩니다. 작성하지 마세요.\n'
+      + '  - 면적의 단위는 ㎡로, 숫자 형태로 입력\n'
+      + "  - 토양검정일은 숫자(4)-숫자(2)-숫자(2)로 정의하며 '-'로 구분\n"
+      + '  - 작물을 입력할 시에는 작물명 또는 숫자 5자리로 이루어진 작물코드 입력\n'
+      + '  - 용도구분은 코드를 [일반적인토양검정-0] 선택 시에는 시행(재배) 전후를 선택 하지 마세요.(추가 내용)\n'
+      + '  - 성토여부는 미해당, 해당으로 입력\n'
+      + '  - 경작자 주소(추가내용)는 선택사항이므로 생략하셔도 입력에는 문제가 없습니다.\n'
+      + "  - 신청인 전화번호는 '-' 없이 입력하세요(예:01023456789)\n"
+      + '  - 경영체등록번호/농업인번호를 조회하기 위해서는 개인(경작자명, 생년월일 모두 입력) / 법인(법인번호) 중 한 항목만 입력하세요. (해당 필드 필수입력 항목 아님)\n'
+      + '  - 생년월일은 숫자(8자리), 법인번호는 숫자(13자리)를 입력\n'
+      + '  - 생년월일, 법인번호 항목은 경영체등록번호/농업인번호 조회 목적으로만 사용함 (흙토람에 등록되지 않는 정보)\n\n'
+      + '원활한 일괄입력을 위하여 1회당 300건 이하의 자료 입력을 권장드립니다.';
     data.push(row2);
 
-    // 3행: 대분류 헤더
-    const row3 = new Array(COL).fill('') as string[];
+    // 3행: 대분류 헤더 + AY~BD 코드 범례
+    const row3 = new Array(COL_HEADER).fill('') as string[];
     row3[0]  = '필지구분';
-    row3[1]  = '채취년도';
+    row3[1]  = ' 채취년도';
     row3[2]  = '시료채취자';
     row3[3]  = '분석의뢰일(접수일자)';
-    row3[4]  = '경지구분';        // E3:F3 가로 병합
-    row3[6]  = '용도구분';        // G3:H3 가로 병합
+    row3[4]  = ' 경지구분';   // E3:F3 가로 병합
+    row3[6]  = '용도구분';    // G3:H3 가로 병합
     row3[8]  = '시료번호';
-    row3[9]  = '대상지 주소';     // J3:M3 가로 병합
+    row3[9]  = '대상지 주소'; // J3:M3 가로 병합
     row3[13] = '지번 구분';
-    row3[14] = '지번';            // O3:P3 가로 병합
+    row3[14] = '지번';        // O3:P3 가로 병합
     row3[16] = '주소매핑여부';
     row3[17] = '기타주소';
     row3[18] = '면적(㎡)';
     row3[19] = '토양검정일';
     row3[20] = '경작자';
     row3[21] = '경작자 주소(이전주소기준)'; // V3:AC3 가로 병합
-    row3[29] = '개인 (Agrix 조회용)';        // AD3:AE3 가로 병합
+    row3[29] = '개인 (Agrix 조회용)';       // AD3:AE3 가로 병합
     row3[31] = '법인 (Agrix 조회용)';
-    row3[32] = '작물명 또는\n작물코드';
+    row3[32] = ' 작물명 또는\n작물코드';
     row3[33] = '성토여부';
     row3[34] = '점토함량';
-    row3[35] = 'pH';
-    row3[36] = '유기물';
+    row3[35] = ' pH';
+    row3[36] = ' 유기물';
     row3[37] = '유효인산';
     row3[38] = '교환성 칼륨';
     row3[39] = '교환성 칼슘';
-    row3[40] = '교환성 마그네슘';
+    row3[40] = '교환성\n마그네슘';
     row3[41] = '유효규산';
     row3[42] = '전기전도도';
     row3[43] = '석회소요량';
     row3[44] = '질산태질소';
-    row3[45] = '양이온 치환용량';
-    row3[46] = '암모니아태 질소';
+    row3[45] = '양이온\n치환용량';
+    row3[46] = '암모니아태\n질소';
     row3[47] = '신청인 전화번호';
     row3[48] = '개인정보\n수집·이용 동의';
     row3[49] = '개인정보\n제3자 제공동의';
+    // 코드 범례 AY=50 ~ BD=55
+    row3[50] = '일반적인토양검정-0';
+    row3[51] = '토양개량제 규산-1';
+    row3[52] = '토양개량제 석회질-2';
+    row3[53] = '녹비작물-3';
+    row3[54] = '전-N';
+    row3[55] = '후-Y';
     data.push(row3);
 
     // 4행: 소분류 헤더
-    const row4 = new Array(COL).fill('') as string[];
-    row4[0]  = '필지/하위필지';
+    const row4 = new Array(COL_HEADER).fill('') as string[];
     row4[4]  = '1차';
     row4[5]  = '2차';
     row4[6]  = '코드';
@@ -1404,7 +1579,6 @@ class HeuktoramManager {
     row4[29] = '경작자명';
     row4[30] = '생년월일';
     row4[31] = '법인번호';
-    row4[33] = '미해당/해당';
     data.push(row4);
 
     // 5행부터 데이터 (48컬럼)
@@ -1441,7 +1615,7 @@ class HeuktoramManager {
         if (!isNaN(parsed)) areaM2 = Math.round(parsed * PYEONG_TO_SQM);
       }
 
-      const dataRow = new Array(COL).fill('') as (string | number)[];
+      const dataRow = new Array(50).fill('') as (string | number)[];
       dataRow[0]  = row.isSubLot ? '하위필지' : '필지';
       dataRow[1]  = collectYear;
       dataRow[2]  = collector || row.log.name || '';
@@ -1460,7 +1634,7 @@ class HeuktoramManager {
       dataRow[14] = lotParsed.jibun1;
       dataRow[15] = lotParsed.jibun2;
       dataRow[16] = ''; // 주소매핑여부 (빈값)
-      dataRow[17] = row.parcel?.note || ''; // 기타주소
+      dataRow[17] = (row.parcel as { note?: string } | undefined)?.note ?? ''; // 기타주소
       dataRow[18] = areaM2;
       dataRow[19] = result.testDate ?? '';
       dataRow[20] = row.log.name ?? '';
@@ -1500,69 +1674,35 @@ class HeuktoramManager {
     return data;
   }
 
-  /** 48컬럼 너비 설정 (문서 기준) */
+  /** 56컬럼 너비 설정 (48 데이터 + 빈 AW/AX + 코드 범례 AY~BD) */
   private getColumnWidths(): { wch: number }[] {
     return [
-      { wch: 12 }, // A: 필지구분
-      { wch: 10 }, // B: 채취년도
-      { wch: 12 }, // C: 시료채취자
-      { wch: 20 }, // D: 분석의뢰일
-      { wch: 10 }, // E: 경지구분 1차
-      { wch: 8  }, // F: 경지구분 2차
-      { wch: 20 }, // G: 용도구분 코드
-      { wch: 16 }, // H: 시행전후
-      { wch: 10 }, // I: 시료번호
-      { wch: 12 }, // J: 시도
-      { wch: 10 }, // K: 시군구
-      { wch: 10 }, // L: 읍면동
-      { wch: 8  }, // M: 리
-      { wch: 10 }, // N: 지번구분
-      { wch: 8  }, // O: 지번1
-      { wch: 8  }, // P: 지번2
-      { wch: 14 }, // Q: 주소매핑여부
-      { wch: 10 }, // R: 기타주소
-      { wch: 10 }, // S: 면적
-      { wch: 14 }, // T: 토양검정일
-      { wch: 10 }, // U: 경작자
-      { wch: 12 }, // V: 경작자 시도
-      { wch: 10 }, // W: 경작자 시군구
-      { wch: 10 }, // X: 경작자 읍면동
-      { wch: 12 }, // Y: 도로명
-      { wch: 6  }, // Z: 본번
-      { wch: 6  }, // AA: 부번
-      { wch: 10 }, // AB: 동층호
-      { wch: 20 }, // AC: 법정동
-      { wch: 12 }, // AD: Agrix 경작자명
-      { wch: 12 }, // AE: 생년월일
-      { wch: 18 }, // AF: 법인번호
-      { wch: 22 }, // AG: 작물명
-      { wch: 12 }, // AH: 성토여부
-      { wch: 10 }, // AI: 점토함량
-      { wch: 6  }, // AJ: pH
-      { wch: 8  }, // AK: 유기물
-      { wch: 10 }, // AL: 유효인산
-      { wch: 12 }, // AM: 교환성K
-      { wch: 12 }, // AN: 교환성Ca
-      { wch: 12 }, // AO: 교환성Mg
-      { wch: 10 }, // AP: 유효규산
-      { wch: 12 }, // AQ: EC
-      { wch: 12 }, // AR: 석회소요량
-      { wch: 12 }, // AS: NO3-N
-      { wch: 12 }, // AT: CEC
-      { wch: 12 }, // AU: NH4-N
-      { wch: 16 }, // AV: 전화번호
-      { wch: 16 }, // AW: 개인정보 수집·이용 동의
-      { wch: 16 }, // AX: 개인정보 제3자 제공동의
+      { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 20 },
+      { wch: 10 }, { wch: 8  }, { wch: 20 }, { wch: 16 },
+      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+      { wch: 8  }, { wch: 10 }, { wch: 8  }, { wch: 8  },
+      { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
+      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+      { wch: 12 }, { wch: 6  }, { wch: 6  }, { wch: 10 },
+      { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 18 },
+      { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 6  },
+      { wch: 8  }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 },
+      // 코드 범례 영역
+      { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 12 },
+      { wch: 8  }, { wch: 8  },
     ];
   }
 
-  /** 셀 병합 설정 (제목/안내문 + 헤더 3~4행) */
+  /** 셀 병합 설정 (서식.xlsx 원본 기준) */
   private applyHeaderMerges(ws: Record<string, unknown>): void {
     const merges = [
-      // 1~2행
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 2  } }, // A1:C1 제목
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 7  } }, // A2:H2 안내문
-      // 세로 병합 (3~4행 단독 컬럼)
+      // 1~2행 — A1:AV1, A2:AV2 (서식.xlsx 원본)
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 47 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 47 } },
+      // 3~4행 세로 병합 (단독 컬럼)
       { s: { r: 2, c: 0  }, e: { r: 3, c: 0  } }, // A: 필지구분
       { s: { r: 2, c: 1  }, e: { r: 3, c: 1  } }, // B: 채취년도
       { s: { r: 2, c: 2  }, e: { r: 3, c: 2  } }, // C: 시료채취자
@@ -1574,7 +1714,7 @@ class HeuktoramManager {
       { s: { r: 2, c: 18 }, e: { r: 3, c: 18 } }, // S: 면적
       { s: { r: 2, c: 19 }, e: { r: 3, c: 19 } }, // T: 토양검정일
       { s: { r: 2, c: 20 }, e: { r: 3, c: 20 } }, // U: 경작자
-      { s: { r: 2, c: 31 }, e: { r: 3, c: 31 } }, // AF: 법인
+      // AF3:AF4 세로 병합 없음 — AF3='법인 (Agrix 조회용)', AF4='법인번호' 별도 셀
       { s: { r: 2, c: 32 }, e: { r: 3, c: 32 } }, // AG: 작물명
       { s: { r: 2, c: 33 }, e: { r: 3, c: 33 } }, // AH: 성토여부
       { s: { r: 2, c: 34 }, e: { r: 3, c: 34 } }, // AI: 점토함량
@@ -1593,7 +1733,7 @@ class HeuktoramManager {
       { s: { r: 2, c: 47 }, e: { r: 3, c: 47 } }, // AV: 전화번호
       { s: { r: 2, c: 48 }, e: { r: 3, c: 48 } }, // AW: 개인정보 수집·이용 동의
       { s: { r: 2, c: 49 }, e: { r: 3, c: 49 } }, // AX: 개인정보 제3자 제공동의
-      // 가로 병합 (3행 그룹 헤더)
+      // 3행 가로 병합 (그룹 헤더)
       { s: { r: 2, c: 4  }, e: { r: 2, c: 5  } }, // E3:F3 경지구분
       { s: { r: 2, c: 6  }, e: { r: 2, c: 7  } }, // G3:H3 용도구분
       { s: { r: 2, c: 9  }, e: { r: 2, c: 12 } }, // J3:M3 대상지 주소
@@ -1605,9 +1745,10 @@ class HeuktoramManager {
     ws['!merges'] = merges;
   }
 
-  /** 헤더 스타일 + 데이터 행 정렬/테두리 적용 (xlsx-js-style) */
+  /** 헤더 스타일 (3·4행 회색 #C0C0C0, 코드 범례 영역은 일반 셀) + 데이터 행 정렬·테두리 */
   private applyHeaderStyles(ws: Record<string, unknown>, wsData: (string | number)[][]): void {
-    const COL = 50;
+    const COL_HEADER = 56;
+    const DATA_COL_END = 50; // 0~49만 데이터/헤더 영역, 50~55는 코드 범례
     const THIN_BORDER = {
       top:    { style: 'thin', color: { rgb: 'FF808080' } },
       bottom: { style: 'thin', color: { rgb: 'FF808080' } },
@@ -1623,31 +1764,45 @@ class HeuktoramManager {
       return `${col}${r + 1}`;
     };
 
+    const wsCells = ws as Record<string, { v?: unknown; t?: string; s?: unknown }>;
+
     for (let r = 0; r < wsData.length; r++) {
-      for (let c = 0; c < COL; c++) {
+      for (let c = 0; c < COL_HEADER; c++) {
         const addr = toCell(r, c);
-        const cell = (ws as Record<string, { v?: unknown; t?: string; s?: unknown }>)[addr];
-        if (!cell) continue;
+        const cell = wsCells[addr];
 
         if (r === 2) {
-          // 3행: 대분류 헤더
-          cell.s = {
-            fill: { patternType: 'solid', fgColor: { rgb: 'FFB4C6E7' } },
-            font: { bold: true, sz: 10 },
-            alignment: CENTER_ALIGN,
-            border: THIN_BORDER,
-          };
+          // 3행: 대분류 헤더 (회색)
+          if (c < DATA_COL_END) {
+            if (!cell) wsCells[addr] = { v: '', t: 's' };
+            wsCells[addr].s = {
+              fill: { patternType: 'solid', fgColor: { rgb: 'FFC0C0C0' } },
+              font: { bold: true, sz: 10 },
+              alignment: CENTER_ALIGN,
+              border: THIN_BORDER,
+            };
+          } else if (cell && cell.v !== '' && cell.v !== undefined) {
+            // 코드 범례 영역(AY~BD): 배경/굵기/테두리 없음
+            cell.s = {
+              font: { sz: 11, name: '맑은 고딕' },
+              alignment: { horizontal: 'center', vertical: 'center' },
+            };
+          }
         } else if (r === 3) {
-          // 4행: 소분류 헤더
-          cell.s = {
-            fill: { patternType: 'solid', fgColor: { rgb: 'FFFCE4B5' } },
-            font: { bold: true, sz: 9 },
-            alignment: CENTER_ALIGN,
-            border: THIN_BORDER,
-          };
-        } else if (r >= 4) {
-          // 5행~: 데이터
-          cell.s = {
+          // 4행: 소분류 헤더 (회색) — 데이터 영역만
+          if (c < DATA_COL_END) {
+            if (!cell) wsCells[addr] = { v: '', t: 's' };
+            wsCells[addr].s = {
+              fill: { patternType: 'solid', fgColor: { rgb: 'FFC0C0C0' } },
+              font: { bold: true, sz: 9 },
+              alignment: CENTER_ALIGN,
+              border: THIN_BORDER,
+            };
+          }
+        } else if (r >= 4 && c < DATA_COL_END) {
+          // 5행~ 데이터 행: 데이터 영역(0~49)만
+          if (!cell) wsCells[addr] = { v: '', t: 's' };
+          wsCells[addr].s = {
             alignment: CENTER_ALIGN,
             border: THIN_BORDER,
           };

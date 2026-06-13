@@ -80,6 +80,8 @@ class HeavyMetalAnalysisManager {
     private selectedYear: string;
     private sampleLogs: HeavyMetalSampleLog[];
     private testResults: Record<string, HeavyMetalTestResult>;
+    /** 진행 중인 IDB 저장 promise (fire-and-forget 갭 차단용) */
+    private _pendingIdbSave: Promise<void> | null = null;
     private flatRows: HeavyMetalFlatRow[];
     private selectedKeys: Set<string>;
     private focusedCell: FocusedCell | null;
@@ -140,12 +142,16 @@ class HeavyMetalAnalysisManager {
     // 초기화
     // ========================================
 
-    private init(): void {
+    private async init(): Promise<void> {
         this.cacheElements();
         this.setDefaultYear();
         this.restoreFromHeavyMetalPage();
         this.bindEvents();
-        this.loadData();
+        // 분석결과 IDB 초기화 + localStorage 자동 마이그레이션(멱등)
+        try { await window.AnalysisDB?.init(); } catch (e) {
+            (window.logger?.warn || console.warn)('AnalysisDB 초기화 실패(LS 폴백):', e);
+        }
+        await this.loadData();
         this.render();
 
         // Firestore에서 분석 결과 동기화 (비동기)
@@ -221,8 +227,7 @@ class HeavyMetalAnalysisManager {
         this.yearSelect?.addEventListener('change', () => {
             this.selectedYear = this.yearSelect!.value;
             this.preSelectedLogIds = null;
-            this.loadData();
-            this.render();
+            void this.loadData().then(() => this.render());
         });
 
         this.selectAllCheckbox?.addEventListener('change', () => {
@@ -270,9 +275,9 @@ class HeavyMetalAnalysisManager {
     // 데이터 로드/저장
     // ========================================
 
-    private loadData(): void {
+    private async loadData(): Promise<void> {
         this.sampleLogs = this.loadSampleLogs();
-        this.testResults = this.loadTestResults();
+        this.testResults = await this.loadTestResults();
         this.buildFlatRows();
     }
 
@@ -297,8 +302,29 @@ class HeavyMetalAnalysisManager {
         }
     }
 
-    private loadTestResults(): Record<string, HeavyMetalTestResult> {
+    private async loadTestResults(): Promise<Record<string, HeavyMetalTestResult>> {
         const key = `heavyMetalTestResults_${this.selectedYear}`;
+        // IDB 우선 (init에서 마이그레이션 완료 보장)
+        if (window.AnalysisDB?.isReady?.()) {
+            try {
+                if (this._pendingIdbSave) { await this._pendingIdbSave.catch(() => {}); }
+                const map = await window.AnalysisDB.getMap('heavyMetal', this.selectedYear);
+                const typed = (map as Record<string, HeavyMetalTestResult>) || {};
+                if (Object.keys(typed).length > 0) return typed;
+                // IDB 비어 있음 → LS 자가복구 폴백
+                (window.logger?.warn || console.warn)('[AnalysisDB] heavyMetal IDB 빈 맵, LS 자가복구 시도 year=', this.selectedYear);
+                const lsData = localStorage.getItem(key);
+                if (!lsData) return {};
+                const lsParsed = (JSON.parse(lsData) as Record<string, HeavyMetalTestResult>) || {};
+                if (Object.keys(lsParsed).length > 0) {
+                    this._pendingIdbSave = window.AnalysisDB.saveMap('heavyMetal', this.selectedYear, lsParsed)
+                        .catch(e2 => { (window.logger?.error || console.error)('IDB 자가복구 저장 실패:', e2); });
+                }
+                return lsParsed;
+            } catch (e) {
+                (window.logger?.warn || console.warn)('IDB 검사 결과 로드 실패, LS 폴백:', e);
+            }
+        }
         try {
             const data = localStorage.getItem(key);
             if (!data) return {};
@@ -311,11 +337,21 @@ class HeavyMetalAnalysisManager {
 
     private saveTestResults(): void {
         const key = `heavyMetalTestResults_${this.selectedYear}`;
+        let snapshot: Record<string, HeavyMetalTestResult>;
+        try { snapshot = JSON.parse(JSON.stringify(this.testResults || {})); }
+        catch { snapshot = { ...(this.testResults || {}) }; }
         try {
-            localStorage.setItem(key, JSON.stringify(this.testResults));
+            localStorage.setItem(key, JSON.stringify(snapshot));
             this.syncTestResultsToFirestore();
         } catch (e) {
             (window.logger?.error || console.error)('중금속 검사 결과 저장 실패:', e);
+        }
+        // IDB 영속 저장 (fire-and-forget, 갭 차단용 promise 보관)
+        if (window.AnalysisDB?.isReady?.()) {
+            this._pendingIdbSave = window.AnalysisDB.saveMap('heavyMetal', this.selectedYear, snapshot)
+                .catch(e => {
+                    (window.logger?.error || console.error)('IDB 검사 결과 저장 실패:', e);
+                });
         }
     }
 
@@ -367,6 +403,10 @@ class HeavyMetalAnalysisManager {
             }
             const lsKey = `heavyMetalTestResults_${this.selectedYear}`;
             localStorage.setItem(lsKey, JSON.stringify(this.testResults));
+            if (window.AnalysisDB?.isReady?.()) {
+                this._pendingIdbSave = window.AnalysisDB.saveMap('heavyMetal', this.selectedYear, this.testResults)
+                    .catch(() => {});
+            }
             this.render();
             (window.logger?.info || console.log)('[중금속] Firestore → localStorage 동기화 완료');
         } catch (e) {

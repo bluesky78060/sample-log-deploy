@@ -16,6 +16,7 @@ import '../shared/tooltip.ts';
 import '../shared/logger.ts';
 import '../shared/firebase-config.ts';
 import '../shared/firestore-db.ts';
+import '../shared/analysis-db.ts';
 
 // Main script
 import './pesticide-analysis-script';

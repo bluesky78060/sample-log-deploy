@@ -76,6 +76,8 @@ class PesticideAnalysisViewer {
     private selectedYear: string;
     private sampleLogs: SampleLog[];
     private testResults: Record<string, TestResult>;
+    /** 진행 중인 IDB 저장 promise (fire-and-forget 갭 차단용) */
+    private _pendingIdbSave: Promise<void> | null = null;
     private filterStatus: FilterStatus;
     private preSelectedLogIds: Set<string> | null;
 
@@ -104,12 +106,16 @@ class PesticideAnalysisViewer {
         this.init();
     }
 
-    private init(): void {
+    private async init(): Promise<void> {
         this.cacheElements();
         this.setDefaultYear();
         this.restoreFromPesticidePage();
         this.bindEvents();
-        this.loadData();
+        // 분석결과 IDB 초기화 + localStorage 자동 마이그레이션(멱등)
+        try { await window.AnalysisDB?.init(); } catch (e) {
+            (window.logger?.warn || console.warn)('AnalysisDB 초기화 실패(LS 폴백):', e);
+        }
+        await this.loadData();
         this.render();
 
         if (window.ThemeManager) {
@@ -172,8 +178,7 @@ class PesticideAnalysisViewer {
     private bindEvents(): void {
         this.yearSelect?.addEventListener('change', () => {
             this.selectedYear = this.yearSelect!.value;
-            this.loadData();
-            this.render();
+            void this.loadData().then(() => this.render());
         });
 
         this.filterSelect?.addEventListener('change', () => {
@@ -188,9 +193,9 @@ class PesticideAnalysisViewer {
     // 데이터 로드
     // ========================================
 
-    private loadData(): void {
+    private async loadData(): Promise<void> {
         this.sampleLogs = this.loadSampleLogs();
-        this.testResults = this.loadTestResults();
+        this.testResults = await this.loadTestResults();
     }
 
     private loadSampleLogs(): SampleLog[] {
@@ -213,8 +218,29 @@ class PesticideAnalysisViewer {
         }
     }
 
-    private loadTestResults(): Record<string, TestResult> {
+    private async loadTestResults(): Promise<Record<string, TestResult>> {
         const key = `pesticideTestResults_${this.selectedYear}`;
+        // IDB 우선 (init에서 마이그레이션 완료 보장)
+        if (window.AnalysisDB?.isReady?.()) {
+            try {
+                if (this._pendingIdbSave) { await this._pendingIdbSave.catch(() => {}); }
+                const map = await window.AnalysisDB.getMap('pesticide', this.selectedYear);
+                const typed = (map as Record<string, TestResult>) || {};
+                if (Object.keys(typed).length > 0) return typed;
+                // IDB 비어 있음 → LS 자가복구 폴백
+                (window.logger?.warn || console.warn)('[AnalysisDB] pesticide IDB 빈 맵, LS 자가복구 시도 year=', this.selectedYear);
+                const lsData = localStorage.getItem(key);
+                if (!lsData) return {};
+                const lsParsed = (JSON.parse(lsData) as Record<string, TestResult>) || {};
+                if (Object.keys(lsParsed).length > 0) {
+                    this._pendingIdbSave = window.AnalysisDB.saveMap('pesticide', this.selectedYear, lsParsed)
+                        .catch(e2 => { (window.logger?.error || console.error)('IDB 자가복구 저장 실패:', e2); });
+                }
+                return lsParsed;
+            } catch (e) {
+                (window.logger?.warn || console.warn)('IDB 검사 결과 로드 실패, LS 폴백:', e);
+            }
+        }
         try {
             const data = localStorage.getItem(key);
             if (!data) return {};
@@ -250,6 +276,10 @@ class PesticideAnalysisViewer {
                 }
             }
             localStorage.setItem(`pesticideTestResults_${this.selectedYear}`, JSON.stringify(this.testResults));
+            if (window.AnalysisDB?.isReady?.()) {
+                this._pendingIdbSave = window.AnalysisDB.saveMap('pesticide', this.selectedYear, this.testResults)
+                    .catch(() => {});
+            }
             this.render();
         } catch (e: unknown) {
             (window.logger?.error || console.error)('Firestore 동기화 실패:', e);

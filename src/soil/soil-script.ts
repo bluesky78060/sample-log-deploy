@@ -93,6 +93,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     // 토양 분석결과 모달 상태
     private _soilAnalysisLogId: string | null = null;
     private _cachedSoilTestResults: Record<string, Record<string, string>> | null = null;
+    /** 진행 중인 IDB 저장 promise (fire-and-forget 갭 차단용) */
+    private _pendingIdbSave: Promise<void> | null = null;
 
     // 토양 분석 항목 정의
     static SOIL_ANALYSIS_FIELDS = [
@@ -4386,6 +4388,14 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     // ========================================
 
     async postInit() {
+        // 분석결과 IDB 초기화 + localStorage 자동 마이그레이션(멱등) → IDB 우선 캐시 워밍
+        try {
+            await window.AnalysisDB?.init();
+            await this.warmSoilTestResultsCacheFromIdb();
+        } catch (e) {
+            (window.logger?.warn || console.warn)('AnalysisDB 초기화 실패(LS 폴백):', e);
+        }
+
         // 초기 접수번호 설정
         if (this.receptionNumberInput) {
             this.receptionNumberInput.value = this.generateNextReceptionNumber();
@@ -4628,6 +4638,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     }
 
     loadAllSoilTestResults(): Record<string, Record<string, string>> {
+        // 동기 시그니처 유지(loadSoilTestResult 등 sync 호출부 호환).
+        // IDB 우선 데이터는 warmSoilTestResultsCacheFromIdb()가 init 시 캐시에 반영.
         const key = `test_soilTestResults_${this.selectedYear}`;
         try {
             const data = localStorage.getItem(key);
@@ -4639,14 +4651,62 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         }
     }
 
+    /**
+     * IDB(영속 주 저장소)에서 분석결과를 읽어 동기 캐시(_cachedSoilTestResults)를 갱신.
+     * loadAllSoilTestResults는 동기라서 LS만 보지만, init 직후 IDB 우선값으로 캐시를 덮어 정합 유지.
+     */
+    async warmSoilTestResultsCacheFromIdb(): Promise<void> {
+        if (!window.AnalysisDB?.isReady?.()) return;
+        try {
+            if (this._pendingIdbSave) { await this._pendingIdbSave.catch(() => {}); }
+            const map = await window.AnalysisDB.getMap('soil', this.selectedYear);
+            const typed = (map as Record<string, Record<string, string>>) || {};
+            if (Object.keys(typed).length > 0) {
+                this._cachedSoilTestResults = typed;
+            } else {
+                // IDB 비어 있음 → LS 자가복구 폴백
+                (window.logger?.warn || console.warn)('[AnalysisDB] soil IDB 빈 맵, LS 자가복구 시도 year=', this.selectedYear);
+                const lsKey = `test_soilTestResults_${this.selectedYear}`;
+                const lsData = localStorage.getItem(lsKey);
+                const lsParsed: Record<string, Record<string, string>> = lsData
+                    ? ((JSON.parse(lsData) as Record<string, Record<string, string>>) || {})
+                    : {};
+                this._cachedSoilTestResults = lsParsed;
+                if (Object.keys(lsParsed).length > 0) {
+                    // IDB 자가복구 저장 (fire-and-forget)
+                    this._pendingIdbSave = window.AnalysisDB.saveMap('soil', this.selectedYear, lsParsed)
+                        .catch(e2 => { (window.logger?.error || console.error)('IDB 자가복구 저장 실패:', e2); });
+                }
+            }
+            // LS 미러도 정합 유지(동기 폴백 대비)
+            try {
+                localStorage.setItem(`test_soilTestResults_${this.selectedYear}`, JSON.stringify(this._cachedSoilTestResults));
+            } catch { /* quota 무시 */ }
+            this.filterAndRenderLogs?.();
+        } catch (e) {
+            (window.logger?.warn || console.warn)('IDB 토양 분석결과 캐시 워밍 실패(LS 폴백):', e);
+        }
+    }
+
     saveAllSoilTestResults(results: Record<string, Record<string, string>>): void {
         const key = `test_soilTestResults_${this.selectedYear}`;
+        // 깊은 복사 스냅샷: 이후 results 변경이 IDB 비동기 write에 영향 주지 않도록
+        let snapshot: Record<string, Record<string, string>>;
+        try { snapshot = JSON.parse(JSON.stringify(results || {})); }
+        catch { snapshot = { ...(results || {}) }; }
         try {
-            localStorage.setItem(key, JSON.stringify(results));
+            localStorage.setItem(key, JSON.stringify(snapshot));
             this._cachedSoilTestResults = results;
             this.syncSoilTestResultsToFirestore(results);
         } catch (e) {
             (window.logger?.error || console.error)('토양 분석결과 저장 실패:', e);
+        }
+        // IDB 영속 저장 (fire-and-forget, 갭 차단용 promise 보관)
+        if (window.AnalysisDB?.isReady?.()) {
+            this._pendingIdbSave = window.AnalysisDB.saveMap('soil', this.selectedYear, snapshot)
+                .catch(e => {
+                    (window.logger?.error || console.error)('IDB 토양 분석결과 저장 실패:', e);
+                });
         }
     }
 
@@ -4694,6 +4754,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const storageKey = `test_soilTestResults_${this.selectedYear}`;
             localStorage.setItem(storageKey, JSON.stringify(merged));
             this._cachedSoilTestResults = merged;
+            // IDB에도 미러 (LS와 IDB 정합 유지)
+            if (window.AnalysisDB?.isReady?.()) {
+                this._pendingIdbSave = window.AnalysisDB.saveMap('soil', this.selectedYear, merged)
+                    .catch(() => {});
+            }
 
             this.filterAndRenderLogs();
             (window.logger?.info || console.log)('[토양분석] Firestore -> localStorage 동기화 완료');

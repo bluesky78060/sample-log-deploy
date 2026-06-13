@@ -41,6 +41,7 @@ import '../shared/sync-utils.ts';
 import '../shared/VirtualListManager.ts';
 import '../shared/BaseSampleManager.ts';
 import '../shared/excel-import-manager.ts';
+import '../shared/analysis-db.ts';
 
 // Data
 import '../cropData.ts';

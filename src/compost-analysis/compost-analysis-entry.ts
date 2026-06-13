@@ -11,6 +11,7 @@ import '../shared/toast';
 import '../shared/theme';
 import '../shared/tooltip';
 import '../shared/logger';
+import '../shared/analysis-db';
 
 // Main script
 import './compost-analysis-script';

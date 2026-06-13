@@ -713,6 +713,17 @@ interface Window {
   // Storage
   storageManager?: StorageManager;
 
+  // Analysis results (IndexedDB / Dexie)
+  AnalysisDB?: {
+    init(): Promise<void>;
+    isReady(): boolean;
+    getMap(type: string, year: string | number): Promise<Record<string, Record<string, unknown>>>;
+    saveMap(type: string, year: string | number, map: Record<string, Record<string, unknown>>): Promise<void>;
+    saveOne(type: string, year: string | number, sampleKey: string, fields: Record<string, unknown>): Promise<void>;
+    deleteYear(type: string, year: string | number): Promise<void>;
+    migrateFromLocalStorage(): Promise<{ migrated: number; scanned: number }>;
+  };
+
   // Encryption
   encryptionManager?: EncryptionManager;
   CryptoUtils?: CryptoUtils;

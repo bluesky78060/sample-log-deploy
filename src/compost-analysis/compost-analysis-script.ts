@@ -94,6 +94,8 @@ class CompostAnalysisManager {
     private selectedYear: string;
     private sampleLogs: CompostSampleLog[];
     private testResults: Record<string, CompostTestResult>;
+    /** 진행 중인 IDB 저장 promise (fire-and-forget 갭 차단용) */
+    private _pendingIdbSave: Promise<void> | null = null;
     private flatRows: CompostFlatRow[];
     private selectedKeys: Set<string>;
     private focusedCell: FocusedCell | null;
@@ -139,12 +141,16 @@ class CompostAnalysisManager {
     // 초기화
     // ========================================
 
-    private init(): void {
+    private async init(): Promise<void> {
         this.cacheElements();
         this.setDefaultYear();
         this.restoreFromCompostPage();
         this.bindEvents();
-        this.loadData();
+        // 분석결과 IDB 초기화 + localStorage 자동 마이그레이션(멱등)
+        try { await window.AnalysisDB?.init(); } catch (e) {
+            (window.logger?.warn || console.warn)('AnalysisDB 초기화 실패(LS 폴백):', e);
+        }
+        await this.loadData();
         this.render();
 
         // Firestore에서 분석 결과 동기화 (비동기)
@@ -220,8 +226,7 @@ class CompostAnalysisManager {
         this.yearSelect?.addEventListener('change', () => {
             this.selectedYear = this.yearSelect!.value;
             this.preSelectedLogIds = null;
-            this.loadData();
-            this.render();
+            void this.loadData().then(() => this.render());
         });
 
         this.selectAllCheckbox?.addEventListener('change', () => {
@@ -269,9 +274,9 @@ class CompostAnalysisManager {
     // 데이터 로드/저장
     // ========================================
 
-    private loadData(): void {
+    private async loadData(): Promise<void> {
         this.sampleLogs = this.loadSampleLogs();
-        this.testResults = this.loadTestResults();
+        this.testResults = await this.loadTestResults();
         this.buildFlatRows();
     }
 
@@ -297,8 +302,32 @@ class CompostAnalysisManager {
         }
     }
 
-    private loadTestResults(): Record<string, CompostTestResult> {
+    private async loadTestResults(): Promise<Record<string, CompostTestResult>> {
         const key = `compostTestResults_${this.selectedYear}`;
+        // IDB 우선 (init에서 마이그레이션 완료 보장)
+        if (window.AnalysisDB?.isReady?.()) {
+            try {
+                // fire-and-forget IDB write의 갭 차단: 진행 중 저장 완료까지 대기
+                if (this._pendingIdbSave) { await this._pendingIdbSave.catch(() => {}); }
+                const map = await window.AnalysisDB.getMap('compost', this.selectedYear);
+                const typed = (map as Record<string, CompostTestResult>) || {};
+                if (Object.keys(typed).length > 0) return typed;
+                // IDB 비어 있음 → LS 자가복구 폴백
+                (window.logger?.warn || console.warn)('[AnalysisDB] compost IDB 빈 맵, LS 자가복구 시도 year=', this.selectedYear);
+                const lsData = localStorage.getItem(key);
+                if (!lsData) return {};
+                const lsParsed = (JSON.parse(lsData) as Record<string, CompostTestResult>) || {};
+                if (Object.keys(lsParsed).length > 0) {
+                    // LS 데이터를 IDB에 복구 저장 (fire-and-forget)
+                    this._pendingIdbSave = window.AnalysisDB.saveMap('compost', this.selectedYear, lsParsed)
+                        .catch(e2 => { (window.logger?.error || console.error)('IDB 자가복구 저장 실패:', e2); });
+                }
+                return lsParsed;
+            } catch (e) {
+                (window.logger?.warn || console.warn)('IDB 검사 결과 로드 실패, LS 폴백:', e);
+            }
+        }
+        // 폴백: localStorage (IDB 미초기화 또는 오류 시)
         try {
             const data = localStorage.getItem(key);
             if (!data) return {};
@@ -311,11 +340,23 @@ class CompostAnalysisManager {
 
     private saveTestResults(): void {
         const key = `compostTestResults_${this.selectedYear}`;
+        // 깊은 복사 스냅샷: 이후 this.testResults 변경이 IDB 비동기 write에 영향 주지 않도록
+        let snapshot: Record<string, CompostTestResult>;
+        try { snapshot = JSON.parse(JSON.stringify(this.testResults || {})); }
+        catch { snapshot = { ...(this.testResults || {}) }; }
         try {
-            localStorage.setItem(key, JSON.stringify(this.testResults));
+            // LS 백업 미러 (rollback 안전 + 동기 폴백 지원)
+            localStorage.setItem(key, JSON.stringify(snapshot));
             this.syncTestResultsToFirestore();
         } catch (e) {
             (window.logger?.error || console.error)('퇴·액비 검사 결과 저장 실패:', e);
+        }
+        // IDB 영속 저장 — 진행 중 promise 보관해 loadTestResults에서 await(갭 차단)
+        if (window.AnalysisDB?.isReady?.()) {
+            this._pendingIdbSave = window.AnalysisDB.saveMap('compost', this.selectedYear, snapshot)
+                .catch(e => {
+                    (window.logger?.error || console.error)('IDB 검사 결과 저장 실패:', e);
+                });
         }
     }
 
@@ -367,6 +408,11 @@ class CompostAnalysisManager {
             }
             const lsKey = `compostTestResults_${this.selectedYear}`;
             localStorage.setItem(lsKey, JSON.stringify(this.testResults));
+            // IDB에도 미러 (LS와 IDB 정합 유지)
+            if (window.AnalysisDB?.isReady?.()) {
+                this._pendingIdbSave = window.AnalysisDB.saveMap('compost', this.selectedYear, this.testResults)
+                    .catch(() => {});
+            }
             this.render();
             (window.logger?.info || console.log)('[퇴·액비] Firestore → localStorage 동기화 완료');
         } catch (e) {
