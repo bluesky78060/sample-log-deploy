@@ -289,17 +289,42 @@ async function getAllDocuments(
     year: number,
     options: GetAllDocumentsOptions = {}
 ): Promise<Array<Record<string, unknown>>> {
+    // SAMPL-1-80: getAllDocumentsWithMeta에 위임하여 단일 진실원천(쿼리/정렬/정규화) 유지
+    const { documents } = await getAllDocumentsWithMeta(sampleType, year, options);
+    return documents;
+}
+
+interface GetAllWithMetaResult {
+    documents: Array<Record<string, unknown>>;
+    fromCache: boolean;
+}
+
+/**
+ * 컬렉션 전체 조회 + fromCache 메타데이터 (SAMPL-1-80)
+ * 캐시(오프라인/경합/일시단절)에서 온 불완전 응답 여부를 호출부에 노출하여
+ * cross-device 삭제 판정을 보류할 수 있게 한다.
+ */
+async function getAllDocumentsWithMeta(
+    sampleType: string,
+    year: number,
+    options: GetAllDocumentsOptions = {}
+): Promise<GetAllWithMetaResult> {
+    void options;
     if (!window.firebaseConfig?.isEnabled()) {
-        return [];
+        return { documents: [], fromCache: false };
     }
 
     try {
         return await withFirebaseRetry(async () => {
             const db = window.firebaseConfig!.getDb();
-            if (!db) return [];
+            if (!db) return { documents: [], fromCache: false };
 
             const collectionName = getCollectionName(sampleType, year);
             const querySnapshot = await db.collection(collectionName).get();
+
+            // SAMPL-1-80: 캐시(오프라인/경합/일시단절)에서 온 불완전 응답 여부.
+            // fromCache=true면 호출부가 cross-device 삭제 판정을 보류해야 한다.
+            const fromCache = querySnapshot.metadata?.fromCache === true;
 
             const documents: Array<Record<string, unknown>> = [];
             querySnapshot.forEach((doc: FirestoreDocumentSnapshot) => {
@@ -319,14 +344,14 @@ async function getAllDocuments(
                 });
             }
 
-            logFirestore(`조회 완료: ${collectionName}, ${documents.length}건`);
-            return normalizeDataIds(documents);
-        }, 'getAllDocuments');
+            logFirestore(`조회 완료(메타): ${collectionName}, ${documents.length}건 (fromCache=${fromCache})`);
+            return { documents: normalizeDataIds(documents), fromCache };
+        }, 'getAllDocumentsWithMeta');
     } catch (error) {
         if (window.ErrorHandler && window.ErrorHandler.handle) {
             window.ErrorHandler.handle(error, 'FIREBASE_LOAD', { silent: true });
         }
-        return [];
+        return { documents: [], fromCache: false };
     }
 }
 
@@ -702,6 +727,7 @@ window.firestoreDb = {
     save: saveDocument,
     get: getDocument,
     getAll: getAllDocuments,
+    getAllWithMeta: getAllDocumentsWithMeta,
     delete: deleteDocument,
     batchSave: batchSave,
     migrate: migrateFromLocalStorage,
