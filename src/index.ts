@@ -11,6 +11,7 @@ import {
   dialog,
   session,
   safeStorage,
+  shell,
   type MenuItemConstructorOptions,
   type IpcMainInvokeEvent,
 } from 'electron';
@@ -61,6 +62,7 @@ const IPC_RATE_LIMIT = {
   WINDOW_MS: 1000,
   MAX_CALLS_FILE: 10,      // 파일 작업: 초당 10회 (보안 강화)
   MAX_CALLS_GENERAL: 30,   // 일반 IPC: 초당 30회
+  MAX_CALLS_EXTERNAL: 5,   // 외부 API(JUSO 등): 초당 5회 (외부 쿼터 보호)
 } as const;
 
 // ========================================
@@ -431,6 +433,21 @@ const createWindow = (): void => {
     }
   });
 
+  // SEC(SAMPL-2-18): 신규 창 생성 차단 (window.open / target=_blank)
+  // will-navigate는 같은 창 내 이동만 막으므로 새 BrowserWindow 생성은 별도 차단 필요.
+  // 외부 https 링크는 OS 기본 브라우저로 위임하고, 그 외(file:/data: 포함)는 모두 거부한다.
+  // 참고: 앱은 renderer에서 window.open을 사용하지만 Electron 경로에서는
+  //  (1) 분석 팝업이 isElectron 가드로 IPC(electronAPI.openX)를 타고
+  //  (2) viewer.html 팝업은 버튼/파일이 없는 죽은 코드라 호출되지 않으므로 현재 기능 무파손.
+  //  (viewer 기능 복구나 가드 제거 시에는 내부 file:// 경로 허용 분기를 여기 추가할 것)
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) {
+      // Promise 거부가 unhandledRejection이 되지 않도록 swallow (외부 브라우저 위임 실패는 무시 가능)
+      void shell.openExternal(url).catch(() => {});
+    }
+    return { action: 'deny' };
+  });
+
   // 개발 모드에서 DevTools 열기
   if (
     process.env.DEV_MODE === '1' ||
@@ -447,6 +464,13 @@ const createWindow = (): void => {
 
 // Electron 초기화 완료 후 브라우저 창 생성 준비
 app.whenReady().then(async () => {
+  // SEC(SAMPL-2-18): 모든 webContents(메인+분석/팝업 창)에 신규 창 생성 일괄 차단.
+  // 메인 윈도우는 createWindow에서 https 외부링크를 shell.openExternal로 위임하지만,
+  // 자식 창들은 외부 링크가 필요 없으므로 전역적으로 신규 창을 거부한다.
+  app.on('web-contents-created', (_event, contents) => {
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  });
+
   // 개발 모드에서 캐시 클리어
   if (isDev) {
     await session.defaultSession.clearCache();
@@ -465,12 +489,12 @@ app.whenReady().then(async () => {
             "default-src 'self' file:; " +
               // unsafe-eval 제거 완료: eval(), Function(), setTimeout(string) 사용 차단
               // unsafe-inline은 단계적 마이그레이션을 위해 일시적으로 유지 (추후 해시 방식으로 전환 예정)
-              "script-src 'self' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://t1.kakaocdn.net https://t1.daumcdn.net https://cdnjs.cloudflare.com; " +
-              "style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com https://t1.kakaocdn.net; " +
+              "script-src 'self' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://cdnjs.cloudflare.com; " +
+              "style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; " +
               "font-src 'self' file: https://fonts.gstatic.com; " +
-              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.ipify.org https://www.gstatic.com https://cdnjs.cloudflare.com; " +
+              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.ipify.org https://www.gstatic.com https://cdnjs.cloudflare.com https://openapi.foodsafetykorea.go.kr; " +
               "img-src 'self' file: data:; " +
-              "frame-src 'self' http://t1.kakaocdn.net https://t1.kakaocdn.net http://postcode.map.kakao.com https://postcode.map.kakao.com http://*.kakaocdn.net https://*.kakaocdn.net http://t1.daumcdn.net https://t1.daumcdn.net http://postcode.map.daum.net https://postcode.map.daum.net http://*.daumcdn.net https://*.daumcdn.net; " + // Kakao 우편번호 API iframe (HTTP/HTTPS 모두 허용)
+              "frame-src 'self'; " + // (SAMPL-1-110) Daum/Kakao 우편번호 iframe 제거 — JUSO 검색으로 전환
               "object-src 'none'; " + // Flash, Java 등 플러그인 차단
               "base-uri 'self'; " + // <base> 태그 제한
               "form-action 'self'; " + // 폼 제출 대상 제한
@@ -665,6 +689,8 @@ const ipcRateLimiter = (() => {
   const callCounts = new Map<string, RateLimiterEntry>();
   // 파일 작업 채널 목록 (보안상 더 엄격한 제한 적용)
   const fileChannels = new Set(['write-file', 'read-file', 'save-file-dialog', 'open-file-dialog']);
+  // 외부 API 채널 목록 (외부 쿼터 보호를 위해 더 낮은 제한)
+  const externalChannels = new Set(['juso:search', 'vworld-geocode', 'psis:lookup-use']);
 
   return {
     check(channel: string): boolean {
@@ -672,7 +698,9 @@ const ipcRateLimiter = (() => {
       const entry = callCounts.get(channel);
       const maxCalls = fileChannels.has(channel)
         ? IPC_RATE_LIMIT.MAX_CALLS_FILE
-        : IPC_RATE_LIMIT.MAX_CALLS_GENERAL;
+        : externalChannels.has(channel)
+          ? IPC_RATE_LIMIT.MAX_CALLS_EXTERNAL
+          : IPC_RATE_LIMIT.MAX_CALLS_GENERAL;
 
       if (!entry || now - entry.start > IPC_RATE_LIMIT.WINDOW_MS) {
         callCounts.set(channel, { start: now, count: 1 });
@@ -1577,9 +1605,37 @@ ipcMain.handle('clear-session-password', async (event) => {
 // VWORLD 지번 지오코딩 (main process → Origin 헤더 없음, 도메인 제한 우회)
 // ========================================
 
-ipcMain.handle('vworld-geocode', async (_event, { address, apiKey }: { address: string; apiKey: string }) => {
+/**
+ * VWORLD API 키를 메인 프로세스에서만 로드 (SAMPL-2-19).
+ * 렌더러/소스/번들에 키를 노출하지 않기 위해 빌드 시 주입된 파일/환경변수에서 읽는다.
+ * 우선순위: process.env → dist/vworld-key.txt(개발/패키지) → resources/vworld-key.txt(extraResource 폴백).
+ * scripts/gen-vworld-key.mjs 가 dist/vworld-key.txt 를 생성한다.
+ */
+function getVworldKey(): string {
+  if (process.env.VWORLD_API_KEY) return process.env.VWORLD_API_KEY.trim();
+  const candidates = [
+    path.join(__dirname, 'vworld-key.txt'), // dist/ (asar 내부 포함)
+    process.resourcesPath ? path.join(process.resourcesPath, 'vworld-key.txt') : '', // extraResource 폴백
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const v = fs.readFileSync(p, 'utf-8').trim();
+        if (v) return v;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
+ipcMain.handle('vworld-geocode', async (event, { address }: { address: string }) => {
+  if (!isValidSender(event)) return null;
+  const apiKey = getVworldKey();
+  if (!apiKey || !address) return null;
   const https = require('node:https');
-  const url = `https://api.vworld.kr/req/address?service=address&request=getCoord&version=2.0&crs=epsg:4326&address=${encodeURIComponent(address)}&refine=true&simple=false&format=json&type=parcel&key=${apiKey}`;
+  const url = `https://api.vworld.kr/req/address?service=address&request=getCoord&version=2.0&crs=epsg:4326&address=${encodeURIComponent(address)}&refine=true&simple=false&format=json&type=parcel&key=${encodeURIComponent(apiKey)}`;
   return new Promise<boolean | null>((resolve) => {
     const timeout = setTimeout(() => { req.destroy(); resolve(null); }, 8000);
     const req = https.get(url, (res: any) => {
@@ -1597,5 +1653,365 @@ ipcMain.handle('vworld-geocode', async (_event, { address, apiKey }: { address: 
       });
     });
     req.on('error', () => { clearTimeout(timeout); resolve(null); });
+  });
+});
+
+// ========================================
+// 행정안전부 도로명주소(JUSO) 검색 (SAMPL-1-110)
+// main process → file:// Origin/CORS 우회. confmKey는 main에서만 보유(렌더러 미노출).
+// ========================================
+
+/**
+ * JUSO API confmKey 로드 (메인 프로세스 전용, 렌더러 미노출).
+ * VWORLD와 동일 패턴: process.env → dist/juso-key.txt → resources/juso-key.txt.
+ * scripts/gen-juso-key.mjs 가 dist/juso-key.txt 를 생성한다.
+ */
+function getJusoKey(): string {
+  if (process.env.JUSO_API_KEY) return process.env.JUSO_API_KEY.trim();
+  const candidates = [
+    path.join(__dirname, 'juso-key.txt'),
+    process.resourcesPath ? path.join(process.resourcesPath, 'juso-key.txt') : '',
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const v = fs.readFileSync(p, 'utf-8').trim();
+        if (v) return v;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
+// JUSO 검색어 sanitize (SQL 인젝션 방어).
+// SAMPL-1-47 H-2: defense-in-depth 의도적 중복 — renderer 카운터파트:
+//   src/shared/juso-service.ts (동일 상수/로직). 목록 변경 시 두 파일 동시 수정 필수.
+//   renderer는 즉시 UX 에러용, main이 보안 신뢰 경계.
+const JUSO_SQL_RESERVED = [
+  'OR', 'SELECT', 'INSERT', 'DELETE', 'UPDATE',
+  'CREATE', 'DROP', 'EXEC', 'UNION', 'FETCH',
+  'DECLARE', 'TRUNCATE',
+];
+const JUSO_BAD_CHARS = /[<>=%]/;
+const JUSO_SQL_PATTERNS = JUSO_SQL_RESERVED.map((w) => ({ word: w, re: new RegExp(`\\b${w}\\b`, 'i') }));
+
+function sanitizeJusoKeyword(q: unknown): { ok: true; value: string } | { ok: false; error: string } {
+  const s = String(q ?? '').trim();
+  if (!s) return { ok: false, error: '검색어를 입력해 주세요.' };
+  if (s.length > 80) return { ok: false, error: '검색어가 너무 깁니다 (최대 80자).' };
+  if (JUSO_BAD_CHARS.test(s)) return { ok: false, error: '<, >, =, % 문자는 사용할 수 없습니다.' };
+  for (const { word, re } of JUSO_SQL_PATTERNS) {
+    if (re.test(s)) return { ok: false, error: `"${word}" 같은 예약어는 사용할 수 없습니다.` };
+  }
+  return { ok: true, value: s };
+}
+
+interface JusoSearchPayload {
+  keyword?: unknown;
+  page?: unknown;
+  size?: unknown;
+}
+
+ipcMain.handle('juso:search', async (event: IpcMainInvokeEvent, payload: JusoSearchPayload) => {
+  if (!isValidSender(event)) return { ok: false, error: '유효하지 않은 요청입니다.' };
+  if (!ipcRateLimiter.check('juso:search')) {
+    return { ok: false, error: '요청이 너무 빈번합니다. 잠시 후 다시 시도하세요.' };
+  }
+  if (!payload || typeof payload !== 'object') {
+    return { ok: false, error: '유효하지 않은 요청입니다.' };
+  }
+  const chk = sanitizeJusoKeyword(payload.keyword);
+  if (!chk.ok) return { ok: false, error: chk.error };
+
+  const pageNum = Math.max(1, Math.min(100, Number(payload.page) || 1));
+  const sizeNum = Math.max(1, Math.min(50, Number(payload.size) || 10));
+
+  const apiKey = getJusoKey();
+  if (!apiKey) {
+    return { ok: false, error: 'JUSO_API_KEY가 설정되지 않았습니다.' };
+  }
+
+  const https = require('node:https');
+  const params = new URLSearchParams({
+    confmKey: apiKey,
+    currentPage: String(pageNum),
+    countPerPage: String(sizeNum),
+    keyword: chk.value,
+    resultType: 'json',
+    hstryYn: 'N',
+  });
+  const url = `https://business.juso.go.kr/addrlink/addrLinkApi.do?${params.toString()}`;
+  const MAX_RESPONSE_SIZE = 256 * 1024; // 256KB
+
+  return new Promise((resolve) => {
+    // Buffer 누적: 청크 경계 UTF-8 다중바이트(한글 3B) 잘림 방어
+    const chunks: Buffer[] = [];
+    let totalSize = 0;
+    let aborted = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const finish = (result: unknown): void => {
+      if (aborted) return;
+      aborted = true;
+      if (timeout) clearTimeout(timeout);
+      resolve(result);
+    };
+    const req = https.get(url, (res: any) => {
+      const status = res.statusCode || 0;
+      if (status < 200 || status >= 300) {
+        req.destroy();
+        return finish({ ok: false, error: `JUSO HTTP ${status} 오류 (점검 중이거나 API 키를 확인하세요).` });
+      }
+      res.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        chunks.push(chunk);
+        totalSize += chunk.length;
+        if (totalSize > MAX_RESPONSE_SIZE) {
+          req.destroy();
+          finish({ ok: false, error: 'JUSO 응답이 너무 큽니다.' });
+        }
+      });
+      res.on('end', () => {
+        if (aborted) return;
+        try {
+          const data = Buffer.concat(chunks).toString('utf8');
+          const json = JSON.parse(data);
+          const results = json?.results;
+          if (!results) return finish({ ok: false, error: 'JUSO 응답 형식 오류' });
+          const common = results.common || {};
+          if (common.errorCode && common.errorCode !== '0') {
+            return finish({ ok: false, error: `JUSO ${common.errorCode}: ${common.errorMessage || ''}`.trim() });
+          }
+          const items = Array.isArray(results.juso) ? results.juso : [];
+          finish({
+            ok: true,
+            total: Number(common.totalCount || items.length || 0),
+            page: Number(common.currentPage || pageNum),
+            size: Number(common.countPerPage || sizeNum),
+            items,
+          });
+        } catch {
+          finish({ ok: false, error: 'JUSO 응답 파싱 오류' });
+        }
+      });
+    });
+    timeout = setTimeout(() => { req.destroy(); finish({ ok: false, error: 'JUSO 호출 시간 초과 (8초).' }); }, 8000);
+    req.on('error', (err: any) => {
+      console.error('[juso:search] 네트워크 오류:', err?.message);
+      finish({ ok: false, error: 'JUSO 네트워크 오류' });
+    });
+  });
+});
+
+// ========================================
+// MRL / PSIS IPC Handlers (잔류농약 기준 인프라 — SAMPL-1-112 Phase 1)
+// ========================================
+
+/**
+ * 식품안전나라(MRL) API 키를 메인 프로세스에서만 로드 (SAMPL-1-114).
+ * 렌더러/소스/번들에 키를 노출하지 않기 위해 빌드 시 주입된 파일/환경변수에서 읽는다.
+ * 우선순위: process.env → dist/mrl-key.txt(개발/패키지) → resources/mrl-key.txt(extraResource 폴백).
+ * scripts/gen-mrl-key.mjs 가 dist/mrl-key.txt 를 생성한다. (VWORLD/JUSO 패턴과 동일)
+ */
+function getMrlApiKey(): string {
+  if (process.env.FOODSAFETY_API_KEY) return process.env.FOODSAFETY_API_KEY.trim();
+  const candidates = [
+    path.join(__dirname, 'mrl-key.txt'), // dist/ (asar 내부 포함)
+    process.resourcesPath ? path.join(process.resourcesPath, 'mrl-key.txt') : '', // extraResource 폴백
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const v = fs.readFileSync(p, 'utf-8').trim();
+        if (v) return v;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
+// MRL(식품안전나라) API 키 게터 — 렌더러가 fetch를 직접 수행하므로 키만 전달.
+// 우선순위: 렌더러 localStorage('mrl_api_key') > 이 IPC 반환값 (mrl-api.ts에서 결정).
+// 보안(M1): 식품안전나라 무료·저위험 키 — 렌더러 직접 fetch라 키가 노출되는 의도된 트레이드오프.
+ipcMain.handle('mrl:get-api-key', (event: IpcMainInvokeEvent) => {
+  // sender 검증 — 이 프로젝트 index.ts 의 모든 민감 핸들러 패턴과 일치(방어적 일관성).
+  if (!isValidSender(event)) return '';
+  return getMrlApiKey();
+});
+
+/**
+ * PSIS(농촌진흥청 농약등록정보) API 키를 메인 프로세스에서만 로드 (SAMPL-1-114).
+ * 우선순위: process.env(RDA_PSIS_API_KEY → RAD_PSIS_API_KEY 오타폴백) → dist/psis-key.txt → resources/psis-key.txt.
+ * scripts/gen-psis-key.mjs 가 dist/psis-key.txt 를 생성한다. (VWORLD/JUSO/MRL 패턴과 동일)
+ * 빌드 주입이 없으면 패키징 앱의 process.env 가 비어 용도조회가 비활성되므로 파일 폴백이 필수.
+ */
+function getPsisApiKey(): string {
+  // [M2] .env/secrets 오타(RAD) 폴백 포함
+  if (process.env.RDA_PSIS_API_KEY) return process.env.RDA_PSIS_API_KEY.trim();
+  if (process.env.RAD_PSIS_API_KEY) return process.env.RAD_PSIS_API_KEY.trim();
+  const candidates = [
+    path.join(__dirname, 'psis-key.txt'), // dist/ (asar 내부 포함)
+    process.resourcesPath ? path.join(process.resourcesPath, 'psis-key.txt') : '', // extraResource 폴백
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const v = fs.readFileSync(p, 'utf-8').trim();
+        if (v) return v;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
+// PSIS(농촌진흥청 농약등록정보) 농약 용도 조회 — main process 경유(http 엔드포인트라 렌더러 직접 호출 불가).
+// 보안: apiKey는 main process의 getPsisApiKey()에서만 참조, 로그에 키 노출 금지.
+//   psis-parse.ts 와 동일 규칙의 XML 파서를 main 프로세스 자체완결을 위해 인라인 구현
+//   (dist 에는 index.js/preload.js 만 emit 되므로 shared 모듈을 require 하지 않는다 — JUSO 패턴과 동일).
+ipcMain.handle('psis:lookup-use', async (event: IpcMainInvokeEvent, payload?: { korName?: unknown }) => {
+  if (!isValidSender(event)) return { useName: null, error: 'invalid_sender' };
+  if (!ipcRateLimiter.check('psis:lookup-use')) {
+    return { useName: null, error: 'rate_limited' };
+  }
+  const korName = payload?.korName;
+  if (typeof korName !== 'string' || korName.length === 0 || korName.length > 100) {
+    return { useName: null, error: 'invalid_input' };
+  }
+  // SAMPL-1-114: env → dist/psis-key.txt 폴백 (패키징 앱에서 process.env 빈 값 대응)
+  const apiKey = getPsisApiKey();
+  if (!apiKey) {
+    return { useName: null, error: 'no_key' };
+  }
+
+  // ----- XML 파서 (psis-parse.ts normalizeUseName/parsePsisUseName 와 동일 규칙) -----
+  const decodeEntities = (str: string): string =>
+    String(str)
+      .replace(/&#x([0-9a-fA-F]+);/g, (_m, h: string) => {
+        const code = parseInt(h, 16);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : _m;
+      })
+      .replace(/&#(\d+);/g, (_m, d: string) => {
+        const code = parseInt(d, 10);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : _m;
+      })
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&');
+  const extractTagValues = (xml: string, localName: string): string[] => {
+    if (typeof xml !== 'string' || !xml) return [];
+    const re = new RegExp(
+      '<(?:[\\w.-]+:)?' + localName + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?' + localName + '>',
+      'gi'
+    );
+    const out: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(xml)) !== null) out.push(decodeEntities(m[1]).trim());
+    return out;
+  };
+  const extractFirst = (xml: string, localName: string): string | null => {
+    const v = extractTagValues(xml, localName);
+    return v.length ? v[0] : null;
+  };
+  const normalizeUseName = (raw: string | null): string | null => {
+    if (raw == null) return null;
+    const s = String(raw).trim();
+    if (!s) return null;
+    if (/제$/.test(s)) return s;
+    return s + '제';
+  };
+  const parsePsisUseName = (xmlString: string): { useName: string | null; error: string | null } => {
+    if (typeof xmlString !== 'string' || !xmlString.trim()) {
+      return { useName: null, error: 'empty_response' };
+    }
+    const errorCode = extractFirst(xmlString, 'errorCode');
+    if (errorCode) {
+      const errorMsg = extractFirst(xmlString, 'errorMsg') || '';
+      return { useName: null, error: `${errorCode}: ${errorMsg}`.trim() };
+    }
+    const values = extractTagValues(xmlString, 'useName').filter((v) => v !== '');
+    if (!values.length) return { useName: null, error: null };
+    const counts = new Map<string, number>();
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const v of values) {
+      const next = (counts.get(v) || 0) + 1;
+      counts.set(v, next);
+      if (next > bestCount) {
+        bestCount = next;
+        best = v;
+      }
+    }
+    return { useName: normalizeUseName(best), error: null };
+  };
+
+  // 한글 품목명은 UTF-8 encodeURIComponent로 인코딩 (apiKey는 URL에만, 로그 금지)
+  const url =
+    `http://psis.rda.go.kr/openApi/service.do?apiKey=${encodeURIComponent(apiKey)}` +
+    `&serviceCode=SVC01&serviceType=AA001&displayCount=20&startPoint=1` +
+    `&pestiKorName=${encodeURIComponent(korName)}`;
+  const MAX_RESPONSE_SIZE = 512 * 1024; // 512KB
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let totalSize = 0;
+    let aborted = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const finish = (value: unknown): void => {
+      if (aborted) return;
+      aborted = true;
+      if (timeout) clearTimeout(timeout);
+      resolve(value);
+    };
+    const req = http.get(url, (res) => {
+      const status = res.statusCode || 0;
+      if (status < 200 || status >= 300) {
+        req.destroy();
+        return finish({ useName: null, error: `http_${status}` });
+      }
+      res.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        chunks.push(chunk);
+        totalSize += chunk.length;
+        if (totalSize > MAX_RESPONSE_SIZE) {
+          req.destroy();
+          finish({ useName: null, error: 'response_too_large' });
+        }
+      });
+      res.on('end', () => {
+        if (aborted) return;
+        try {
+          const body = Buffer.concat(chunks).toString('utf8');
+          const parsed = parsePsisUseName(body);
+          if (parsed.error || !parsed.useName) {
+            // 진단용 일부 로그. apiKey 는 body 에 없으나, 만약 응답이 요청 URL 을 echo 할 경우
+            // apiKey 노출을 막기 위해 스니펫에서 마스킹한다(방어적).
+            const snippet = body
+              .slice(0, 300)
+              .replace(/\s+/g, ' ')
+              .replace(/apiKey=[^&\s]+/gi, 'apiKey=***');
+            console.warn(
+              `[psis:lookup-use] "${korName}" 결과없음/오류: ${parsed.error || 'no_useName'} | ${snippet}`
+            );
+          }
+          finish(parsed);
+        } catch {
+          finish({ useName: null, error: 'parse_error' });
+        }
+      });
+    });
+    timeout = setTimeout(() => {
+      req.destroy();
+      finish({ useName: null, error: 'timeout' });
+    }, 8000);
+    req.on('error', (err: Error) => {
+      console.error('[psis:lookup-use] 네트워크 오류:', err?.message);
+      finish({ useName: null, error: 'network_error' });
+    });
   });
 });

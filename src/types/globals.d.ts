@@ -140,7 +140,135 @@ interface ElectronAPI {
   openHeavyMetalAnalysis?(): Promise<boolean>;
 
   // VWORLD geocoding (IPC via main process, no Origin restriction)
-  vworldGeocode?(address: string, apiKey: string): Promise<boolean | null>;
+  vworldGeocode?(address: string): Promise<boolean | null>;
+
+  // JUSO(도로명주소) 검색 (IPC via main process, key는 main 보유)
+  jusoSearch?(payload: { keyword: string; page?: number; size?: number }): Promise<JusoSearchResult>;
+
+  // MRL(식품안전나라) 내장 API 키 게터 (키는 main env 보유 — 렌더러가 직접 fetch)
+  mrlGetApiKey?(): Promise<string>;
+
+  // PSIS(농촌진흥청) 농약 용도 조회 (IPC via main process, http 엔드포인트)
+  psisLookupUse?(payload: { korName: string }): Promise<PsisLookupUseResult>;
+}
+
+// ========================================
+// MRL / PSIS Types (SAMPL-1-112 Phase 1)
+// ========================================
+
+/** psis:lookup-use IPC 반환 형태 */
+interface PsisLookupUseResult {
+  useName: string | null;
+  error?: string;
+}
+
+/** mrl-name-canon (window.MrlNameCanon) */
+interface MrlNameCanonApi {
+  canonicalizeKor(name: unknown): string;
+  stripIsomerSuffix(key: unknown): string;
+  KOR_ALIAS: Record<string, string>;
+  baseNorm(s: unknown): string;
+}
+
+/** mrl-search 후보 항목 */
+interface MrlPesticideCandidate {
+  kor: string;
+  engNames: string[];
+  inMrl: boolean;
+}
+
+/** mrl-search (window.MrlSearch) */
+interface MrlSearchApi {
+  normalize(str: unknown): string;
+  hasKorean(str: unknown): boolean;
+  buildKorToEngIndex(
+    nameMapEntries: Record<string, { kor?: string; [k: string]: unknown }> | null | undefined
+  ): Map<string, string[]>;
+  engNamesForKor(kor: string, korToEngIndex: Map<string, string[]> | null | undefined): string[];
+  findPesticideCandidates(
+    query: string,
+    korPesticideNames: string[] | null | undefined,
+    nameMapEntries: Record<string, { kor?: string; [k: string]: unknown }> | null | undefined,
+    limit?: number
+  ): MrlPesticideCandidate[];
+}
+
+/** psis-parse (window.PsisParse) */
+interface PsisParseApi {
+  parsePsisUseName(xmlString: unknown): { useName: string | null; error: string | null };
+  normalizeUseName(raw: unknown): string | null;
+  decodeEntities(str: unknown): string;
+  extractTagValues(xml: unknown, localName: string): string[];
+}
+
+/** pesticide-use-type (window.PesticideUseType / window.PESTICIDE_USE_TYPE) */
+interface PesticideUseTypeApi {
+  get(engName: unknown): string | null;
+  getByKor(korName: unknown): string | null;
+  normalize(str: unknown): string;
+  USE_TYPES: string[];
+  meta: Record<string, unknown>;
+}
+
+/** pesticide-name-map (window.PESTICIDE_NAME_MAP) */
+interface PesticideNameMapData {
+  meta?: Record<string, unknown>;
+  map: Record<string, { kor: string; confidence?: string; score?: number; [k: string]: unknown }>;
+}
+
+/** MrlApi (window.MrlApi) — 느슨한 타입(거대 API 표면) */
+interface MrlApiInstance {
+  getApiKey(): string;
+  setApiKey(key: string): boolean;
+  hasApiKey(): boolean;
+  ensureEmbeddedKey(): Promise<string>;
+  init(): Promise<boolean>;
+  sync(onProgress?: (p: { loaded: number; total: number }) => void): Promise<{ success: boolean; count?: number; error?: string }>;
+  syncIfStale(onProgress?: (p: { loaded: number; total: number }) => void): Promise<{ success: boolean; count?: number; error?: string; fromCache?: boolean }>;
+  getCacheStatus(): { cached: boolean; expired: boolean | null; count: number; timestamp: number | null; ageMs?: number };
+  clearCache(): boolean;
+  lookup(crop: string, pesticide: string): Record<string, unknown> | null;
+  lookupByEng(crop: string, engPesticide: string): Record<string, unknown>;
+  lookupFlexible(crop: string, pesticideName: string): Record<string, unknown>;
+  searchNames(query: string, field?: 'crop' | 'pesticide', limit?: number): string[];
+  getAllByPesticide(pesticide: string): Array<Record<string, unknown>>;
+  getAllByCrop(crop: string): Array<Record<string, unknown>>;
+  engToKor(engName: string): { kor: string; confidence?: string; score?: number } | null;
+  resolvePesticideName(name: string): { kor: string; confidence?: string; source: string; score?: number } | null;
+  parseCropName(raw: unknown): string;
+  resolveCropAlias(cropName: string): string;
+  judge(detected: number | null, mrl: number | null): 'pass' | 'fail' | 'unknown';
+  isReady(): boolean;
+  getRowCount(): number;
+  CACHE_TTL_MS: number;
+  SERVICE_ID: string;
+}
+
+// ========================================
+// JUSO(도로명주소) API Types (SAMPL-1-110)
+// ========================================
+
+/** JUSO addrLinkApi 응답 항목 (results.juso[i]) */
+interface JusoAddressItem {
+  zipNo?: string;     // 우편번호
+  roadAddr?: string;  // 도로명주소(참고항목 포함)
+  jibunAddr?: string; // 지번주소
+  siNm?: string;      // 시도명
+  sggNm?: string;     // 시군구명
+  emdNm?: string;     // 읍면동명
+  liNm?: string;      // 법정리명
+  mtYn?: string;      // 산 여부 ('0' 대지, '1' 산)
+  [k: string]: unknown;
+}
+
+/** juso:search IPC 반환 형태 */
+interface JusoSearchResult {
+  ok: boolean;
+  items?: JusoAddressItem[];
+  total?: number;
+  page?: number;
+  size?: number;
+  error?: string;
 }
 
 // ========================================
@@ -171,6 +299,7 @@ interface FirestoreDb {
   save(sampleType: string, year: number, docId: string, data: Record<string, unknown>): Promise<boolean>;
   get(sampleType: string, year: number, docId: string): Promise<Record<string, unknown> | null>;
   getAll(sampleType: string, year: number, options?: { skipOrder?: boolean }): Promise<Array<Record<string, unknown>>>;
+  getAllWithMeta?(sampleType: string, year: number, options?: { skipOrder?: boolean }): Promise<{ documents: Array<Record<string, unknown>>; fromCache: boolean }>;
   delete(sampleType: string, year: number, docId: string): Promise<boolean>;
   batchSave(sampleType: string, year: number, documents: Array<Record<string, unknown>>, options?: { signal?: AbortSignal }): Promise<boolean>;
   migrate(sampleType: string, year: number, localStorageKey: string): Promise<{ success: boolean; count: number }>;
@@ -696,10 +825,61 @@ interface ShowOpenFilePickerOptions {
 // Window Interface Extension
 // ========================================
 
+/** 주소 자동완성 선택 컨텍스트 (onSelect 콜백 2번째 인자) */
+interface AddressAutocompleteSelectContext {
+  source: 'juso' | 'local';
+  zipNo?: string;
+  roadAddr?: string;
+  jibunAddr?: string;
+  sido?: string;
+  sigungu?: string;
+  emd?: string;
+  isMountain: boolean;
+}
+
+/** 주소 자동완성 bind 옵션 */
+interface AddressAutocompleteBindOptions {
+  regionKeys?: string[] | null;
+  regionNames?: string[];
+  enableJusoFallback?: boolean;
+  getDefaultRegion?: () => string;
+  onInput?: () => void;
+  onSelect?: (value: string, ctx: AddressAutocompleteSelectContext) => void;
+  onShowModal?: (result: unknown, input: HTMLInputElement) => void;
+}
+
+/** JUSO 자동완성 공통 모듈 (window.AddressAutocomplete) */
+interface AddressAutocompleteApi {
+  bind(input: HTMLInputElement | null, list: HTMLElement | null, options?: AddressAutocompleteBindOptions): void;
+  clearAllJusoCache(): number;
+  renderSuggestions(list: HTMLElement, suggestions: unknown[]): void;
+  renderJusoSuggestions(list: HTMLElement, items: unknown[]): void;
+  buildFullAddress(li: HTMLElement, currentInputValue: string): string;
+  buildSelectContext(li: HTMLElement, currentInputValue: string): AddressAutocompleteSelectContext;
+}
+
+/** JUSO 검색 헬퍼 (window.JusoService) */
+interface JusoServiceApi {
+  search(keyword: string, options?: { page?: number; size?: number }): Promise<JusoSearchResult>;
+}
+
 interface Window {
   // Environment
   electronAPI?: ElectronAPI;
   isElectron: boolean;
+
+  // Address (JUSO 자동완성 + 검색)
+  AddressAutocomplete: AddressAutocompleteApi;
+  JusoService?: JusoServiceApi;
+
+  // MRL(농약 잔류허용기준) 인프라 (SAMPL-1-112 Phase 1)
+  MrlApi?: MrlApiInstance;
+  MrlSearch?: MrlSearchApi;
+  MrlNameCanon?: MrlNameCanonApi;
+  PsisParse?: PsisParseApi;
+  PESTICIDE_NAME_MAP?: PesticideNameMapData;
+  PesticideUseType?: PesticideUseTypeApi;
+  PESTICIDE_USE_TYPE?: PesticideUseTypeApi;
 
   // Firebase
   firebaseConfig?: FirebaseConfigManager;
@@ -884,8 +1064,8 @@ declare class BaseSampleManager {
   deleteSample(id: string): Promise<void>;
   loadYearData(year: string): Promise<void>;
   syncWithCloud(year: string, localLogs: unknown[]): Promise<void>;
-  loadFromFirebase(year: string): Promise<unknown[]>;
-  smartMerge<T>(localData: T[], firebaseData: T[]): T[];
+  loadFromFirebase(year: string): Promise<{ data: unknown[]; fromCache: boolean }>;
+  smartMerge<T>(localData: T[], firebaseData: T[], options?: { allowDeletions?: boolean }): T[];
   hasChanges(data1: unknown, data2: unknown): boolean;
 
   triggerAutoSave(): void;

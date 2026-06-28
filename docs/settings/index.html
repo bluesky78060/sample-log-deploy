@@ -618,11 +618,11 @@
             color: #D4A96A;
         }
     </style>
-  <script type="module" crossorigin src="../assets/settings-BPiHl_OU.js"></script>
-  <link rel="modulepreload" crossorigin href="../assets/theme-CYakEN5j.js">
+  <script type="module" crossorigin src="../assets/settings-Bt6rTHeW.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/theme-DnQEVF2I.js">
   <link rel="modulepreload" crossorigin href="../assets/loading-manager-8YTLSOMM.js">
-  <link rel="modulepreload" crossorigin href="../assets/storage-manager-DaJ_pg6X.js">
-  <link rel="modulepreload" crossorigin href="../assets/firestore-db-xf4fNFBs.js">
+  <link rel="modulepreload" crossorigin href="../assets/storage-manager-Lyka0lzb.js">
+  <link rel="modulepreload" crossorigin href="../assets/firestore-db-Czbcv-7H.js">
   <link rel="modulepreload" crossorigin href="../assets/toast-BwdSIJOp.js">
   <link rel="modulepreload" crossorigin href="../assets/cache-manager-BO25IUP8.js">
   <link rel="stylesheet" crossorigin href="../assets/tailwind-output-D4cT4cf1.css">
@@ -861,6 +861,29 @@
                     </form>
                 </div>
             </div>
+        </div>
+
+        <!-- 식품안전나라(MRL) OpenAPI 인증키 (SAMPL-1-114) -->
+        <div class="settings-card" id="mrlApiSection">
+            <h2>
+                <span>🥬</span>
+                식품안전나라 OpenAPI 인증키
+                <span id="mrlApiStatus" class="status-badge disconnected">● 미설정</span>
+            </h2>
+
+            <div class="alert alert-info">
+                <strong>잔류농약(MRL) 자동 조회용 키입니다.</strong><br>
+                식품안전나라 OpenAPI(<code>openapi.foodsafetykorea.go.kr</code>) 인증키입니다.
+                배포본에는 키가 내장되어 있을 수 있으며, 그 경우 비워두어도 됩니다.
+                직접 발급한 키를 쓰려면 아래에 입력 후 저장하세요. (입력을 비우고 저장하면 키가 삭제됩니다.)
+            </div>
+
+            <div class="form-group">
+                <label for="mrlApiKey">인증키 (Service Key)</label>
+                <input type="text" id="mrlApiKey" placeholder="식품안전나라에서 발급받은 인증키" autocomplete="off">
+            </div>
+
+            <button type="button" id="saveMrlApiKeyBtn" class="btn btn-primary">저장</button>
         </div>
 
         <!-- 암호화 설정 -->

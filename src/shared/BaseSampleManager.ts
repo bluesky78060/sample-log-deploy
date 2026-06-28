@@ -100,6 +100,8 @@ export interface EventDelegator {
 interface FirebaseCacheEntry<T> {
   data: T[];
   timestamp: number;
+  /** SAMPL-1-80: 캐시된 응답의 원래 fromCache 신뢰도 보존 */
+  fromCache?: boolean;
 }
 
 // ========================================
@@ -535,24 +537,34 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
           const cacheEntry = this._firebaseCache.get(year);
           const cacheValid = cacheEntry && Date.now() - cacheEntry.timestamp < this._firebaseCacheTTL;
           this.log(cacheValid ? ` Firebase 캐시 사용 (${year}년)` : ' Firebase에서 데이터 로드 시작');
-          const firebaseLogs = cacheValid
-            ? cacheEntry.data
-            : await this.loadFromFirebase(year);
+          // SAMPL-1-80: firebaseLogs와 함께 fromCache(읽기 신뢰도)도 확보
+          let firebaseLogs: T[];
+          let fromCache: boolean;
+          if (cacheValid) {
+            firebaseLogs = cacheEntry!.data;
+            fromCache = cacheEntry!.fromCache === true; // 캐시된 응답의 원래 신뢰도 보존
+          } else {
+            const res = await this.loadFromFirebase(year);
+            firebaseLogs = res.data;
+            fromCache = res.fromCache === true;
+          }
 
           if (firebaseLogs && firebaseLogs.length > 0) {
-            this.log(' Firebase 데이터:', firebaseLogs.length, '건');
+            this.log(' Firebase 데이터:', firebaseLogs.length, '건', `(fromCache=${fromCache})`);
 
             // L2-P0: 무병합 덮어쓰기 금지 — 미업로드 로컬 항목(syncedAt 없음) 보존
+            // SAMPL-1-80: fromCache(불완전 가능) 읽기에서는 cross-device 삭제를 보류
             const localLogs = this.loadFromLocalStorage(yearStorageKey);
             const merged = mergeCloudData(
               localLogs as unknown as DataItem[],
-              firebaseLogs as unknown as DataItem[]
+              firebaseLogs as unknown as DataItem[],
+              { fromCache }
             );
             this.sampleLogs = merged.data as unknown as T[];
 
             // PER-9: TTL 포함 캐시 저장 (Firebase 원본 응답 기준 — 병합 결과 아님)
             if (!cacheValid) {
-              this._firebaseCache.set(year, { data: firebaseLogs, timestamp: Date.now() });
+              this._firebaseCache.set(year, { data: firebaseLogs, fromCache, timestamp: Date.now() });
             }
 
             // 병합 결과를 localStorage에 저장
@@ -683,10 +695,12 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
       this.log('☁️ 클라우드 동기화 시작');
 
       try {
-        const firebaseLogs = await this.loadFromFirebase(year);
+        // SAMPL-1-80: loadFromFirebase는 { data, fromCache } 반환
+        const { data: firebaseLogs, fromCache } = await this.loadFromFirebase(year);
 
         if (firebaseLogs && firebaseLogs.length > 0) {
-          const mergedLogs = this.smartMerge(localLogs, firebaseLogs);
+          // SAMPL-1-80: fromCache(불완전 가능) 읽기에서는 cross-device 삭제 보류
+          const mergedLogs = this.smartMerge(localLogs, firebaseLogs, { allowDeletions: !fromCache });
 
           if (
             mergedLogs.length !== localLogs.length ||
@@ -710,7 +724,7 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
    * Firebase에서 데이터 로드
    * @param year - 연도
    */
-  protected async loadFromFirebase(year: string): Promise<T[]> {
+  protected async loadFromFirebase(year: string): Promise<{ data: T[]; fromCache: boolean }> {
     try {
       this.log(' Firebase getAll 호출 - moduleKey:', this.moduleKey, ', year:', year);
       this.log(' Firebase 상태:', {
@@ -719,24 +733,34 @@ export abstract class BaseSampleManager<T extends BaseSample = BaseSample> {
         firestoreDb: !!window.firestoreDb,
       });
 
-      const data = await window.firestoreDb?.getAll(this.moduleKey, parseInt(year));
-      this.log(' Firebase 응답:', data ? `${data.length}건` : 'null/undefined');
+      // SAMPL-1-80: fromCache 메타 포함 조회 (있으면) — 불완전 캐시 읽기 시 삭제 보류 판단용
+      let data: Array<Record<string, unknown>> | undefined;
+      let fromCache = false;
+      if (typeof window.firestoreDb?.getAllWithMeta === 'function') {
+        const res = await window.firestoreDb.getAllWithMeta(this.moduleKey, parseInt(year));
+        data = res.documents;
+        fromCache = res.fromCache === true;
+      } else {
+        data = await window.firestoreDb?.getAll(this.moduleKey, parseInt(year));
+      }
+      this.log(' Firebase 응답:', data ? `${data.length}건 (fromCache=${fromCache})` : 'null/undefined');
       this.log(' Firebase 데이터 샘플:', data && data.length > 0 ? data[0] : 'No data');
-      return (data as T[]) || [];
+      return { data: (data as T[]) || [], fromCache };
     } catch (error) {
       (window.logger?.error || console.error)(`[${this.moduleName}] Firebase 로드 오류 상세:`, error);
       (window.logger?.error || console.error)('Firebase 로드 실패:', error);
-      return [];
+      return { data: [], fromCache: false };
     }
   }
 
   /**
    * 스마트 병합 - sync-utils ES 모듈 import 사용
    */
-  protected smartMerge(localData: T[], firebaseData: T[]): T[] {
+  protected smartMerge(localData: T[], firebaseData: T[], options: { allowDeletions?: boolean } = {}): T[] {
     const result = syncSmartMerge(
       localData as Array<{ id: string }>,
-      firebaseData as Array<{ id: string }>
+      firebaseData as Array<{ id: string }>,
+      options
     );
     return result.data as T[];
   }

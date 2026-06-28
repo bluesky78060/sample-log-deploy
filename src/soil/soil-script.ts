@@ -1055,90 +1055,14 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     // ========================================
 
     bindLotAddressAutocomplete(parcelId) {
-        const lotInput = document.querySelector(`.lot-address-input[data-id="${parcelId}"]`);
+        const lotInput = document.querySelector(`.lot-address-input[data-id="${parcelId}"]`) as HTMLInputElement | null;
         const autocompleteList = document.getElementById(`lotAutocomplete-${parcelId}`);
-
-        if (!lotInput || !autocompleteList) return;
-
-        lotInput.addEventListener('input', (e) => {
-            const value = e.target.value.trim();
-            if (value.startsWith('봉화군') || value.startsWith('영주시') || value.startsWith('울진군')) {
-                autocompleteList.classList.remove('show');
-                this.updateParcelLotAddress(parcelId);
-                return;
-            }
-            if (value.length > 0 && typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin'], true);
-                if (suggestions.length > 0) {
-                    autocompleteList.innerHTML = sanitizeHTML(suggestions.map(item => `
-                        <li data-village="${item.village}" data-district="${item.district}" data-region-key="${item.regionKey}" data-region="${item.region || ''}" data-is-mountain="${item.isMountain}">
-                            ${item.displayText}
-                        </li>
-                    `).join(''));
-                    autocompleteList.classList.add('show');
-                } else {
-                    autocompleteList.classList.remove('show');
-                }
-            } else {
-                autocompleteList.classList.remove('show');
-            }
-            this.updateParcelLotAddress(parcelId);
-        });
-
-        lotInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const value = lotInput.value.trim();
-                if (value.startsWith('봉화군') || value.startsWith('영주시') || value.startsWith('울진군')) {
-                    autocompleteList.classList.remove('show');
-                    return;
-                }
-                if (typeof parseParcelAddress === 'function') {
-                    const result = parseParcelAddress(value);
-                    if (result) {
-                        if (result.isDuplicate) {
-                            this.showRegionSelectionModal(result, parcelId, lotInput);
-                        } else if (result.alternatives && result.alternatives.length > 1) {
-                            autocompleteList.innerHTML = sanitizeHTML(result.alternatives.map(district => `
-                                <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber}" data-region-key="${result.regionKey}">
-                                    ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            autocompleteList.classList.add('show');
-                        } else {
-                            lotInput.value = result.fullAddress;
-                            autocompleteList.classList.remove('show');
-                            this.updateParcelLotAddress(parcelId);
-                        }
-                    }
-                }
-            }
-        });
-
-        autocompleteList.addEventListener('click', (e) => {
-            if (e.target.tagName === 'LI') {
-                const village = e.target.dataset.village;
-                const district = e.target.dataset.district;
-                const regionKey = e.target.dataset.regionKey;
-                const isMountain = e.target.dataset.isMountain === 'true';
-                const lotNumber = e.target.dataset.lot || '';
-                const LOCAL_REGIONS = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
-                const region = e.target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
-                const villageWithMountain = isMountain ? `${village} 산` : village;
-                const currentValue = lotInput.value.trim();
-                const match = currentValue.match(/\d+(-\d+)?$/);
-                const extractedLotNumber = lotNumber || (match ? match[0] : '');
-                const fullAddress = extractedLotNumber
-                    ? `${region} ${district} ${villageWithMountain} ${extractedLotNumber}`
-                    : `${region} ${district} ${villageWithMountain}`;
-                lotInput.value = fullAddress;
-                autocompleteList.classList.remove('show');
-                this.updateParcelLotAddress(parcelId);
-            }
-        });
-
-        lotInput.addEventListener('blur', () => {
-            setTimeout(() => { autocompleteList.classList.remove('show'); }, 200);
+        // JUSO(도로명주소) 전국 검색 자동완성으로 통일 (로컬 다지역 자동완성 제거)
+        window.AddressAutocomplete.bind(lotInput, autocompleteList, {
+            regionKeys: ['bonghwa', 'yeongju', 'uljin'],
+            onInput: () => this.updateParcelLotAddress(parcelId),
+            onSelect: () => this.updateParcelLotAddress(parcelId),
+            onShowModal: (result) => this.showRegionSelectionModal(result as ParsedParcelAddress, parcelId, lotInput as HTMLInputElement),
         });
     }
 
@@ -1147,86 +1071,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     // ========================================
 
     bindSubLotAutocomplete(parcelId) {
-        const subLotInput = document.querySelector(`.sub-lot-input[data-id="${parcelId}"]`);
+        const subLotInput = document.querySelector(`.sub-lot-input[data-id="${parcelId}"]`) as HTMLInputElement | null;
         const autocompleteList = document.getElementById(`subLotAutocomplete-${parcelId}`);
-
-        if (!subLotInput || !autocompleteList) return;
-
-        subLotInput.addEventListener('input', (e) => {
-            const value = e.target.value.trim();
-            if (value.startsWith('봉화군') || value.startsWith('영주시') || value.startsWith('울진군')) {
-                autocompleteList.classList.remove('show');
-                return;
-            }
-            if (value.length > 0 && typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin'], true);
-                if (suggestions.length > 0) {
-                    autocompleteList.innerHTML = sanitizeHTML(suggestions.map(item => `
-                        <li data-village="${item.village}" data-district="${item.district}" data-region-key="${item.regionKey}" data-region="${item.region || ''}" data-is-mountain="${item.isMountain}">
-                            ${item.displayText}
-                        </li>
-                    `).join(''));
-                    autocompleteList.classList.add('show');
-                } else {
-                    autocompleteList.classList.remove('show');
-                }
-            } else {
-                autocompleteList.classList.remove('show');
-            }
-        });
-
-        subLotInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const value = subLotInput.value.trim();
-                if (value.startsWith('봉화군') || value.startsWith('영주시') || value.startsWith('울진군')) {
-                    autocompleteList.classList.remove('show');
-                    return;
-                }
-                if (typeof parseParcelAddress === 'function') {
-                    const result = parseParcelAddress(value);
-                    if (result) {
-                        if (result.isDuplicate) {
-                            this.showRegionSelectionModal(result, parcelId, subLotInput);
-                        } else if (result.alternatives && result.alternatives.length > 1) {
-                            autocompleteList.innerHTML = sanitizeHTML(result.alternatives.map(district => `
-                                <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber}" data-region-key="${result.regionKey}">
-                                    ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            autocompleteList.classList.add('show');
-                        } else {
-                            subLotInput.value = result.fullAddress;
-                            autocompleteList.classList.remove('show');
-                        }
-                    }
-                }
-            }
-        });
-
-        autocompleteList.addEventListener('click', (e) => {
-            if (e.target.tagName === 'LI') {
-                const village = e.target.dataset.village;
-                const district = e.target.dataset.district;
-                const regionKey = e.target.dataset.regionKey;
-                const isMountain = e.target.dataset.isMountain === 'true';
-                const lotNumber = e.target.dataset.lot || '';
-                const LOCAL_REGIONS = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
-                const region = e.target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
-                const villageWithMountain = isMountain ? `${village} 산` : village;
-                const currentValue = subLotInput.value.trim();
-                const match = currentValue.match(/\d+(-\d+)?$/);
-                const extractedLotNumber = lotNumber || (match ? match[0] : '');
-                const fullAddress = extractedLotNumber
-                    ? `${region} ${district} ${villageWithMountain} ${extractedLotNumber}`
-                    : `${region} ${district} ${villageWithMountain}`;
-                subLotInput.value = fullAddress;
-                autocompleteList.classList.remove('show');
-            }
-        });
-
-        subLotInput.addEventListener('blur', () => {
-            setTimeout(() => { autocompleteList.classList.remove('show'); }, 200);
+        // JUSO(도로명주소) 전국 검색 자동완성으로 통일 (로컬 다지역 자동완성 제거)
+        window.AddressAutocomplete.bind(subLotInput, autocompleteList, {
+            regionKeys: ['bonghwa', 'yeongju', 'uljin'],
+            onShowModal: (result) => this.showRegionSelectionModal(result as ParsedParcelAddress, parcelId, subLotInput as HTMLInputElement),
         });
     }
 
@@ -4774,8 +4624,6 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     async validateParcelAddress(lotAddress: string): Promise<boolean | null> {
         if (!lotAddress || lotAddress === '-') return null;
         if (!navigator.onLine) return null;
-        const apiKey = (window as any).NETWORK_CONFIG?.VWORLD_API_KEY;
-        if (!apiKey) return null;
 
         // 시·도 결정 (전국 기관용 — 봉화군/경상북도 가정 제거)
         //  1) 주소에 시·도가 이미 있으면(자동완성 선택 시 JUSO siNm 포함) 약어를 정식명으로 펼쳐 사용
@@ -4803,28 +4651,14 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             fullAddress = `${defaultSido} ${lotAddress}`;
         }
 
-        // Electron: main process IPC 경유 (Origin 헤더 없음 → 도메인 제한 우회)
-        if ((window as any).electronAPI?.vworldGeocode) {
-            try {
-                return await (window as any).electronAPI.vworldGeocode(fullAddress, apiKey);
-            } catch {
-                return null;
-            }
-        }
-
-        // 웹 환경: 직접 fetch (등록된 도메인에서만 작동)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        // Electron: main process IPC 경유 (키는 메인 프로세스 보유 — SAMPL-2-19).
+        // 웹 환경에서는 키를 노출하지 않으므로 지번 검증을 스킵한다(Electron 전용 기능).
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI?.vworldGeocode) return null;
         try {
-            const url = `https://api.vworld.kr/req/address?service=address&request=getCoord&version=2.0&crs=epsg:4326&address=${encodeURIComponent(fullAddress)}&refine=true&simple=false&format=json&type=parcel&key=${apiKey}`;
-            const res = await fetch(url, { signal: controller.signal });
-            if (!res.ok) return null;
-            const data = await res.json();
-            return data?.response?.status === 'OK';
+            return await electronAPI.vworldGeocode(fullAddress);
         } catch {
             return null;
-        } finally {
-            clearTimeout(timeoutId);
         }
     }
 

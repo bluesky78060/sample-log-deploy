@@ -83,8 +83,26 @@ interface ElectronAPI {
     // 토양 중금속 분석결과 조회 팝업 창 열기
     openHeavyMetalAnalysis: () => Promise<boolean>;
 
-    // VWORLD 지번 지오코딩
-    vworldGeocode: (address: string, apiKey: string) => Promise<boolean | null>;
+    // VWORLD 지번 지오코딩 (키는 메인 프로세스 보유 — 렌더러는 주소만 전달)
+    vworldGeocode: (address: string) => Promise<boolean | null>;
+
+    // JUSO 도로명주소 검색 (키는 메인 프로세스 보유 — 렌더러는 검색어만 전달)
+    // 반환 타입은 tsconfig.electron 범위 자체완결을 위해 인라인(globals.d.ts의 JusoSearchResult와 동형)
+    jusoSearch: (payload: { keyword: string; page?: number; size?: number }) => Promise<{
+      ok: boolean;
+      items?: unknown[];
+      total?: number;
+      page?: number;
+      size?: number;
+      error?: string;
+    }>;
+
+    // MRL(식품안전나라) 내장 API 키 게터 (키는 메인 프로세스 env 보유 — 렌더러가 직접 fetch)
+    // 반환 타입은 tsconfig.electron 자체완결을 위해 인라인(globals.d.ts ambient를 못 봄 — JUSO 동일 함정)
+    mrlGetApiKey: () => Promise<string>;
+
+    // PSIS(농촌진흥청) 농약 용도 조회 (http 엔드포인트라 메인 경유)
+    psisLookupUse: (payload: { korName: string }) => Promise<{ useName: string | null; error?: string }>;
 
     isElectron: true;
 }
@@ -199,7 +217,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openHeavyMetalAnalysis: () => ipcRenderer.invoke('open-heavy-metal-analysis'),
 
     // VWORLD 지번 지오코딩 (main process 경유, Origin 제한 없음)
-    vworldGeocode: (address: string, apiKey: string) => ipcRenderer.invoke('vworld-geocode', { address, apiKey }),
+    // 키는 메인 프로세스에서만 보유한다(SAMPL-2-19) — 렌더러는 주소만 전달.
+    vworldGeocode: (address: string) => ipcRenderer.invoke('vworld-geocode', { address }),
+
+    // JUSO 도로명주소 검색 (main process 경유, 키 노출 없음)
+    // payload: { keyword, page?, size? } → { ok, items?, total?, page?, size?, error? }
+    jusoSearch: (payload: { keyword: string; page?: number; size?: number }) =>
+      ipcRenderer.invoke('juso:search', payload),
+
+    // MRL(식품안전나라) 내장 API 키 게터 — 키는 메인 process env 보유 (렌더러가 직접 fetch)
+    mrlGetApiKey: () => ipcRenderer.invoke('mrl:get-api-key'),
+
+    // PSIS(농촌진흥청) 농약 용도 조회 — main process 경유(http 엔드포인트)
+    psisLookupUse: (payload: { korName: string }) => ipcRenderer.invoke('psis:lookup-use', payload),
 
     // Electron 환경 여부
     isElectron: true as const

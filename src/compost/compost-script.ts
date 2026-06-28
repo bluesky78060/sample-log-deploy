@@ -2096,112 +2096,11 @@ class CompostSampleManager extends BaseSampleManager<CompostSample> {
     // ========================================
 
     bindFarmAddressAutocomplete(): void {
-        const farmAddressInput = document.getElementById('farmAddressFull');
+        const farmAddressInput = document.getElementById('farmAddressFull') as HTMLInputElement | null;
         const autocompleteList = document.getElementById('farmAddressAutocomplete');
-
-        if (!farmAddressInput || !autocompleteList) return;
-
-        // 입력 시 자동완성 목록 표시
-        (farmAddressInput as HTMLInputElement).addEventListener('input', (e: Event) => {
-            const target = e.target as HTMLInputElement;
-            const value = target.value.trim();
-
-            // 이미 완전한 주소면 자동완성 비활성화
-            if (value.startsWith('봉화군') || value.startsWith('영주시') || value.startsWith('울진군')) {
-                autocompleteList.classList.remove('show');
-                return;
-            }
-
-            if (value.length > 0 && typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, ['bonghwa', 'yeongju', 'uljin', 'pohang_buk', 'pohang_nam'], true);
-
-                if (suggestions.length > 0) {
-                    autocompleteList.innerHTML = sanitizeHTML(suggestions.map((item: { village: string; district: string; regionKey: string; region?: string; isMountain: boolean; displayText: string }) => `
-                        <li data-village="${item.village}" data-district="${item.district}" data-region-key="${item.regionKey}" data-region="${item.region || ''}" data-is-mountain="${item.isMountain}">
-                            ${item.displayText}
-                        </li>
-                    `).join(''));
-                    autocompleteList.classList.add('show');
-                } else {
-                    autocompleteList.classList.remove('show');
-                }
-            } else {
-                autocompleteList.classList.remove('show');
-            }
-        });
-
-        // Enter 키 입력 시 자동 변환
-        (farmAddressInput as HTMLInputElement).addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-
-                const value = (farmAddressInput as HTMLInputElement).value.trim();
-
-                if (value.startsWith('봉화군') || value.startsWith('영주시') || value.startsWith('울진군')) {
-                    autocompleteList.classList.remove('show');
-                    return;
-                }
-
-                if (typeof parseParcelAddress === 'function') {
-                    const result = parseParcelAddress(value);
-
-                    if (result) {
-                        if (result.isDuplicate && result.locations) {
-                            autocompleteList.innerHTML = sanitizeHTML(result.locations.map((loc) => `
-                                <li data-village="${result.villageName}" data-district="${(loc as { district?: string }).district || ''}" data-region-key="${(loc as { regionKey?: string }).regionKey || ''}" data-lot="${result.lotNumber}">
-                                    ${loc.fullAddress} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            autocompleteList.classList.add('show');
-                        } else if (result.alternatives && result.alternatives.length > 1) {
-                            autocompleteList.innerHTML = sanitizeHTML(result.alternatives.map((district: string) => `
-                                <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber}" data-region-key="${result.regionKey}">
-                                    ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            autocompleteList.classList.add('show');
-                        } else {
-                            const fullAddress = `${result.region} ${result.district} ${result.village}${result.lotNumber ? ' ' + result.lotNumber : ''}`;
-                            (farmAddressInput as HTMLInputElement).value = fullAddress;
-                            autocompleteList.classList.remove('show');
-                        }
-                    }
-                }
-            }
-        });
-
-        // 자동완성 목록 클릭 선택
-        autocompleteList.addEventListener('click', (e: Event) => {
-            const target = e.target as HTMLElement;
-            const li = target.closest('li') as HTMLElement | null;
-            if (li) {
-                const village = li.dataset.village;
-                const district = li.dataset.district;
-                const regionKey = li.dataset.regionKey || '';
-                const isMountain = li.dataset.isMountain === 'true';
-                const lot = li.dataset.lot || '';
-
-                const LOCAL_REGIONS: Record<string, string> = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
-                const region = target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
-
-                const villageWithMountain = isMountain ? `${village} 산` : village;
-
-                const currentValue = (farmAddressInput as HTMLInputElement).value.trim();
-                const match = currentValue.match(/\d+(-\d+)?$/);
-                const extractedLot = lot || (match ? match[0] : '');
-
-                const fullAddress = `${region} ${district} ${villageWithMountain}${extractedLot ? ' ' + extractedLot : ''}`;
-                (farmAddressInput as HTMLInputElement).value = fullAddress;
-                autocompleteList.classList.remove('show');
-            }
-        });
-
-        // 외부 클릭 시 자동완성 목록 숨기기
-        document.addEventListener('click', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (!target.closest('.lot-address-autocomplete-wrapper')) {
-                autocompleteList.classList.remove('show');
-            }
+        // JUSO(도로명주소) 전국 검색 자동완성으로 통일 (로컬 다지역 자동완성 제거)
+        window.AddressAutocomplete.bind(farmAddressInput, autocompleteList, {
+            regionKeys: ['bonghwa', 'yeongju', 'uljin', 'pohang_buk', 'pohang_nam'],
         });
     }
 

@@ -27,14 +27,20 @@ jobs:
         run: |
           @"
           (window as any).NETWORK_CONFIG = {
-              ALLOWED_GATEWAY: '${{ secrets.ALLOWED_GATEWAY }}',
-              VWORLD_API_KEY: '${{ secrets.VWORLD_API_KEY }}'
+              ALLOWED_GATEWAY: '${{ secrets.ALLOWED_GATEWAY }}'
           };
           "@ | Out-File -FilePath "src/shared/network-config.ts" -Encoding utf8
         shell: pwsh
 
+      # SAMPL-2-19: VWORLD 키는 렌더러(network-config)가 아닌 메인 프로세스로 주입.
+      # build:electron 의 gen-vworld-key.mjs 가 이 env 를 읽어 dist/vworld-key.txt 생성.
       - name: Build Windows package
         run: npm run make
+        env:
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
+          JUSO_API_KEY: ${{ secrets.JUSO_API_KEY }}
+          FOODSAFETY_API_KEY: ${{ secrets.FOODSAFETY_API_KEY }}
+          RAD_PSIS_API_KEY: ${{ secrets.RAD_PSIS_API_KEY }}
 
       - name: Create latest.yml for auto-updater
         run: |
@@ -95,15 +101,19 @@ jobs:
         run: |
           cat > src/shared/network-config.ts << 'NETEOF'
           (window as any).NETWORK_CONFIG = {
-              ALLOWED_GATEWAY: '${{ secrets.ALLOWED_GATEWAY }}',
-              VWORLD_API_KEY: '${{ secrets.VWORLD_API_KEY }}'
+              ALLOWED_GATEWAY: '${{ secrets.ALLOWED_GATEWAY }}'
           };
           NETEOF
 
+      # SAMPL-2-19: VWORLD 키는 렌더러(network-config)가 아닌 메인 프로세스로 주입.
       - name: Build macOS package
         run: npm run make -- --platform darwin
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
+          JUSO_API_KEY: ${{ secrets.JUSO_API_KEY }}
+          FOODSAFETY_API_KEY: ${{ secrets.FOODSAFETY_API_KEY }}
+          RAD_PSIS_API_KEY: ${{ secrets.RAD_PSIS_API_KEY }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

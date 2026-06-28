@@ -141,7 +141,7 @@ function buildCSPWithHashes(hashResults: ProjectHashResults): CSPConfig {
         hashResults[file].styles.forEach(s => styleHashes.add(s.hash));
     }
 
-    const baseScriptSrc = "'self' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://t1.daumcdn.net https://cdnjs.cloudflare.com";
+    const baseScriptSrc = "'self' file: https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.sheetjs.com https://cdnjs.cloudflare.com";
     const baseStyleSrc = "'self' file: https://fonts.googleapis.com";
 
     return {

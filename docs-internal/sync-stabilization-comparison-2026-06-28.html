@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동기화 안정화 비교 — 메인 vs 테스트 (2026-06-28)</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --card2: #273449;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #334155;
+    --red: #f87171; --green: #4ade80; --blue: #60a5fa; --amber: #fbbf24;
+    --redbg: rgba(248,113,113,.12); --greenbg: rgba(74,222,128,.12); --bluebg: rgba(96,165,250,.1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+  header.doc {
+    border-bottom: 1px solid var(--border); padding-bottom: 28px; margin-bottom: 36px;
+  }
+  header.doc h1 { font-size: 30px; margin: 0 0 10px; letter-spacing: -.5px; }
+  header.doc .sub { color: var(--muted); font-size: 15px; }
+  header.doc .meta { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip {
+    display: inline-block; font-size: 12.5px; padding: 4px 12px; border-radius: 999px;
+    background: var(--card2); border: 1px solid var(--border); color: var(--muted);
+  }
+  h2 { font-size: 22px; margin: 44px 0 16px; padding-top: 8px; letter-spacing: -.3px; }
+  h3 { font-size: 17px; margin: 28px 0 12px; }
+  p { margin: 12px 0; }
+  .lead {
+    background: var(--bluebg); border: 1px solid var(--border); border-left: 4px solid var(--blue);
+    padding: 18px 22px; border-radius: 10px; margin: 20px 0 8px;
+  }
+  .callout {
+    border-radius: 10px; padding: 18px 22px; margin: 22px 0; border: 1px solid var(--border);
+  }
+  .callout.red { background: var(--redbg); border-left: 4px solid var(--red); }
+  .callout.green { background: var(--greenbg); border-left: 4px solid var(--green); }
+  .callout.amber { background: rgba(251,191,36,.1); border-left: 4px solid var(--amber); }
+  .callout h3 { margin-top: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px;
+    background: var(--card); border-radius: 10px; overflow: hidden;
+  }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--card2); font-weight: 600; font-size: 13.5px; color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  td.yes { color: var(--green); }
+  td.no { color: var(--red); }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px;
+    background: #0b1220; padding: 2px 6px; border-radius: 5px; color: #fcd9b6;
+  }
+  pre {
+    background: #0b1220; border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55;
+    font-family: "SF Mono", Menlo, Consolas, monospace; color: #e2e8f0;
+  }
+  pre .cm { color: var(--muted); }
+  pre .kw { color: #c792ea; }
+  pre .gd { color: var(--green); }
+  pre .bd { color: var(--red); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .grid2 .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .grid2 .panel h4 { margin: 0 0 10px; font-size: 14px; }
+  .grid2 .panel.main h4 { color: var(--blue); }
+  .grid2 .panel.test h4 { color: var(--amber); }
+  .sev {
+    display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px;
+    border-radius: 6px; vertical-align: middle; margin-right: 8px;
+  }
+  .sev.high { background: var(--red); color: #1a0000; }
+  .sev.med { background: var(--amber); color: #1a1200; }
+  .sev.info { background: var(--blue); color: #001022; }
+  ul { margin: 12px 0; padding-left: 22px; }
+  li { margin: 6px 0; }
+  footer.doc { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  .filepath { color: var(--muted); font-size: 12.5px; font-family: "SF Mono", Menlo, monospace; }
+  @media (max-width: 680px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <h1>동기화 안정화 정밀 비교</h1>
+  <div class="sub">메인 프로젝트(sample-log-electron) vs 테스트 프로젝트(sample-log-electron-test)</div>
+  <div class="meta">
+    <span class="chip">작성일 2026-06-28</span>
+    <span class="chip">대상: Firestore 동기화 계층 4파일 + sync-utils + BaseSampleManager</span>
+    <span class="chip">방식: 함수·로직 단위 라인 대조</span>
+  </div>
+</header>
+
+<div class="lead">
+  <strong>한 줄 결론.</strong> 동기화 계층은 한쪽이 일방적으로 우위가 아니라 <strong>양방향 트레이드</strong>다.
+  테스트는 네트워크 회복성(재시도·오프라인 큐·취소)이 강하고, 메인은
+  <strong>불완전 캐시 읽기 시 로컬 데이터가 일시적으로 사라지는 현상을 막는 안전장치(SAMPL-1-80)</strong>를 갖췄다.
+  소비 흐름 추적 결과 이는 <strong>영구 cross-device 손실이 아니라 일시적 로컬 소실(다음 정상 읽기 시 자가 치유)</strong>로,
+  심각도 <strong>MEDIUM</strong>의 실질 격차이며 테스트에 빠져 있다.
+</div>
+
+<p style="color:var(--muted); font-size:14px;">
+  ※ 이전 세션에서 줄 수·키워드 카운트 기반으로 "동기화 격차 없음, 테스트가 더 견고"라고 보고했으나,
+  본 라인 대조 결과 그 결론은 이 안전장치 축에서 <strong>틀렸음</strong>을 정정한다.
+</p>
+
+<!-- ===================== ① ===================== -->
+<h2><span class="sev med">MEDIUM</span>① 메인에만 있음 — <code>fromCache</code> 기반 cross-device 삭제 보류 (SAMPL-1-80)</h2>
+
+<p>
+  양쪽 <code>smartMerge</code>의 "로컬에만 있는 항목" 처리 분기가 핵심 차이다.
+  로컬에 있지만 클라우드 응답에 없는 항목을 <em>삭제</em>로 볼지 <em>보존</em>할지를 결정한다.
+</p>
+
+<div class="grid2">
+  <div class="panel main">
+    <h4>MAIN — 가드 있음 ✅</h4>
+    <div class="filepath">src/shared/sync-utils.js:132</div>
+    <pre><span class="kw">if</span> (localItem.syncedAt <span class="gd">&amp;&amp; allowDeletions</span>) {
+  deleted++;            <span class="cm">// 삭제</span>
+} <span class="kw">else</span> {
+  merged.push(localItem); <span class="cm">// 비신뢰 읽기면 보존</span>
+}</pre>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:0;">
+      <code>mergeCloudData(local, cloud, {fromCache})</code> →
+      <code>allowDeletions: !fromCache</code> 로 전달.
+    </p>
+  </div>
+  <div class="panel test">
+    <h4>TEST — 가드 없음 ❌</h4>
+    <div class="filepath">project/src/shared/sync-utils.ts:168</div>
+    <pre><span class="kw">if</span> (localItem.syncedAt) {  <span class="bd">// 무조건</span>
+  deleted++;            <span class="cm">// 삭제</span>
+} <span class="kw">else</span> {
+  merged.push(localItem);
+}</pre>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:0;">
+      <code>mergeCloudData(local, cloud)</code> —
+      <code>fromCache</code> / <code>allowDeletions</code> 파라미터 <strong>자체가 없음</strong>.
+    </p>
+  </div>
+</div>
+
+<div class="callout amber">
+  <h3>실제 위험 시나리오 — 소비 흐름 추적 결과</h3>
+  <p>
+    오프라인·일시 단절·경합 상태에서 Firestore가 <strong>캐시(불완전) 응답</strong>(<code>fromCache=true</code>)을 반환하면,
+    테스트는 "클라우드에 없음 = 다른 기기에서 삭제됨"으로 오판하고
+    <code>syncedAt</code>이 있는 멀쩡한 로컬 레코드를 병합 결과에서 떨어뜨린 뒤
+    <code>localStorage</code>에 덮어쓴다(<span class="filepath">BaseSampleManager.ts:545~566</span>).
+  </p>
+  <p style="margin-bottom:0;">
+    단, 실제 blast radius는 제한적이다:
+    <strong>클라우드(서버)에는 레코드가 보존</strong>된다(<code>batchSave</code>는 <code>merge:true</code>라 누락 문서를 삭제하지 않고,
+    명시적 <code>delete()</code>는 사용자 액션일 때만 호출됨).
+    따라서 <strong>영구 손실이 아니라 "로컬에서 일시적으로 사라졌다 다음 정상 읽기 때 다시 나타나는" 자가 치유 현상</strong>이다.
+    다만 PER-9 TTL 캐시가 그 불완전 응답을 TTL 동안 재사용하므로, 오프라인·경합이 지속되면 한동안 데이터가 보이지 않아
+    사용자가 데이터 유실로 오해하고 재입력(중복 생성)하는 2차 사고를 부를 수 있다.
+  </p>
+</div>
+
+<p>이 안전장치는 3개 파일에 걸친 체인이며 테스트는 <strong>전부 누락</strong>했다.</p>
+
+<table>
+  <thead><tr><th>계층</th><th>MAIN</th><th>TEST</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>firestore-db</td>
+      <td class="yes"><code>getAllWithMeta()</code> → <code>{documents, fromCache}</code></td>
+      <td class="no">❌ <code>getAll()</code>만 (fromCache 없음)</td>
+    </tr>
+    <tr>
+      <td>sync-utils</td>
+      <td class="yes"><code>smartMerge(.., {allowDeletions})</code><br><code>mergeCloudData(.., {fromCache})</code></td>
+      <td class="no">❌ 옵션 인자 없음</td>
+    </tr>
+    <tr>
+      <td>BaseSampleManager</td>
+      <td class="yes"><code>loadFromFirebase()</code> → <code>{data, fromCache}</code>,<br>fromCache 캐싱 후 <code>allowDeletions:!fromCache</code> 전달</td>
+      <td class="no">❌ <code>loadFromFirebase()</code> → <code>T[]</code>, 평범한 <code>getAll</code> 호출</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size:14px; color:var(--muted);">
+  부수적으로 정렬 안정화도 메인이 한 수 위다 — 접수번호 동률 시 메인은
+  <code>localeCompare</code> 보조 정렬(<span class="filepath">sync-utils.js:149</span>), 테스트는
+  <code>aNum - bNum</code>만(<span class="filepath">sync-utils.ts:184</span>).
+</p>
+
+<!-- ===================== ② ===================== -->
+<h2><span class="sev info">RESILIENCE</span>② 테스트에만 있음 — 네트워크 회복성</h2>
+
+<p>반대로 테스트 <code>firestore-db.ts</code>가 더 강한 영역. 메인 동기화 계층에는 아래가 없다.</p>
+
+<table>
+  <thead><tr><th>기능</th><th>MAIN</th><th>TEST</th></tr></thead>
+  <tbody>
+    <tr><td>재시도(지수 백오프)</td><td class="no">❌</td><td class="yes">✅ <code>withFirebaseRetry</code> (3회, 2→8s, no-retry 에러 분류)</td></tr>
+    <tr><td>오프라인 큐</td><td class="no">❌ (<code>networkStatus</code> 자체 없음)</td><td class="yes">✅ <code>network-status.ts</code> + <code>queueOperation</code> (save/delete/batch 진입·실패 시 적재)</td></tr>
+    <tr><td>진행률·취소</td><td class="no">❌</td><td class="yes">✅ <code>loadingManager</code> 진행률 + <code>AbortSignal</code> 취소</td></tr>
+    <tr><td>중앙 에러 핸들러</td><td class="no">❌ console 직접</td><td class="yes">✅ <code>ErrorHandler.handle('FIREBASE_SYNC')</code></td></tr>
+    <tr><td>운영 데이터 격리</td><td class="no">❌</td><td class="yes">✅ <code>test_</code> 접두사 강제</td></tr>
+    <tr><td>진단 도구</td><td class="no">❌</td><td class="yes">✅ <code>firebase-diagnostics.ts</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== ③ ===================== -->
+<h2><span class="sev info" style="background:var(--green); color:#001a00;">SAME</span>③ 양쪽 동일 — 충돌·timestamp 핵심 로직</h2>
+
+<p>이 5개 장치는 <strong>메인·테스트가 완전히 동일</strong>해서 두 프로젝트의 동기화 "기반"은 같은 수준이다.
+각 장치가 어떤 동기화 실패를 막는지 아래에 풀어 설명한다.</p>
+
+<h3>1. <code>serverTimestamp()</code> + <code>{ merge: true }</code> — 시계 충돌 &amp; 부분 덮어쓰기 방지</h3>
+<div class="filepath">project/src/shared/firestore-db.ts:214~221</div>
+<pre><span class="kw">const</span> docData = {
+  ...data,
+  id: normalizedId,
+  updatedAt: serverTimestamp()   <span class="cm">// 서버 시각</span>
+};
+<span class="kw">if</span> (!docData.createdAt) docData.createdAt = serverTimestamp();
+<span class="kw">await</span> db.collection(...).doc(...).set(docData, <span class="gd">{ merge: true }</span>);</pre>
+<ul>
+  <li><strong><code>serverTimestamp()</code></strong>: 클라이언트 로컬 시계가 아니라 <strong>Firestore 서버 시각</strong>을 기록. 여러 기기 시계가 어긋나 있어도 "누가 더 최신인가" 판정이 서버 기준 단일 타임라인으로 통일됨 → 시계 차이로 인한 최신성 오판 제거.</li>
+  <li><strong><code>{ merge: true }</code></strong>: 문서를 통째로 덮어쓰지 않고 <strong>전달한 필드만 갱신</strong>. A 기기가 일부 필드만 바꿔도 B 기기가 채운 다른 필드가 안 날아감. (①의 "캐시 삭제 보류"가 성립하는 전제 — merge라서 누락 문서가 안 지워짐.)</li>
+</ul>
+
+<h3>2. <code>createdAt → updatedAt → 0</code> 오름차순 로컬 정렬 — 정렬 누락 방지</h3>
+<div class="filepath">project/src/shared/firestore-db.ts:314~320</div>
+<pre>documents.sort((a, b) =&gt; {
+  <span class="kw">const</span> aTime = a.createdAt?.seconds || a.updatedAt?.seconds || <span class="gd">0</span>;
+  <span class="kw">const</span> bTime = b.createdAt?.seconds || b.updatedAt?.seconds || <span class="gd">0</span>;
+  <span class="kw">return</span> aTime - bTime;
+});</pre>
+<ul>
+  <li><strong>폴백 체인</strong>: <code>createdAt</code> 없으면 <code>updatedAt</code>, 그것도 없으면 <code>0</code>. timestamp 필드가 빠진 구버전 문서도 정렬에서 탈락하지 않고 맨 앞(0)에 배치 → 항목이 화면에서 사라지는 일 방지.</li>
+  <li><strong><code>?.seconds</code></strong>: 아직 확정 안 된(pending) serverTimestamp 문서도 안전하게 0으로 처리.</li>
+</ul>
+
+<h3>3. <code>orderBy</code> 제거 — "필드 없으면 제외" 함정 회피</h3>
+<div class="filepath">project/src/shared/firestore-db.ts:661 (subscribeToChanges)</div>
+<pre><span class="cm">// orderBy 제거: updatedAt이 없는 문서가 제외되는 문제 방지</span>
+<span class="kw">const</span> querySnapshot = <span class="kw">await</span> db.collection(collectionName).get();</pre>
+<ul>
+  <li>Firestore에서 <code>.orderBy('updatedAt')</code>로 서버 정렬을 걸면 <strong>그 필드가 없는 문서는 결과에서 통째로 빠진다</strong>(Firestore 기본 동작). 정렬하려다 데이터가 누락됨.</li>
+  <li>그래서 <strong>서버 정렬을 포기하고 전체를 가져온 뒤 2번처럼 로컬 정렬</strong>. 정렬 정확도를 약간 양보하되 <strong>"데이터 누락 0"을 보장</strong>하는 트레이드. 동기화에선 누락이 정렬보다 치명적이라 올바른 선택.</li>
+</ul>
+
+<h3>4. 삭제 3단계 + 멱등 삭제 — ID 타입 불일치 &amp; 거짓 실패 방지</h3>
+<div class="filepath">project/src/shared/firestore-db.ts:374~400</div>
+<pre><span class="cm">// 1차: 문서 ID로 직접 삭제</span>
+<span class="kw">if</span> (directDocSnap.exists) { <span class="kw">await</span> directDocRef.delete(); <span class="kw">return</span> true; }
+<span class="cm">// 2차: id 필드 == 문자열 로 쿼리</span>
+<span class="kw">let</span> q = <span class="kw">await</span> col.where('id', '==', stringDocId).get();
+<span class="cm">// 3차: 문자열로 못 찾으면 id == 숫자 로 재시도</span>
+<span class="kw">if</span> (q.empty &amp;&amp; !isNaN(numericDocId)) q = <span class="kw">await</span> col.where('id', '==', numericDocId).get();
+<span class="cm">// 대상 없음 = 이미 삭제됨 = 성공 (멱등)</span>
+<span class="kw">if</span> (q.empty) <span class="kw">return</span> true;</pre>
+<ul>
+  <li><strong>3단계 탐색</strong>: <code>id</code>가 문자열(<code>"123"</code>)·숫자(<code>123</code>)로 <strong>혼재</strong>된 상황을 모두 커버. 한 타입만 쿼리하면 못 지우는 좀비 데이터가 생기는데 그걸 방지.</li>
+  <li><strong>멱등 삭제</strong>: 지울 대상이 이미 없으면 에러가 아니라 <strong>성공</strong>으로 처리. 미업로드 항목 삭제 시 "삭제 실패"로 잘못 뜨는 거짓 실패를 막아 재시도 루프가 헛돌지 않음.</li>
+</ul>
+
+<h3>5. 실시간 <code>subscribe</code>의 <code>fromCache</code> 전달 — 실시간 경로의 신뢰도 표시</h3>
+<div class="filepath">firestore-db.ts:663 / storage-manager.ts:441</div>
+<pre>.onSnapshot((snapshot) =&gt; {
+  ...
+  callback(documents, <span class="gd">snapshot.metadata.fromCache</span>);  <span class="cm">// 신뢰도 동반</span>
+});
+<span class="cm">// storage-manager 소비:</span>
+<span class="kw">if</span> (!fromCache) syncStatus.lastSyncTime = <span class="kw">new</span> Date();  <span class="cm">// 서버 확정분만 기록</span></pre>
+<ul>
+  <li>실시간 스냅샷이 캐시에서 온 것인지(<code>fromCache=true</code>) 콜백에 같이 넘김. 캐시 응답으로는 <code>lastSyncTime</code>을 갱신하지 않아 "마지막 동기화 시각"이 거짓 최신화되지 않음.</li>
+  <li><strong>핵심</strong>: ①의 격차는 <strong>일회성 <code>getAll</code> 경로</strong>에만 있다. 이 <strong>실시간 <code>subscribe</code> 경로는 테스트도 <code>fromCache</code>를 제대로 인지</strong>한다. 즉 테스트가 fromCache 개념을 모르는 게 아니라, <strong>로드 시점(getAll)에서만 그 플래그를 버리는</strong> 게 ①의 정확한 빈틈이다.</li>
+</ul>
+
+<div class="callout green">
+  <h3 style="margin-top:0;">한눈에 — 이 5개가 함께 막는 것</h3>
+  <table style="margin:8px 0 0; background:transparent;">
+    <thead><tr><th>장치</th><th>막는 실패</th></tr></thead>
+    <tbody>
+      <tr><td><code>serverTimestamp</code> + <code>merge</code></td><td>기기 간 시계 차이 오판 / 필드 부분 유실</td></tr>
+      <tr><td><code>createdAt→updatedAt→0</code> 정렬</td><td>timestamp 없는 문서가 목록에서 사라짐</td></tr>
+      <tr><td><code>orderBy</code> 제거</td><td>서버 정렬이 필드 없는 문서를 누락</td></tr>
+      <tr><td>삭제 3단계 + 멱등</td><td>ID 타입 혼재로 안 지워지는 좀비 / 거짓 삭제 실패</td></tr>
+      <tr><td><code>subscribe fromCache</code></td><td>캐시 응답을 "동기화 완료"로 오기록</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===================== 요약 ===================== -->
+<h2>정리 &amp; 권고</h2>
+
+<div class="callout amber">
+  <h3>이전 결론 정정</h3>
+  <p>줄 수·키워드 카운트는 회복성 코드량 때문에 테스트가 커 보였을 뿐, <strong>데이터 무결성 안전장치는 메인이 우위</strong>다.</p>
+  <ul style="margin-bottom:0;">
+    <li><strong>테스트 우위</strong>: 네트워크 회복성(재시도 / 오프라인 큐 / 취소)</li>
+    <li><strong>메인 우위(실질 격차, MEDIUM)</strong>: <code>fromCache</code> 삭제 보류 — 불완전 캐시 읽기 시 로컬 데이터가 일시적으로 사라지는 현상 방지(자가 치유되지만 사용자 혼란·재입력 2차 사고 유발).</li>
+  </ul>
+</div>
+
+<div class="callout green">
+  <h3>적용하면 더 좋은가? — 권장(단, 성격 정확히)</h3>
+  <p style="margin-bottom:8px;">적용 가치 있음. 다만 이유는 <strong>"치명적 손실 방지"가 아니라 "혼란스러운 데이터 깜빡임 제거 + 메인 라인과 정합"</strong>이다.</p>
+  <ul style="margin:0;">
+    <li><strong>좋아지는 점</strong>: 오프라인/순간 단절 시 멀쩡한 데이터가 화면에서 사라지는 episode 제거 → 사용자 재입력(중복) 2차 사고 차단; 두 코드베이스 발산(유지보수 부담) 해소; 메인의 검증된 패턴 재사용이라 비용 저렴.</li>
+    <li><strong>받아들이는 트레이드(의도된 것)</strong>: 진짜 cross-device 삭제 반영이 약간 늦어짐(다음 정상 읽기까지 보류). 저동시성·소수 기기 농업 시료 대장에선 <em>데이터 보존 ≫ 즉시 삭제 전파</em>라 올바른 트레이드.</li>
+  </ul>
+</div>
+
+<p>MRL에 이어 <strong>이식할 가치가 있는 두 번째 실질 격차</strong>다. 권장 이식 범위는 3파일:</p>
+
+<table>
+  <thead><tr><th>#</th><th>파일</th><th>변경 내용</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>firestore-db.ts</code></td><td><code>getAllWithMeta()</code> 추가 — <code>{documents, fromCache}</code> 반환</td></tr>
+    <tr><td>2</td><td><code>sync-utils.ts</code></td><td><code>smartMerge</code>/<code>mergeCloudData</code>에 <code>allowDeletions</code>/<code>fromCache</code> 옵션 복원</td></tr>
+    <tr><td>3</td><td><code>BaseSampleManager.ts</code></td><td><code>loadFromFirebase</code>가 <code>{data, fromCache}</code> 반환 + 병합 시 <code>allowDeletions:!fromCache</code> 전달</td></tr>
+  </tbody>
+</table>
+
+<p style="color:var(--muted); font-size:14px;">
+  진행 시 ai-pm 티켓 발행 → executor 위임 → 빌드/타입게이트 → 코드리뷰 순서를 따른다.
+</p>
+
+<footer class="doc">
+  생성: Claude Code · 동기화 안정화 정밀 비교 · 2026-06-28<br>
+  근거 파일: <code>sync-utils.js/.ts</code>, <code>firestore-db.js/.ts</code>, <code>storage-manager.js/.ts</code>, <code>BaseSampleManager.js/.ts</code>
+</footer>
+
+</div>
+</body>
+</html>

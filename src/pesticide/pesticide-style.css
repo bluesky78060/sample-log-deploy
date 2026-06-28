@@ -1884,3 +1884,305 @@
 [data-theme="dark"] .data-table .col-name {
     border-right-color: #7f1d1d;
 }
+
+/* ===== MRL 농약 잔류허용기준 (Phase 2 이식) ===== */
+/* MRL / 판정 컬럼 */
+.pa-col-mrl { width: 80px; text-align: center; background: rgba(254, 243, 199, 0.3); }
+.pa-col-judgment { width: 70px; text-align: center; background: rgba(254, 243, 199, 0.3); }
+
+.pa-mrl-cell {
+    font-weight: 600;
+    color: #059669;
+    font-size: 0.85rem;
+}
+.pa-mrl-cell.pa-mrl-loading { color: #94a3b8; font-style: italic; }
+.pa-mrl-cell.pa-mrl-none { color: #64748b; font-size: 0.75rem; font-weight: 500; }
+.pa-mrl-cell.pa-mrl-error { color: #dc2626; font-size: 0.7rem; font-weight: 500; }
+.pa-mrl-cell.pa-mrl-category { color: #0369a1; }
+.pa-mrl-src {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 400;
+    color: #64748b;
+    line-height: 1;
+    margin-top: 1px;
+}
+[data-theme="dark"] .pa-mrl-cell.pa-mrl-category { color: #38bdf8; }
+[data-theme="dark"] .pa-mrl-src { color: #94a3b8; }
+
+.pa-judgment-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    min-width: 42px;
+}
+.pa-judgment-pass { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.pa-judgment-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.pa-judgment-none { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+
+[data-theme="dark"] .pa-col-mrl,
+[data-theme="dark"] .pa-col-judgment {
+    background: rgba(146, 64, 14, 0.12);
+}
+[data-theme="dark"] .pa-mrl-cell { color: #34d399; }
+[data-theme="dark"] .pa-mrl-cell.pa-mrl-none { color: #94a3b8; }
+[data-theme="dark"] .pa-judgment-pass { background: rgba(6, 95, 70, 0.3); color: #6ee7b7; border-color: #065f46; }
+[data-theme="dark"] .pa-judgment-fail { background: rgba(127, 29, 29, 0.3); color: #fca5a5; border-color: #991b1b; }
+[data-theme="dark"] .pa-judgment-none { background: rgba(51, 65, 85, 0.5); color: #94a3b8; border-color: #475569; }
+
+/* MRL 일괄 조회 버튼 */
+.pa-mrl-btn {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #10b981;
+    background: #fff;
+    color: #059669;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+.pa-mrl-btn:hover { background: #059669; color: #fff; }
+.pa-mrl-btn:disabled { opacity: 0.4; cursor: default; }
+.pa-mrl-btn:disabled:hover { background: #fff; color: #059669; }
+[data-theme="dark"] .pa-mrl-btn { background: #1e293b; border-color: #10b981; color: #6ee7b7; }
+[data-theme="dark"] .pa-mrl-btn:hover { background: #10b981; color: #0f172a; }
+
+/* MRL API 상태 표시줄 */
+.pa-mrl-status {
+    margin-top: 0.6rem;
+    padding: 0.55rem 0.85rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.78rem;
+    color: #1e40af;
+}
+.pa-mrl-status.pa-mrl-status-warn {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+.pa-mrl-status.pa-mrl-status-error {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+.pa-mrl-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    flex-shrink: 0;
+}
+.pa-mrl-status.pa-mrl-status-warn .pa-mrl-dot { background: #f59e0b; }
+.pa-mrl-status.pa-mrl-status-error .pa-mrl-dot { background: #dc2626; }
+.pa-mrl-link-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+.pa-mrl-link-btn:hover { background: rgba(255, 255, 255, 0.4); }
+[data-theme="dark"] .pa-mrl-status { background: rgba(30, 58, 138, 0.2); border-color: #1e40af; color: #93c5fd; }
+[data-theme="dark"] .pa-mrl-status.pa-mrl-status-warn { background: rgba(146, 64, 14, 0.2); border-color: #92400e; color: #fcd34d; }
+[data-theme="dark"] .pa-mrl-status.pa-mrl-status-error { background: rgba(127, 29, 29, 0.2); border-color: #7f1d1d; color: #fca5a5; }
+
+/* ========================================
+   MRL 검색 모달 (접수목록 진입점)
+   ======================================== */
+.btn-mrl-search-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid #10b981;
+    background: #ecfdf5;
+    color: #047857;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition, all 0.15s ease);
+}
+.btn-mrl-search-open:hover { background: #10b981; color: #fff; }
+[data-theme="dark"] .btn-mrl-search-open { background: #064e3b; border-color: #10b981; color: #6ee7b7; }
+[data-theme="dark"] .btn-mrl-search-open:hover { background: #10b981; color: #022c22; }
+
+/* 상태 안내줄 */
+.mrl-search-status {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.85rem;
+    margin-bottom: 0.85rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: #1e40af;
+}
+.mrl-search-status.mrl-search-status-warn { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.mrl-search-status.mrl-search-status-error { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.mrl-search-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; flex-shrink: 0; }
+.mrl-search-status.mrl-search-status-warn .mrl-search-dot { background: #f59e0b; }
+.mrl-search-status.mrl-search-status-error .mrl-search-dot { background: #dc2626; }
+.mrl-search-link-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+.mrl-search-link-btn:hover { background: rgba(255, 255, 255, 0.4); }
+[data-theme="dark"] .mrl-search-status { background: rgba(30, 58, 138, 0.2); border-color: #1e40af; color: #93c5fd; }
+[data-theme="dark"] .mrl-search-status.mrl-search-status-warn { background: rgba(146, 64, 14, 0.2); border-color: #92400e; color: #fcd34d; }
+[data-theme="dark"] .mrl-search-status.mrl-search-status-error { background: rgba(127, 29, 29, 0.2); border-color: #7f1d1d; color: #fca5a5; }
+
+/* 검색 입력 */
+.mrl-search-input-row { position: relative; display: flex; align-items: center; }
+.mrl-search-input-icon {
+    position: absolute; left: 0.7rem; color: #94a3b8; font-size: 20px; pointer-events: none;
+}
+.mrl-search-input {
+    width: 100%;
+    padding: 0.65rem 2.4rem 0.65rem 2.4rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: #1e293b;
+}
+.mrl-search-input:focus { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15); outline: none; }
+.mrl-search-clear-btn {
+    position: absolute; right: 0.6rem; width: 24px; height: 24px;
+    border: none; background: #e2e8f0; color: #475569; border-radius: 50%;
+    font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.mrl-search-clear-btn:hover { background: #cbd5e1; }
+[data-theme="dark"] .mrl-search-input { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+[data-theme="dark"] .mrl-search-clear-btn { background: #334155; color: #cbd5e1; }
+
+/* 후보 리스트 */
+.mrl-candidate-section { margin-top: 0.9rem; }
+.mrl-candidate-info { font-size: 0.78rem; color: #64748b; margin-bottom: 0.4rem; }
+.mrl-candidate-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+.mrl-candidate-item {
+    display: flex; align-items: center; gap: 0.55rem;
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.mrl-candidate-item:last-child { border-bottom: none; }
+.mrl-candidate-item:hover { background: #ecfdf5; }
+.mrl-candidate-item.mrl-cand-disabled { cursor: default; opacity: 0.65; }
+.mrl-candidate-item.mrl-cand-disabled:hover { background: transparent; }
+.mrl-cand-kor { font-weight: 600; color: #1e293b; font-size: 0.9rem; }
+.mrl-cand-eng { color: #64748b; font-size: 0.78rem; }
+.mrl-cand-nomrl { font-size: 0.7rem; color: #b45309; background: #fef3c7; padding: 1px 7px; border-radius: 10px; }
+.mrl-cand-arrow { margin-left: auto; color: #94a3b8; font-size: 18px; }
+[data-theme="dark"] .mrl-candidate-list { border-color: #334155; }
+[data-theme="dark"] .mrl-candidate-item { border-bottom-color: #1e293b; }
+[data-theme="dark"] .mrl-candidate-item:hover { background: rgba(16, 185, 129, 0.12); }
+[data-theme="dark"] .mrl-cand-kor { color: #e2e8f0; }
+[data-theme="dark"] .mrl-cand-eng { color: #94a3b8; }
+[data-theme="dark"] .mrl-cand-nomrl { background: rgba(146, 64, 14, 0.3); color: #fcd34d; }
+
+/* 결과 영역 */
+.mrl-result-section { margin-top: 0.9rem; }
+.mrl-result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
+.mrl-result-title { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.mrl-result-kor { font-size: 1rem; font-weight: 700; color: #047857; }
+.mrl-result-eng { font-size: 0.82rem; color: #64748b; }
+.mrl-back-btn {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    padding: 0.3rem 0.7rem; border: 1px solid #cbd5e1; background: #fff;
+    color: #475569; border-radius: 6px; font-size: 0.78rem; cursor: pointer;
+}
+.mrl-back-btn:hover { background: #f1f5f9; }
+
+/* 농약 용도 배지 (살충/살균/제초 등) — SAMPL-1-101 */
+.mrl-use-badge {
+    display: inline-flex; align-items: center;
+    font-size: 0.68rem; font-weight: 700; line-height: 1;
+    padding: 2px 7px; border-radius: 10px;
+    border: 1px solid transparent; white-space: nowrap;
+}
+.mrl-use-badge.use-insecticide { color: #92400e; background: #fef3c7; border-color: #fde68a; }   /* 살충제 amber */
+.mrl-use-badge.use-fungicide   { color: #1e40af; background: #dbeafe; border-color: #bfdbfe; }   /* 살균제 blue */
+.mrl-use-badge.use-herbicide   { color: #166534; background: #dcfce7; border-color: #bbf7d0; }   /* 제초제 green */
+.mrl-use-badge.use-acaricide   { color: #9a3412; background: #ffedd5; border-color: #fed7aa; }   /* 살응애제 orange */
+.mrl-use-badge.use-pgr         { color: #6b21a8; background: #f3e8ff; border-color: #e9d5ff; }   /* 생장조정제 purple */
+.mrl-use-badge.use-nematicide  { color: #115e59; background: #ccfbf1; border-color: #99f6e4; }   /* 살선충제 teal */
+.mrl-use-badge.use-etc         { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }   /* 기타 slate */
+.mrl-use-badge.use-unknown     { color: #64748b; background: #f1f5f9; border-color: #e2e8f0; }   /* 미분류 회색 */
+/* 후보 리스트용 약간 작은 배지 */
+.mrl-candidate-item .mrl-use-badge { font-size: 0.64rem; padding: 1px 6px; }
+.mrl-use-note { font-size: 0.68rem; color: #94a3b8; margin-left: 0.1rem; cursor: help; }
+[data-theme="dark"] .mrl-use-badge.use-insecticide { color: #fcd34d; background: rgba(146, 64, 14, 0.30); border-color: rgba(146, 64, 14, 0.5); }
+[data-theme="dark"] .mrl-use-badge.use-fungicide   { color: #93c5fd; background: rgba(30, 64, 175, 0.30); border-color: rgba(30, 64, 175, 0.5); }
+[data-theme="dark"] .mrl-use-badge.use-herbicide   { color: #86efac; background: rgba(22, 101, 52, 0.30); border-color: rgba(22, 101, 52, 0.5); }
+[data-theme="dark"] .mrl-use-badge.use-acaricide   { color: #fdba74; background: rgba(154, 52, 18, 0.30); border-color: rgba(154, 52, 18, 0.5); }
+[data-theme="dark"] .mrl-use-badge.use-pgr         { color: #d8b4fe; background: rgba(107, 33, 168, 0.30); border-color: rgba(107, 33, 168, 0.5); }
+[data-theme="dark"] .mrl-use-badge.use-nematicide  { color: #5eead4; background: rgba(17, 94, 89, 0.30); border-color: rgba(17, 94, 89, 0.5); }
+[data-theme="dark"] .mrl-use-badge.use-etc,
+[data-theme="dark"] .mrl-use-badge.use-unknown     { color: #cbd5e1; background: rgba(51, 65, 85, 0.5); border-color: #475569; }
+[data-theme="dark"] .mrl-use-note { color: #64748b; }
+
+[data-theme="dark"] .mrl-result-kor { color: #6ee7b7; }
+[data-theme="dark"] .mrl-result-eng { color: #94a3b8; }
+[data-theme="dark"] .mrl-back-btn { background: #1e293b; border-color: #475569; color: #cbd5e1; }
+[data-theme="dark"] .mrl-back-btn:hover { background: #334155; }
+
+.mrl-food-filter-row { position: relative; display: flex; align-items: center; margin-bottom: 0.6rem; }
+.mrl-food-filter-icon { position: absolute; left: 0.6rem; color: #94a3b8; font-size: 18px; pointer-events: none; }
+.mrl-food-filter-input {
+    flex: 1; padding: 0.5rem 0.7rem 0.5rem 2.2rem;
+    border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-family: inherit; color: #1e293b;
+}
+.mrl-food-filter-input:focus { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.12); outline: none; }
+.mrl-result-count { margin-left: 0.7rem; font-size: 0.78rem; color: #64748b; white-space: nowrap; }
+[data-theme="dark"] .mrl-food-filter-input { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+[data-theme="dark"] .mrl-result-count { color: #94a3b8; }
+
+.mrl-result-table-wrapper { max-height: 340px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+.mrl-result-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.mrl-result-table thead th {
+    position: sticky; top: 0; z-index: 1;
+    background: #f8fafc; color: #475569; font-weight: 600;
+    text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid #e2e8f0;
+}
+.mrl-result-table tbody td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.mrl-result-table tbody tr:last-child td { border-bottom: none; }
+.mrl-result-table tbody tr:hover { background: #f8fafc; }
+.mrl-result-table .mrl-col-value { font-weight: 600; color: #047857; }
+.mrl-result-table .mrl-col-unit { color: #94a3b8; }
+.mrl-result-empty-row { text-align: center; color: #94a3b8; padding: 1.2rem !important; }
+[data-theme="dark"] .mrl-result-table-wrapper { border-color: #334155; }
+[data-theme="dark"] .mrl-result-table thead th { background: #1e293b; color: #cbd5e1; border-bottom-color: #334155; }
+[data-theme="dark"] .mrl-result-table tbody td { color: #cbd5e1; border-bottom-color: #1e293b; }
+[data-theme="dark"] .mrl-result-table tbody tr:hover { background: rgba(148, 163, 184, 0.08); }
+[data-theme="dark"] .mrl-result-table .mrl-col-value { color: #6ee7b7; }
+
+/* 빈 상태 */
+.mrl-search-empty {
+    margin-top: 1.2rem; padding: 1.5rem; text-align: center;
+    color: #94a3b8; font-size: 0.85rem;
+    background: #f8fafc; border-radius: 8px; border: 1px dashed #e2e8f0;
+}
+[data-theme="dark"] .mrl-search-empty { background: rgba(30, 41, 59, 0.5); border-color: #334155; color: #94a3b8; }

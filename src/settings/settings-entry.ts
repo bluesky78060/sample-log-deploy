@@ -115,6 +115,7 @@ async function initSettingsPage(): Promise<void> {
     SettingsScript.initStorageModeUI(),
     SettingsScript.updateEncryptionStatusUI(),
     SettingsScript.initNetworkAccessUI(),
+    SettingsScript.initMrlApiUI(),
     SettingsScript.updateCacheStatusUI(),
   ]);
 

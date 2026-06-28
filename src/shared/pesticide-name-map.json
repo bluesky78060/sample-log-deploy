@@ -1,0 +1,3220 @@
+{
+  "meta": {
+    "generated_at": "2026-04-12T20:24:30.853505",
+    "source": "잔류농약_한글명매핑.xlsx (수동 검증) + 기존 수동 오버라이드 병합",
+    "algorithm": "manual-xlsx + manual-overrides",
+    "eng_count": 552,
+    "matched": 551,
+    "exact": 498,
+    "unverified": 26,
+    "manual": 27,
+    "unmapped": 1
+  },
+  "map": {
+    "2.6-DIPN": {
+      "kor": "2,6-디이소프로필나프탈렌",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "2,4,6-trichlorophenol": {
+      "kor": "2,4,6-트리클로로페놀",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "2-phenyl phenol": {
+      "kor": "2-페닐페놀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Acetochlor": {
+      "kor": "아세토클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Acrinathrin": {
+      "kor": "아크리나트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Alachlor": {
+      "kor": "알라클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 45
+    },
+    "Aldrin": {
+      "kor": "알드린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "Allidochlor": {
+      "kor": "알리도클로르",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Ametryn": {
+      "kor": "아메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Aramite": {
+      "kor": "아라마이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Aspon": {
+      "kor": "아스폰",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Atrazine": {
+      "kor": "아트라진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 48
+    },
+    "Azinphos-ethyl": {
+      "kor": "아진포스에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 70
+    },
+    "Benfluralin": {
+      "kor": "벤플루랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 26
+    },
+    "Benodanil": {
+      "kor": "베노다닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 13
+    },
+    "Benzoylprop-ethyl": {
+      "kor": "벤조일프로프에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "BHC-α": {
+      "kor": "α-BHC",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 38
+    },
+    "BHC-β": {
+      "kor": "β-BHC",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "BHC-δ": {
+      "kor": "δ-BHC",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Bifenazate": {
+      "kor": "비페나제이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 31
+    },
+    "Bifenthrin": {
+      "kor": "비펜트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 146
+    },
+    "Boscalid": {
+      "kor": "보스칼리드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 108
+    },
+    "Bromobutide": {
+      "kor": "브로모부타이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 5
+    },
+    "Bromophos-ethyl": {
+      "kor": "브로모포스에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Bromophos-methyl": {
+      "kor": "브로모포스메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 43
+    },
+    "Bromopropylate": {
+      "kor": "브로모프로필레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Bupirimate": {
+      "kor": "부피리메이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Buprofezin": {
+      "kor": "부프로페진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 64
+    },
+    "Butachlor": {
+      "kor": "부타클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 34
+    },
+    "Butralin": {
+      "kor": "부트랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Butylate": {
+      "kor": "부틸레이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Cadusafos": {
+      "kor": "카두사포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 77
+    },
+    "Carboxin": {
+      "kor": "카복신",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Chinomethionat": {
+      "kor": "키노메티오네이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 9
+    },
+    "Chlorbenside": {
+      "kor": "클로르벤사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Chlorbufam": {
+      "kor": "클로르부팜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 73
+    },
+    "Chlordane-cis": {
+      "kor": "시스-클로르데인",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Chlordane-trans": {
+      "kor": "트랜스-클로르데인",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Chlorethoxyfos": {
+      "kor": "클로르에톡시포스",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Chlorfenapyr": {
+      "kor": "클로르페나피르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 125
+    },
+    "Chlorfenson": {
+      "kor": "클로르펜손",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Chlorflurenol-methyl": {
+      "kor": "클로르플루레놀메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Chlornitrofen": {
+      "kor": "클로르니트로펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 44
+    },
+    "Chlorobenzilate": {
+      "kor": "클로로벤질레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Chloraneb": {
+      "kor": "클로라네브",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Chloropropylate": {
+      "kor": "클로로프로필레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Chlorothalonil": {
+      "kor": "클로로탈로닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 85
+    },
+    "Chlorpropham": {
+      "kor": "클로르프로팜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 73
+    },
+    "Chlorpyrifos(-ethyl)": {
+      "kor": "클로르피리포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 145
+    },
+    "Chlorpyrifos-methyl": {
+      "kor": "클로르피리포스메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Chlorthal-dimethyl": {
+      "kor": "클로르탈디메틸",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Chlorthion": {
+      "kor": "클로르티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Chlorthiophos": {
+      "kor": "클로르티오포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Chlozolinate": {
+      "kor": "클로졸리네이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Cinmethylin": {
+      "kor": "신메틸린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Coumaphos": {
+      "kor": "쿠마포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Cyanophos": {
+      "kor": "시아노포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Cyflufenamid": {
+      "kor": "사이플루페나미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 21
+    },
+    "Cyfluthrin": {
+      "kor": "사이플루트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 89
+    },
+    "Cyhalothrin-γ": {
+      "kor": "감마-시할로트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 129
+    },
+    "Cyhalothrin-λ": {
+      "kor": "람다-시할로트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 129
+    },
+    "Cypermethrin": {
+      "kor": "사이퍼메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 123
+    },
+    "Cyprazine": {
+      "kor": "사이프라진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 86
+    },
+    "Cyprodinil": {
+      "kor": "사이프로디닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 35
+    },
+    "DDD-pp": {
+      "kor": "p,p'-DDD",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "DDE-pp": {
+      "kor": "p,p'-DDE",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "DDT-op": {
+      "kor": "o,p'-DDT",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "DDT-pp": {
+      "kor": "p,p'-DDT",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Deltamethrin": {
+      "kor": "델타메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 118
+    },
+    "Desmetryn": {
+      "kor": "데스메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Dialifor": {
+      "kor": "디알리포르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 52
+    },
+    "Diallate": {
+      "kor": "디알레이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Diazinon": {
+      "kor": "다이아지논",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 77
+    },
+    "Dichlobenil": {
+      "kor": "디클로베닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 18
+    },
+    "Dichlofenthion": {
+      "kor": "디클로펜티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 5
+    },
+    "Dichlofluanid": {
+      "kor": "디클로플루아니드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 80
+    },
+    "Dichlormid": {
+      "kor": "디클로르미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 80
+    },
+    "Diclobutrazol": {
+      "kor": "디클로부트라졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Dicofol": {
+      "kor": "디코폴",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 52
+    },
+    "Dicrotophos": {
+      "kor": "디크로토포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Dieldrin": {
+      "kor": "디엘드린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "Diethatyl-ethyl": {
+      "kor": "디에타틸에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Diethofencarb": {
+      "kor": "디에토펜카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 46
+    },
+    "Difenoconazole": {
+      "kor": "디페노코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 111
+    },
+    "Diflufenican": {
+      "kor": "디플루페니칸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Dimethachlor": {
+      "kor": "디메타클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Dimethenamid": {
+      "kor": "디메테나미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 13
+    },
+    "Dimethipin": {
+      "kor": "디메티핀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Dimethomorph E": {
+      "kor": "디메토모르프 E",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Dimethomorph Z": {
+      "kor": "디메토모르프 Z",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Diniconazole": {
+      "kor": "디니코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Dinitramine": {
+      "kor": "디니트라민",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Dioxathion": {
+      "kor": "디옥사티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 58
+    },
+    "Diphenylamine": {
+      "kor": "디페닐아민",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Dithiopyr": {
+      "kor": "디티오피르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Edifenphos": {
+      "kor": "에디펜포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "EMA": {
+      "kor": "EMA",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Endosulfan sulfate": {
+      "kor": "엔도설판 설페이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Endosulfan-α": {
+      "kor": "α-엔도설판",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Endosulfan-β": {
+      "kor": "β-엔도설판",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Endrin": {
+      "kor": "엔드린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "ΕΡΝ": {
+      "kor": "이피엔",
+      "confidence": "exact",
+      "score": 0.8
+    },
+    "Epoxiconazole": {
+      "kor": "에폭시코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 18
+    },
+    "EPTC": {
+      "kor": "EPTC",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Etaconazole": {
+      "kor": "에타코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Ethalfluralin": {
+      "kor": "에탈플루랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 26
+    },
+    "Ethion": {
+      "kor": "에티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Ethofurnesate": {
+      "kor": "에토퍼네세이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Ethoprophos": {
+      "kor": "에토프로포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Ethychlozate": {
+      "kor": "에티클로제이트",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Ethoxazole": {
+      "kor": "에톡사졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 63
+    },
+    "Etridiazole": {
+      "kor": "에트리디아졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 24
+    },
+    "Fenamidone": {
+      "kor": "페나미돈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 13
+    },
+    "Fenarimol": {
+      "kor": "페나리몰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 31
+    },
+    "Fenbuconazole": {
+      "kor": "펜부코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 44
+    },
+    "Fenchlorphos": {
+      "kor": "펜클로르포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Fenfuram": {
+      "kor": "펜푸람",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Fenitrothion": {
+      "kor": "페니트로티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 111
+    },
+    "Fenobucarb": {
+      "kor": "페노부카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Fnoxanil": {
+      "kor": "플녹사닐",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 7
+    },
+    "Fenpropathrin": {
+      "kor": "펜프로파트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 59
+    },
+    "Fenpropimorph": {
+      "kor": "펜프로피모르프",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 31
+    },
+    "Fenpyrazamine": {
+      "kor": "펜피라자민",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 60
+    },
+    "Fenson": {
+      "kor": "펜손",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Fenthion": {
+      "kor": "펜티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Fenvalerate": {
+      "kor": "펜발레레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 102
+    },
+    "Fipronil": {
+      "kor": "피프로닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Flamprop-isopropyl": {
+      "kor": "플람프로프이소프로필",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Fluazifop-butyl": {
+      "kor": "플루아지포프부틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 55
+    },
+    "Fluchloralin": {
+      "kor": "플루클로랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 45
+    },
+    "Fluensulfone": {
+      "kor": "플루엔설폰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Flufenpyr-ethyl": {
+      "kor": "플루펜피르에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 6
+    },
+    "Flumetralin": {
+      "kor": "플루메트랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Fluopyram": {
+      "kor": "플루오피람",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 78
+    },
+    "Fluorochloridone": {
+      "kor": "플루오로클로리돈",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Fluquinconazole": {
+      "kor": "플루퀸코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "Flusilazole": {
+      "kor": "플루실라졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 35
+    },
+    "Flutianil": {
+      "kor": "플루티아닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 38
+    },
+    "Fluvalinate": {
+      "kor": "플루발리네이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Fluxapyroxad": {
+      "kor": "플룩사피록사드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 120
+    },
+    "Folpet": {
+      "kor": "폴펫",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 35
+    },
+    "Formothion": {
+      "kor": "포르모티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "HEMA": {
+      "kor": "HEMA",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Heptachlor": {
+      "kor": "헵타클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Heptachlor epoxide": {
+      "kor": "헵타클로르 에폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Heptenophos": {
+      "kor": "헵테노포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Hexachlorobenzene": {
+      "kor": "헥사클로로벤젠",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Hexythiazox": {
+      "kor": "헥시티아족스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 36
+    },
+    "Indoxacarb": {
+      "kor": "인독사카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 85
+    },
+    "Ipconazole": {
+      "kor": "이프코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Iprobenfos": {
+      "kor": "이프로벤포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Iprodione": {
+      "kor": "이프로디온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 64
+    },
+    "Isofenphos": {
+      "kor": "이소펜포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Isofenphos-methyl": {
+      "kor": "이소펜포스메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Isoprocarb": {
+      "kor": "이소프로카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Isopropalin": {
+      "kor": "이소프로팔린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 32
+    },
+    "Isoprothiolane": {
+      "kor": "이소프로티올레인",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 32
+    },
+    "Isopyrazam": {
+      "kor": "이소피라잠",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 37
+    },
+    "Isotianil": {
+      "kor": "이소티아닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Isoxadifen-ethyl": {
+      "kor": "이속사디펜에틸",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Kresoxim-methyl": {
+      "kor": "크레속심메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 76
+    },
+    "Leptophos": {
+      "kor": "렙토포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Lindane(y-BHC)": {
+      "kor": "린데인(감마-BHC)",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 14
+    },
+    "Mefenpyr-diethyl": {
+      "kor": "메펜피르디에틸",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Metalaxyl": {
+      "kor": "메탈락실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 84
+    },
+    "Methidathion": {
+      "kor": "메티다티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 47
+    },
+    "Methoprotryn": {
+      "kor": "메토프로트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 15
+    },
+    "Methoxychlor": {
+      "kor": "메톡시클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "Methyl trithion": {
+      "kor": "메틸트리티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 47
+    },
+    "Metolachlor": {
+      "kor": "메톨라클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 47
+    },
+    "Metribuzin": {
+      "kor": "메트리부진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 40
+    },
+    "MGK-264": {
+      "kor": "MGK-264",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Monolinuron": {
+      "kor": "모노리누론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 32
+    },
+    "Myclobutanil": {
+      "kor": "마이클로부타닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 78
+    },
+    "Nitrapyrin": {
+      "kor": "니트라피린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 5
+    },
+    "Nitrothal-siopropyl": {
+      "kor": "니트로탈이소프로필",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Nonachlor-cis": {
+      "kor": "시스-노나클로르",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Nonachlor-trans": {
+      "kor": "트랜스-노나클로르",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Nuarimol": {
+      "kor": "누아리몰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 6
+    },
+    "Oxadiazon": {
+      "kor": "옥사디아존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 16
+    },
+    "Oxadixyl": {
+      "kor": "옥사딕실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 43
+    },
+    "Oxafluorfen": {
+      "kor": "옥사플루오르펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 34
+    },
+    "Paclobutrazol": {
+      "kor": "파클로부트라졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Parathion": {
+      "kor": "파라티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 63
+    },
+    "Parathion-methyl": {
+      "kor": "파라티온메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 65
+    },
+    "Pendimethalin": {
+      "kor": "펜디메탈린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 92
+    },
+    "Penflufen": {
+      "kor": "펜플루펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Pentachlorobenzonitrile": {
+      "kor": "펜타클로로벤조니트릴",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Penthiopyrad": {
+      "kor": "펜티오피라드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 84
+    },
+    "Pentoxazone": {
+      "kor": "펜톡사존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Permethrin-cis": {
+      "kor": "시스-퍼메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Permethrin-trans": {
+      "kor": "트랜스-퍼메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Perhane": {
+      "kor": "퍼헤인",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Phenthoate": {
+      "kor": "펜토에이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 70
+    },
+    "Phosalone": {
+      "kor": "포살론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 23
+    },
+    "Phosmet": {
+      "kor": "포스멧",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Phosphamidon E": {
+      "kor": "포스파미돈 E",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 31
+    },
+    "Phosphamidon Z": {
+      "kor": "포스파미돈 Z",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 31
+    },
+    "Phthalide, Fthalide": {
+      "kor": "프탈라이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Picoxystrobin": {
+      "kor": "피콕시스트로빈",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 48
+    },
+    "Piperonyl butoxide": {
+      "kor": "피페로닐부톡사이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 16
+    },
+    "Pirimicarb": {
+      "kor": "피리미카브",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 81
+    },
+    "Pirimiphos-ethyl": {
+      "kor": "피리미포스에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Pirimiphos-methyl": {
+      "kor": "피리미포스메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 43
+    },
+    "Prochloraz": {
+      "kor": "프로클로라즈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 51
+    },
+    "Procymidone": {
+      "kor": "프로시미돈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 33
+    },
+    "Prodiamine": {
+      "kor": "프로디아민",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 95
+    },
+    "Profenofos": {
+      "kor": "프로페노포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 34
+    },
+    "Profluralin": {
+      "kor": "프로플루랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 45
+    },
+    "Prohydrojasmon": {
+      "kor": "프로히드로자스몬",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Prometon": {
+      "kor": "프로메톤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Propachlor": {
+      "kor": "프로파클로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Propanil": {
+      "kor": "프로파닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Propetamphos": {
+      "kor": "프로페탐포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 34
+    },
+    "Propham": {
+      "kor": "프로팜",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 78
+    },
+    "Propiconazole": {
+      "kor": "프로피코나졸",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 65
+    },
+    "Propisochlor": {
+      "kor": "프로피소클로르",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 2
+    },
+    "Prothiofos": {
+      "kor": "프로티오포스",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 7
+    },
+    "Pyracarbolid": {
+      "kor": "피라카볼리드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Pyraclofos": {
+      "kor": "피라클로포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Pyraflufen-ethyl": {
+      "kor": "피라플루펜에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 6
+    },
+    "Pyridalyl": {
+      "kor": "피리달릴",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Pyrifenox": {
+      "kor": "피리페녹스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Pyrimethanil": {
+      "kor": "피리메타닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 66
+    },
+    "Quinalphos": {
+      "kor": "퀴날포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Quinoxyfen": {
+      "kor": "퀴녹시펜",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Quintozene": {
+      "kor": "퀸토젠",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Silafluofen": {
+      "kor": "실라플루오펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Simeconazole": {
+      "kor": "시메코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 27
+    },
+    "Spiromesifen": {
+      "kor": "스피로메시펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 60
+    },
+    "Spiroxamine": {
+      "kor": "스피록사민",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Sulfotep": {
+      "kor": "설포텝",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Tebuconazole": {
+      "kor": "테부코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 122
+    },
+    "Tebufenpyrad": {
+      "kor": "테부펜피라드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 56
+    },
+    "Tebupirimfos": {
+      "kor": "테부피림포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 68
+    },
+    "Tecnazene": {
+      "kor": "테크나젠",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Tefluthrin": {
+      "kor": "테플루트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 83
+    },
+    "Terbacil": {
+      "kor": "터바실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Terbumeton": {
+      "kor": "터부메톤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Tetrachlorvinphos": {
+      "kor": "테트라클로르빈포스",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Tetraconazole": {
+      "kor": "테트라코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Tetradifon": {
+      "kor": "테트라디폰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 27
+    },
+    "Tetramethrin": {
+      "kor": "테트라메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 111
+    },
+    "Thifluzamide": {
+      "kor": "티플루자미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 38
+    },
+    "Thiometon": {
+      "kor": "티오메톤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Thionazin": {
+      "kor": "티오나진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 28
+    },
+    "Tolclofos-methyl": {
+      "kor": "톨클로포스메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 16
+    },
+    "Tralomethrin": {
+      "kor": "트랄로메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 111
+    },
+    "Triadimefon": {
+      "kor": "트리아디메폰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 33
+    },
+    "Triadimenol": {
+      "kor": "트리아디메놀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Triazophos": {
+      "kor": "트리아조포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Tridiphane": {
+      "kor": "트리디페인",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 33
+    },
+    "Trifloxystrobin": {
+      "kor": "트리플록시스트로빈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 92
+    },
+    "Triflumizole": {
+      "kor": "트리플루미졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 67
+    },
+    "Trifluralin": {
+      "kor": "트리플루랄린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 45
+    },
+    "Vinclozolin": {
+      "kor": "빈클로졸린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 30
+    },
+    "Zoxamide": {
+      "kor": "족사미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 23
+    },
+    "δ-keto-Endrin": {
+      "kor": "δ-케토-엔드린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "2,3,5-Trimethacarb": {
+      "kor": "2,3,5-트리메타카브",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "3,4,5-Trimethacarb": {
+      "kor": "3,4,5-트리메타카브",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "3-hydroxycarbofuran": {
+      "kor": "3-히드록시카보퓨란",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Abamectin B1a": {
+      "kor": "아바멕틴 B1a",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 103
+    },
+    "Acephate": {
+      "kor": "아세페이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 64
+    },
+    "Acequinocyl": {
+      "kor": "아세퀴노실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 53
+    },
+    "Acetamiprid": {
+      "kor": "아세타미프리드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 134
+    },
+    "Acibenzolar acid": {
+      "kor": "아시벤졸라르산",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 31
+    },
+    "Acibenzolar-S-methyl": {
+      "kor": "아시벤졸라르-S-메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 36
+    },
+    "Aldicarb": {
+      "kor": "알디카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 23
+    },
+    "Allethrin": {
+      "kor": "알레트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 79
+    },
+    "Ametoctradin": {
+      "kor": "아메토크트라딘",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 37
+    },
+    "Amisulbrom": {
+      "kor": "아미설브롬",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 51
+    },
+    "Amitraz": {
+      "kor": "아미트라즈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 48
+    },
+    "Asulam": {
+      "kor": "아설람",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Azamethiphos": {
+      "kor": "아자메티포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Azinphos-methyl": {
+      "kor": "아진포스메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 70
+    },
+    "Azoxystrobin": {
+      "kor": "아족시스트로빈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 133
+    },
+    "Benalaxyl": {
+      "kor": "베날락실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 43
+    },
+    "Bendiocarb": {
+      "kor": "벤디오카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Bensulide": {
+      "kor": "벤설라이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Bentazone": {
+      "kor": "벤타존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 51
+    },
+    "Benthiavalicarb-isopropyl R": {
+      "kor": "벤티아발리카브이소프로필 R",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 37
+    },
+    "Benthiavalicarb-isopropyl S": {
+      "kor": "벤티아발리카브이소프로필 S",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 37
+    },
+    "Benzobicyclon": {
+      "kor": "벤조바이시클론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "6-Benzyl amiopurine": {
+      "kor": "6-벤질아미노퓨린",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "BioResmethrin": {
+      "kor": "바이오레스메트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Bispyribac-sodium": {
+      "kor": "비스피리박나트륨",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Bistrifluron": {
+      "kor": "비스트리플루론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 34
+    },
+    "Bitertanol": {
+      "kor": "비터타놀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 48
+    },
+    "Bixafen": {
+      "kor": "빅사펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Bromacil": {
+      "kor": "브로마실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "BTS 44595": {
+      "kor": "BTS 44595",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "BTS 44596": {
+      "kor": "BTS 44596",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Butocarboxim": {
+      "kor": "부토카복심",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Carbaryl": {
+      "kor": "카바릴",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 80
+    },
+    "Carbendazim": {
+      "kor": "카벤다짐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 149
+    },
+    "Carbetamide": {
+      "kor": "카르베타미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 134
+    },
+    "Carbofuran": {
+      "kor": "카보퓨란",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 88
+    },
+    "Carpropamide": {
+      "kor": "카르프로파미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Chlorantraniliprole": {
+      "kor": "클로란트라닐리프롤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 125
+    },
+    "Chlorfenvinphos E": {
+      "kor": "클로르펜빈포스 E",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Chlorfenvinphos Z": {
+      "kor": "클로르펜빈포스 Z",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 17
+    },
+    "Chlorfluazuron": {
+      "kor": "클로르플루아주론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 67
+    },
+    "Chloridazone": {
+      "kor": "클로리다존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Chlorobenauron": {
+      "kor": "클로란트라닐리프롤",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 8
+    },
+    "Chlorotoluron": {
+      "kor": "클로로톨루론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Chloroxuron": {
+      "kor": "클로록수론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Chromafenozide": {
+      "kor": "크로마페노자이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 53
+    },
+    "Clethodim": {
+      "kor": "클레토딤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 24
+    },
+    "Clethoim sulfoxide": {
+      "kor": "클레토딤 설폭사이드",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Clofentezine": {
+      "kor": "클로펜테진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 47
+    },
+    "Clomeprop": {
+      "kor": "클로메프로프",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 6
+    },
+    "Clothianidin": {
+      "kor": "클로티아니딘",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 110
+    },
+    "Crotoxyphos": {
+      "kor": "크로톡시포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Crufomate": {
+      "kor": "크루포메이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Cyanazine": {
+      "kor": "사이아나진",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Cyantraniliprole": {
+      "kor": "사이안트라닐리프롤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 129
+    },
+    "Cyazofamid": {
+      "kor": "사이아조파미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 61
+    },
+    "Cyclaniliprole": {
+      "kor": "사이클라닐리프롤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 59
+    },
+    "Cycloate": {
+      "kor": "사이클로에이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Cycloprothrin": {
+      "kor": "사이클로프로트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Cyclosulfamuron": {
+      "kor": "사이클로설파무론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Cyenopyrafen": {
+      "kor": "사이에노피라펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 67
+    },
+    "Cyflumetofen": {
+      "kor": "사이플루메토펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 66
+    },
+    "Cymoxanil": {
+      "kor": "사이목사닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 68
+    },
+    "Cyprononazole": {
+      "kor": "사이프로코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 65
+    },
+    "Cyromazine": {
+      "kor": "사이로마진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 11
+    },
+    "Demeton-S": {
+      "kor": "데메톤-S",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Demeton-S-methyl": {
+      "kor": "데메톤-S-메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Demeton-S-methyl-sulfone": {
+      "kor": "데메톤-S-메틸설폰",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Demeton-S-sulfone": {
+      "kor": "데메톤-S-설폰",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Demeton-S-sulfoxide": {
+      "kor": "데메톤-S-설폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Dichlorvos": {
+      "kor": "디클로르보스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 68
+    },
+    "Diclosulam": {
+      "kor": "디클로설람",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Diflubenzuron": {
+      "kor": "디플루벤주론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 65
+    },
+    "Dimethoate": {
+      "kor": "디메토에이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 58
+    },
+    "Dinotefuran": {
+      "kor": "디노테퓨란",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 122
+    },
+    "Disulfoton": {
+      "kor": "디설포톤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Disulfoton sulfone": {
+      "kor": "디설포톤 설폰",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Disulfoton sulfoxide": {
+      "kor": "디설포톤 설폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Diuron": {
+      "kor": "디우론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 21
+    },
+    "Dodine": {
+      "kor": "도딘",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 5
+    },
+    "Emamectin B1a": {
+      "kor": "에마멕틴 B1a",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 131
+    },
+    "Ethaboxam": {
+      "kor": "에타복삼",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 32
+    },
+    "Etofenprox": {
+      "kor": "에토펜프록스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 110
+    },
+    "Etrimfos": {
+      "kor": "에트림포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Famoxadone": {
+      "kor": "파목사돈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 34
+    },
+    "Fenazaquin": {
+      "kor": "페나자퀸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 39
+    },
+    "Fenhexamid": {
+      "kor": "펜헥사미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 47
+    },
+    "Fenpyroximate": {
+      "kor": "펜피록시메이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 47
+    },
+    "Fensulfothion": {
+      "kor": "펜설포티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 23
+    },
+    "Ferimzone E": {
+      "kor": "페림존 E",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Ferimzone Z": {
+      "kor": "페림존 Z",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Flazasulfuron": {
+      "kor": "플라자설퓨론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Flonicamid": {
+      "kor": "플로니카미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 95
+    },
+    "Fluazinam": {
+      "kor": "플루아지남",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 86
+    },
+    "Flubendiamide": {
+      "kor": "플루벤디아미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 48
+    },
+    "Fludioxonil": {
+      "kor": "플루디옥소닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 99
+    },
+    "Flufenoxuron": {
+      "kor": "플루페녹수론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 100
+    },
+    "Fluometuron": {
+      "kor": "플루오메투론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Fluopicolide": {
+      "kor": "플루오피콜라이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 53
+    },
+    "Flupoxam": {
+      "kor": "플루폭삼",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 78
+    },
+    "Flupyradifurone": {
+      "kor": "플루피라디퓨론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 63
+    },
+    "Fluridone": {
+      "kor": "플루리돈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Flusulfamide": {
+      "kor": "플루설파미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 11
+    },
+    "Fluthiacet-methyl": {
+      "kor": "플루티아셋메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 28
+    },
+    "Flutolanil": {
+      "kor": "플루토라닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 41
+    },
+    "Flutriafol": {
+      "kor": "플루트리아폴",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 38
+    },
+    "Fluxametamide": {
+      "kor": "플룩사메타미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 64
+    },
+    "Fomesafen": {
+      "kor": "포메사펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Foramsulfuron": {
+      "kor": "포람설퓨론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Fosthiazte": {
+      "kor": "포스티아제이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 37
+    },
+    "Furathiocarb": {
+      "kor": "퓨라티오카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 70
+    },
+    "Gibberellic acid": {
+      "kor": "지베렐린산",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Halosulfuron-methyl": {
+      "kor": "할로설퓨론메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Haloxyfop": {
+      "kor": "할록시포프",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 13
+    },
+    "Hexaconazole": {
+      "kor": "헥사코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 99
+    },
+    "Hexazinone": {
+      "kor": "헥사지논",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Imazalil": {
+      "kor": "이마잘릴",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 35
+    },
+    "Imibenconazole": {
+      "kor": "이미벤코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Imicyafos": {
+      "kor": "이미시아포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 26
+    },
+    "Imidacloprid": {
+      "kor": "이미다클로프리드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 115
+    },
+    "Indaziflam": {
+      "kor": "인다지플람",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Ipfencarbazone": {
+      "kor": "이프펜카바존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Isoproturon": {
+      "kor": "이소프로투론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 12
+    },
+    "Isoxaben": {
+      "kor": "이속사벤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Isoxathion": {
+      "kor": "이소사티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "KIE-9749": {
+      "kor": "KIE-9749",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Lenacil": {
+      "kor": "레나실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 125
+    },
+    "Lemiectin A3": {
+      "kor": "레미엑틴 A3",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 17
+    },
+    "Lemiectin A4": {
+      "kor": "레미엑틴 A4",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 17
+    },
+    "Linuron": {
+      "kor": "리누론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 32
+    },
+    "Lufenuron": {
+      "kor": "루페누론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 107
+    },
+    "Malaoxon": {
+      "kor": "말라옥손",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 81
+    },
+    "Malathion": {
+      "kor": "말라티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 81
+    },
+    "Mandestrobin": {
+      "kor": "만데스트로빈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 41
+    },
+    "Mandipropamid": {
+      "kor": "만디프로파미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 45
+    },
+    "Mecoprop-P": {
+      "kor": "메코프로프-P",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 6
+    },
+    "Mefenacet": {
+      "kor": "메페나셋",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Mefentrifluconazole": {
+      "kor": "메펜트리플루코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Mephosfolan": {
+      "kor": "메포스폴란",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 70
+    },
+    "Mesotrione": {
+      "kor": "메소트리온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Metaflumizone E": {
+      "kor": "메타플루미존 E",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 105
+    },
+    "Metaflumizone Z": {
+      "kor": "메타플루미존 Z",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 105
+    },
+    "Metamitron": {
+      "kor": "메타미트론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Metconazole": {
+      "kor": "메트코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 92
+    },
+    "Methabenzthiazuron": {
+      "kor": "메타벤즈티아주론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Methamidophos": {
+      "kor": "메타미도포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 50
+    },
+    "Methiocarb": {
+      "kor": "메티오카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 36
+    },
+    "Methomyl": {
+      "kor": "메소밀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 78
+    },
+    "Methoxyfenozide": {
+      "kor": "메톡시페노자이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 106
+    },
+    "Metominostrobin": {
+      "kor": "메토미노스트로빈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 92
+    },
+    "Metrafenone": {
+      "kor": "메트라페논",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 44
+    },
+    "Mevinphos": {
+      "kor": "메빈포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 25
+    },
+    "Milbemectin A3": {
+      "kor": "밀베멕틴 A3",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Milbemectin A4": {
+      "kor": "밀베멕틴 A4",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Monocrotophos": {
+      "kor": "모노크로토포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 26
+    },
+    "Napropamide": {
+      "kor": "나프로파미드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Neburon": {
+      "kor": "네부론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 95
+    },
+    "Nicosulfuron": {
+      "kor": "니코설퓨론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Nitenpyram": {
+      "kor": "니텐피람",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 122
+    },
+    "Norea Noruron": {
+      "kor": "노레아",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 95
+    },
+    "Norflurazon": {
+      "kor": "노르플루라존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 10
+    },
+    "Novaluron": {
+      "kor": "노발루론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 95
+    },
+    "Omethoate": {
+      "kor": "오메토에이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 46
+    },
+    "Orthosulfamuron": {
+      "kor": "오르토설파무론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Orysastrobin": {
+      "kor": "오리사스트로빈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Oryzalin": {
+      "kor": "오리잘린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Oxadiargyl": {
+      "kor": "옥사디아질",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Oxamyl": {
+      "kor": "옥사밀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 78
+    },
+    "Oxamyl oxime": {
+      "kor": "옥사밀 옥심",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Oxathiapiprolin": {
+      "kor": "옥사티아피프롤린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 35
+    },
+    "Oxacarboxin": {
+      "kor": "옥사카복신",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Oxademeton-methyl": {
+      "kor": "옥사데메톤메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Pebulate": {
+      "kor": "페뷸레이트",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Pencycuron": {
+      "kor": "펜시쿠론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 43
+    },
+    "Phenmedipham": {
+      "kor": "페메디팜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 30
+    },
+    "Phenothrin-cis": {
+      "kor": "시스-페노트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Phenothrin-trans": {
+      "kor": "트랜스-페노트린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Phorate": {
+      "kor": "포레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 71
+    },
+    "Phorate oxon": {
+      "kor": "포레이트 옥손",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 63
+    },
+    "Phorate oxon sulfone": {
+      "kor": "포레이트 옥손 설폰",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Phorate oxon sulfoxide": {
+      "kor": "포레이트 옥손 설폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Phorate sulfone": {
+      "kor": "포레이트 설폰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Phorate sulfoxide": {
+      "kor": "포레이트 설폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Phosfolan": {
+      "kor": "포스폴란",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 23
+    },
+    "Phoxim": {
+      "kor": "폭심",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 62
+    },
+    "Picarbutrazox": {
+      "kor": "피카부트라족스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 43
+    },
+    "Picolinafen": {
+      "kor": "피콜리나펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Propamocarb": {
+      "kor": "프로파모카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 42
+    },
+    "Propargite": {
+      "kor": "프로파자이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 28
+    },
+    "Propyrisulfuron": {
+      "kor": "프로피리설퓨론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Proquinazid": {
+      "kor": "프로퀴나지드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 95
+    },
+    "Prosulfocarb": {
+      "kor": "프로설포카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Pydiflumetofen": {
+      "kor": "피디플루메토펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 66
+    },
+    "Pyflubumide": {
+      "kor": "피플루부마이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 27
+    },
+    "Pyflubumide-NH": {
+      "kor": "피플루부마이드-NH",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 27
+    },
+    "Pymetrozine": {
+      "kor": "피메트로진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 100
+    },
+    "Pyraclonil": {
+      "kor": "피라클로닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Pyraclostrobin": {
+      "kor": "피라클로스트로빈",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 113
+    },
+    "Pyaziflumid": {
+      "kor": "피아지플루미드",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 14
+    },
+    "Pyrazolate": {
+      "kor": "피라졸레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Pyrazosulfuron-ethyl": {
+      "kor": "피라조설퓨론에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Pyrazoxyfen": {
+      "kor": "피라족시펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Pyribencarb": {
+      "kor": "피리벤카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 85
+    },
+    "Pyridaben": {
+      "kor": "피리다벤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Pyridaphenthion": {
+      "kor": "피리다펜티온",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 9
+    },
+    "Pyridate": {
+      "kor": "피리데이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Pyrifluquinazon": {
+      "kor": "피리플루퀴나존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 117
+    },
+    "Pyriofenone": {
+      "kor": "피리오페논",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 20
+    },
+    "Pyriproxyfen": {
+      "kor": "피리프록시펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 38
+    },
+    "Saflufenacil": {
+      "kor": "사플루페나실",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 36
+    },
+    "Secbumeton": {
+      "kor": "섹부메톤",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Sedaxane-cis": {
+      "kor": "시스-세다제인",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Sedaxane-trans": {
+      "kor": "트랜스-세다제인",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Sethoxydim": {
+      "kor": "세톡시딤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 85
+    },
+    "Simazine": {
+      "kor": "시마진",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 28
+    },
+    "Spinetoram": {
+      "kor": "스피네토람",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 126
+    },
+    "Spinosyn A": {
+      "kor": "스피노신 A",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 55
+    },
+    "Spinosyn D": {
+      "kor": "스피노신 D",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 55
+    },
+    "Spirodiclofen": {
+      "kor": "스피로디클로펜",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 44
+    },
+    "Spirotetramat": {
+      "kor": "스피로테트라마트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 105
+    },
+    "Spirotetramat-enol": {
+      "kor": "스피로테트라마트-에놀",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 105
+    },
+    "Sulfentrazone": {
+      "kor": "설펜트라존",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Sulfoxaflor": {
+      "kor": "설폭사플로르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 134
+    },
+    "Sulprofos": {
+      "kor": "설프로포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Tebufenozide": {
+      "kor": "테부페노자이드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 71
+    },
+    "Tebufloquin": {
+      "kor": "테부플로퀸",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 1
+    },
+    "Tebufloquin M1": {
+      "kor": "테부플로퀸 M1",
+      "confidence": "unverified",
+      "score": 0.8,
+      "mrl_count": 1
+    },
+    "Tebuthiuron": {
+      "kor": "테부티우론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Teflubenzuron": {
+      "kor": "테플루벤주론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 71
+    },
+    "Tepraloxydim": {
+      "kor": "테프랄록시딤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Terbufos": {
+      "kor": "터부포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Terbufos oxon": {
+      "kor": "터부포스 옥손",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Terbufos oxon sulfone": {
+      "kor": "터부포스 옥손 설폰",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Terbufos oxon sulfoxide": {
+      "kor": "터부포스 옥손 설폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Terbufos sulfone": {
+      "kor": "터부포스 설폰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 100
+    },
+    "Terbufos sulfoxide": {
+      "kor": "터부포스 설폭사이드",
+      "confidence": "exact",
+      "score": 1.0
+    },
+    "Tetraniliprole": {
+      "kor": "테트라닐리프롤",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 26
+    },
+    "Thiabendazole": {
+      "kor": "티아벤다졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 23
+    },
+    "Thiacloprid": {
+      "kor": "티아클로프리드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 82
+    },
+    "Thiamethoxam": {
+      "kor": "티아메톡삼",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 84
+    },
+    "Thidiazuron": {
+      "kor": "티디아주론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 5
+    },
+    "Thiobencarb": {
+      "kor": "티오벤카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 51
+    },
+    "Thiodicarb": {
+      "kor": "티오디카브",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 71
+    },
+    "Thiophanate-methyl": {
+      "kor": "티오파네이트메틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 138
+    },
+    "Tiadinil": {
+      "kor": "티아디닐",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 3
+    },
+    "Tolfenpyrad": {
+      "kor": "톨펜피라드",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 8
+    },
+    "Triafamone": {
+      "kor": "트리아파몬",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Triazamate": {
+      "kor": "트리아자메이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 2
+    },
+    "Tribufos": {
+      "kor": "트리부포스",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 91
+    },
+    "Trichlorfon": {
+      "kor": "트리클로르폰",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 63
+    },
+    "Triclopyr": {
+      "kor": "트리클로피르",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 7
+    },
+    "Tricyclazole": {
+      "kor": "트리사이클라졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 21
+    },
+    "Trifloxysulfuron": {
+      "kor": "트리플록시설퓨론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Triflumuron": {
+      "kor": "트리플루무론",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Triforine": {
+      "kor": "트리포린",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 24
+    },
+    "Trinexapac": {
+      "kor": "트리넥사팩",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "Trinexapac-ethyl": {
+      "kor": "트리넥사팩에틸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 4
+    },
+    "Triticonazole": {
+      "kor": "트리티코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 1
+    },
+    "TZ1-E": {
+      "kor": "TZ1-E",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Uniconazole": {
+      "kor": "유니코나졸",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 22
+    },
+    "Valifenalate": {
+      "kor": "발리페날레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 37
+    },
+    "Vernolate": {
+      "kor": "버놀레이트",
+      "confidence": "exact",
+      "score": 1.0,
+      "mrl_count": 64
+    },
+    "XMC": {
+      "kor": "XMC",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Celthodim sulfone": {
+      "kor": "클레토딤 설폰",
+      "confidence": "unverified",
+      "score": 0.8
+    },
+    "Glyphosate": {
+      "kor": "글리포세이트",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Glufosinate": {
+      "kor": "글루포시네이트",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Mancozeb": {
+      "kor": "만코제브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Maneb": {
+      "kor": "마네브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Metiram": {
+      "kor": "메티람",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Zineb": {
+      "kor": "지네브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Ziram": {
+      "kor": "지람",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Thiram": {
+      "kor": "티람",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Ferbam": {
+      "kor": "퍼밤",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Nabam": {
+      "kor": "나밤",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Propineb": {
+      "kor": "프로피네브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Benomyl": {
+      "kor": "베노밀",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Captan": {
+      "kor": "캡탄",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Ethiofencarb": {
+      "kor": "에티오펜카브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Fenbutatin oxide": {
+      "kor": "펜뷰타틴옥사이드",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Benfuracarb": {
+      "kor": "벤퓨라카브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Iminoctadine": {
+      "kor": "이민녹타딘",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Kasugamycin": {
+      "kor": "가스가마이신",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Streptomycin": {
+      "kor": "스트렙토마이신",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Broflanilide": {
+      "kor": "브로플라닐라이드",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Metaldehyde": {
+      "kor": "메트알데하이드",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Daminozide": {
+      "kor": "다미노자이드",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Iprovalicarb": {
+      "kor": "이프로발리카브",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Ethephon": {
+      "kor": "에테폰",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "2,4-D": {
+      "kor": "이사-디",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "MCPA": {
+      "kor": "엠시피에이",
+      "confidence": "manual",
+      "score": 1.0
+    },
+    "Tiafenacil": {
+      "kor": "티아페나실",
+      "confidence": "manual",
+      "score": 1.0
+    }
+  }
+}

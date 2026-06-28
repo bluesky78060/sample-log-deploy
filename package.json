@@ -14,11 +14,12 @@
     "package": "npm run build && npm run build:electron && electron-forge package",
     "make": "npm run build && npm run build:electron && electron-forge make",
     "build": "npm run build:css && npm run sync-version && npx vite build",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "node scripts/gen-vworld-key.mjs && node scripts/gen-juso-key.mjs && node scripts/gen-mrl-key.mjs && node scripts/gen-psis-key.mjs && tsc -p tsconfig.electron.json",
     "publish": "electron-forge publish",
     "lint": "eslint src --ext .js,.ts",
     "lint:fix": "eslint src --ext .js,.ts --fix",
     "typecheck": "tsc --noEmit",
+    "typecheck:gate": "node scripts/typecheck-gate.mjs",
     "typecheck:watch": "tsc --noEmit --watch",
     "test": "npx playwright test",
     "test:ui": "npx playwright test --ui",
@@ -37,7 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "dexie": "^4.4.3",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.4.11",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.6.2",
     "firebase": "^12.7.0",
@@ -75,5 +76,11 @@
     "vitest": "^4.0.18",
     "wait-on": "^9.0.4",
     "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "protobufjs": "7.6.4",
+    "@grpc/grpc-js": "1.9.16",
+    "@protobufjs/utf8": "1.1.1",
+    "js-yaml": "4.2.0"
   }
 }

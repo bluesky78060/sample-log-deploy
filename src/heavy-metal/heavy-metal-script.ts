@@ -1506,104 +1506,12 @@ class HeavyMetalSampleManager extends BaseSampleManager<HeavyMetalSample> {
     // 채취장소 자동완성
     // ========================================
     bindLocationAutocomplete(): void {
-        const samplingLocationInput = document.getElementById('samplingLocation');
+        const samplingLocationInput = document.getElementById('samplingLocation') as HTMLInputElement | null;
         const samplingLocationAutocomplete = document.getElementById('samplingLocationAutocomplete');
-
-        if (!samplingLocationInput || !samplingLocationAutocomplete) return;
-
-        samplingLocationInput.addEventListener('input', (e) => {
-            const value = (e.target as HTMLInputElement)?.value.trim();
-            samplingLocationAutocomplete.innerHTML = '';
-            samplingLocationAutocomplete.classList.remove('show');
-
-            if (value.length < 1) return;
-
-            if (this.GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) return;
-
-            if (typeof suggestRegionVillages === 'function') {
-                const suggestions = suggestRegionVillages(value, null, true);
-                if (suggestions.length > 0) {
-                    samplingLocationAutocomplete.innerHTML = sanitizeHTML(suggestions.slice(0, 20).map((suggestion: any) => `
-                        <li data-village="${suggestion.village}" data-district="${suggestion.district}" data-region-key="${suggestion.regionKey}" data-region="${suggestion.region || ''}" data-is-mountain="${suggestion.isMountain}">
-                            ${suggestion.displayText}
-                        </li>
-                    `).join(''));
-                    samplingLocationAutocomplete.classList.add('show');
-                }
-            }
-        });
-
-        samplingLocationInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const value = (samplingLocationInput as HTMLInputElement).value.trim();
-
-                if (this.GYEONGBUK_REGION_NAMES.some(name => value.startsWith(name))) {
-                    samplingLocationAutocomplete.innerHTML = '';
-                    samplingLocationAutocomplete.classList.remove('show');
-                    return;
-                }
-
-                if (typeof parseParcelAddress === 'function') {
-                    const result = parseParcelAddress(value);
-                    if (result) {
-                        if (result.isDuplicate && result.locations) {
-                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.locations.map((loc: any) => `
-                                <li data-village="${result.villageName}" data-district="${loc.district}" data-region-key="${loc.regionKey}" data-lot="${result.lotNumber || ''}">
-                                    ${loc.fullAddress} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            samplingLocationAutocomplete.classList.add('show');
-                        } else if (result.alternatives && result.alternatives.length > 1) {
-                            samplingLocationAutocomplete.innerHTML = sanitizeHTML(result.alternatives.map((district: any) => `
-                                <li data-village="${result.village}" data-district="${district}" data-lot="${result.lotNumber || ''}" data-region-key="${result.regionKey}">
-                                    ${result.region} ${district} ${result.village} ${result.lotNumber || ''}
-                                </li>
-                            `).join(''));
-                            samplingLocationAutocomplete.classList.add('show');
-                        } else if (result.fullAddress) {
-                            samplingLocationAutocomplete.innerHTML = '';
-                            samplingLocationAutocomplete.classList.remove('show');
-                            (samplingLocationInput as HTMLInputElement).value = result.fullAddress;
-                        }
-                    }
-                }
-            }
-        });
-
-        samplingLocationAutocomplete.addEventListener('click', (e) => {
-            const target = e.target as HTMLElement;
-            if (target?.tagName === 'LI') {
-                const village = target.dataset.village;
-                const district = target.dataset.district;
-                const regionKey = target.dataset.regionKey || '';
-                const isMountain = target.dataset.isMountain === 'true';
-                const lot = target.dataset.lot;
-
-                const LOCAL_REGIONS: Record<string, string> = { 'bonghwa': '봉화군', 'yeongju': '영주시', 'uljin': '울진군' };
-                const region = target.dataset.region || LOCAL_REGIONS[regionKey] || regionKey;
-
-                const villageWithMountain = isMountain ? `${village} 산` : village;
-
-                const currentValue = (samplingLocationInput as HTMLInputElement).value.trim();
-                const match = currentValue.match(/\d+(-\d+)?$/);
-                const lotNumber = lot || (match ? match[0] : '');
-
-                const fullAddress = lotNumber
-                    ? `${region} ${district} ${villageWithMountain} ${lotNumber}`
-                    : `${region} ${district} ${villageWithMountain}`;
-
-                (samplingLocationInput as HTMLInputElement).value = fullAddress;
-                samplingLocationAutocomplete.innerHTML = '';
-                samplingLocationAutocomplete.classList.remove('show');
-            }
-        });
-
-        samplingLocationInput.addEventListener('blur', () => {
-            setTimeout(() => {
-                samplingLocationAutocomplete.innerHTML = '';
-                samplingLocationAutocomplete.classList.remove('show');
-            }, 200);
+        // JUSO(도로명주소) 전국 검색 자동완성으로 통일 (로컬 다지역 자동완성 제거)
+        window.AddressAutocomplete.bind(samplingLocationInput, samplingLocationAutocomplete, {
+            regionKeys: null,
+            regionNames: this.GYEONGBUK_REGION_NAMES,
         });
     }
 

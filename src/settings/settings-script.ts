@@ -2976,6 +2976,74 @@ if (document.readyState === 'loading') {
 }
 
 // ========================================
+// 식품안전나라(MRL) OpenAPI 인증키 설정 (SAMPL-1-114)
+// ========================================
+
+/** mrl-api.ts getApiKey()가 최우선으로 읽는 localStorage 키 */
+const MRL_API_KEY_STORAGE = 'mrl_api_key';
+
+/**
+ * MRL 키 설정 UI 초기화 — localStorage('mrl_api_key') 직접 조작.
+ * (MrlApi 미로딩 컨텍스트 대비. 우선순위: 수동 입력 > 배포본 내장 키)
+ */
+function initMrlApiUI(): void {
+  const input = getElement<HTMLInputElement>('mrlApiKey');
+  const saveBtn = getElement<HTMLButtonElement>('saveMrlApiKeyBtn');
+  const statusEl = getElement<HTMLElement>('mrlApiStatus');
+  if (!input) return;
+
+  function setBadge(state: 'manual' | 'embedded' | 'none'): void {
+    if (!statusEl) return;
+    if (state === 'none') {
+      statusEl.className = 'status-badge disconnected';
+      statusEl.textContent = '● 미설정';
+    } else {
+      statusEl.className = 'status-badge connected';
+      statusEl.textContent = state === 'manual' ? '● 설정됨(직접 입력)' : '● 내장 키 사용 중';
+    }
+  }
+
+  function refreshBadge(): void {
+    let manual = '';
+    try { manual = localStorage.getItem(MRL_API_KEY_STORAGE) || ''; } catch { /* ignore */ }
+    if (manual) { setBadge('manual'); return; }
+    setBadge('none');
+    // 수동 키가 없으면 배포본 내장 키 여부를 비동기 확인 (Electron 한정)
+    const api = (window as Window & { electronAPI?: { mrlGetApiKey?: () => Promise<string> } }).electronAPI;
+    if (api?.mrlGetApiKey) {
+      api.mrlGetApiKey().then((k: string) => {
+        let cur = '';
+        try { cur = localStorage.getItem(MRL_API_KEY_STORAGE) || ''; } catch { /* ignore */ }
+        if (k && !cur) setBadge('embedded');
+      }).catch(() => { /* ignore */ });
+    }
+  }
+
+  // 저장된 키 로드
+  try { input.value = localStorage.getItem(MRL_API_KEY_STORAGE) || ''; } catch { /* ignore */ }
+  refreshBadge();
+
+  saveBtn?.addEventListener('click', () => {
+    const trimmed = input.value.trim();
+    try {
+      if (trimmed) {
+        localStorage.setItem(MRL_API_KEY_STORAGE, trimmed);
+        // SAMPL-1-114(critic M2): 키 변경 후 기존 캐시는 자동 갱신되지 않음 — 재동기화 안내
+        showToast('식품안전나라 인증키를 저장했습니다. 농약 모듈에서 캐시 비우기/재조회가 필요할 수 있습니다.', 'success');
+      } else {
+        localStorage.removeItem(MRL_API_KEY_STORAGE);
+        input.value = '';
+        showToast('식품안전나라 인증키를 삭제했습니다. (배포본 내장 키가 있으면 그대로 사용됩니다.)', 'info');
+      }
+      refreshBadge();
+    } catch (e) {
+      showToast('인증키 저장 중 오류가 발생했습니다.', 'error');
+      (window.logger?.error || console.error)('[Settings] MRL 키 저장 실패:', e);
+    }
+  });
+}
+
+// ========================================
 // Export functions for module usage
 // ========================================
 
@@ -3000,6 +3068,8 @@ export {
   updateCacheStatusUI,
   // Network access
   initNetworkAccessUI,
+  // 식품안전나라(MRL) 키
+  initMrlApiUI,
   // Organization settings
   loadOrgName,
   loadDefaultSido,
