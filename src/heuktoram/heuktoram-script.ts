@@ -1419,7 +1419,9 @@ class HeuktoramManager {
 
       const wb = XLSX.utils.book_new();
       const wsData = this.buildWorksheetData(targetRows);
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // SAMPL-1-117: 엑셀 수식 인젝션 방어
+      const sanitizeAoa = window.sanitizeExcelAoa ?? ((a: unknown[][]): unknown[][] => a);
+      const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(wsData));
 
       ws['!cols'] = this.getColumnWidths();
       this.applyHeaderStyles(ws, wsData);
@@ -1910,7 +1912,9 @@ class HeuktoramManager {
 
       const wb = XLSX.utils.book_new();
       const wsData = this.buildGongikWorksheetData(targetRows);
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // SAMPL-1-117: 엑셀 수식 인젝션 방어
+      const sanitizeAoa = window.sanitizeExcelAoa ?? ((a: unknown[][]): unknown[][] => a);
+      const ws = XLSX.utils.aoa_to_sheet(sanitizeAoa(wsData));
 
       const wsRec = ws as Record<string, unknown>;
       wsRec['!cols'] = this.getGongikColumnWidths();

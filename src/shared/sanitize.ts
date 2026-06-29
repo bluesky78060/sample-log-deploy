@@ -24,6 +24,8 @@ declare global {
         clearElement: (element: HTMLElement | null) => void;
         safeText: (value: string) => string;
         safeTemplate: (template: string, data: TemplateData) => string;
+        // SAMPL-1-117: 엑셀 수식 인젝션 방어 (분석 모듈 로컬 선언과 동일 optional 시그니처 — 병합 호환)
+        sanitizeExcelAoa?: (aoa: unknown[][]) => unknown[][];
     }
 }
 
@@ -121,6 +123,27 @@ function safeTemplate(template: string, data: TemplateData): string {
     return result;
 }
 
+/**
+ * 엑셀 셀 수식 인젝션 방어 (메인 src/shared/sanitize.js 정본 이식, SAMPL-1-117).
+ * 비문자열(숫자 등)은 원본 그대로 통과(수치 셀 보존).
+ * 문자열이고 길이>1이며 수식 트리거 문자(= + - @ \t \r ; |)로 시작하면 작은따옴표를 앞에 붙여 텍스트로 강제.
+ * 비공개(공개 sanitizeExcelCell 중복 회피 — utils.ts의 SampleUtils.sanitizeExcelCell과 분리, 통일은 후속 티켓).
+ */
+function sanitizeExcelCell(value: unknown): unknown {
+    if (typeof value !== 'string') return value;
+    if (value.length > 1 && /^[=+\-@\t\r;|]/.test(value)) return "'" + value;
+    return value;
+}
+
+/**
+ * 엑셀 내보내기용 2차원 배열의 모든 셀을 새니타이즈 (aoa_to_sheet용).
+ * @param aoa - aoa_to_sheet에 전달할 2차원 배열
+ * @returns 새니타이즈된 2차원 배열
+ */
+function sanitizeExcelAoa(aoa: unknown[][]): unknown[][] {
+    return aoa.map(row => Array.isArray(row) ? row.map(cell => sanitizeExcelCell(cell)) : row);
+}
+
 // 전역으로 내보내기
 window.sanitizeHTML = sanitizeHTML;
 window.escapeHTML = escapeHTML;
@@ -128,6 +151,7 @@ window.setInnerHTML = setInnerHTML;
 window.clearElement = clearElement;
 window.safeText = safeText;
 window.safeTemplate = safeTemplate;
+window.sanitizeExcelAoa = sanitizeExcelAoa;
 
 // ES 모듈 export
-export { sanitizeHTML, escapeHTML, setInnerHTML, clearElement, safeText, safeTemplate };
+export { sanitizeHTML, escapeHTML, setInnerHTML, clearElement, safeText, safeTemplate, sanitizeExcelAoa };

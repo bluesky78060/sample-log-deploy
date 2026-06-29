@@ -996,12 +996,13 @@ function generateUUID(): string {
 }
 
 /**
- * 엑셀 셀 CSV Injection 방지 sanitizer
- * =, +, -, @ 로 시작하는 문자열 앞에 작은따옴표(') 추가
+ * 엑셀 셀 CSV/수식 Injection 방지 sanitizer (메인 sanitize.js 정본 정합, SAMPL-1-118)
+ * 길이>1이고 = + - @ \t \r ; | 로 시작하는 문자열 앞에 작은따옴표(')를 붙여 텍스트로 강제.
+ * 단일 문자(예: 플레이스홀더 '-')는 escape하지 않음 — Excel에서 무해하며 '- 깨짐 방지.
  */
 function sanitizeExcelCell(value: string | undefined | null): string {
     const str = String(value ?? '');
-    if (/^[=+\-@\t\r]/.test(str)) return `'${str}`;
+    if (str.length > 1 && /^[=+\-@\t\r;|]/.test(str)) return `'${str}`;
     return str;
 }
 
