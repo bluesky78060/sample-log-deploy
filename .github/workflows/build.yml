@@ -119,6 +119,14 @@ jobs:
           FOODSAFETY_API_KEY: ${{ secrets.FOODSAFETY_API_KEY }}
           RAD_PSIS_API_KEY: ${{ secrets.RAD_PSIS_API_KEY }}
 
+      # 고정 다운로드 링크용: 버전 없는 안정 이름으로 복사
+      # → https://github.com/<owner>/<repo>/releases/latest/download/sample-log-test-macos.zip 영구 동작
+      - name: Stable-named macOS zip for fixed download link
+        run: |
+          ZIP=$(find out/make -name "*.zip" | head -1)
+          cp "$ZIP" "out/make/sample-log-test-macos.zip"
+          echo "stable zip: out/make/sample-log-test-macos.zip"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -129,7 +137,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: out/make/**/*.zip
+          files: |
+            out/make/**/*.zip
+            out/make/sample-log-test-macos.zip
           draft: false
           prerelease: false
         env:
