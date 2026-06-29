@@ -1,7 +1,7 @@
 {
   "name": "sample-log-test",
   "productName": "시료접수대장(테스트)",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "My Electron application description",
   "main": "dist/index.js",
   "scripts": {
