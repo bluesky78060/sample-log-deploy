@@ -25,6 +25,7 @@ import '../shared/sanitize.ts';
 import '../shared/toast.ts';
 import '../shared/theme.ts';
 import '../shared/cache-manager.ts';
+import '../shared/mrl-api.ts'; // SAMPL-1-115: 설정 페이지에서 MRL 데이터 동기화 (window.MrlApi 등록)
 
 // Main script
 import * as SettingsScript from './settings-script';

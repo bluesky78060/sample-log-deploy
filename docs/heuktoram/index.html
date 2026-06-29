@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
     <link rel="preload" as="style" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
-  <script type="module" crossorigin src="../assets/heuktoram-uogwDyny.js"></script>
+  <script type="module" crossorigin src="../assets/heuktoram-Dup5yw1T.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/theme-DnQEVF2I.js">
   <link rel="modulepreload" crossorigin href="../assets/tooltip-roMURP-E.js">
   <link rel="modulepreload" crossorigin href="../assets/analysis-db---SrSwsE.js">
@@ -39,6 +39,13 @@
         <!-- 툴바: 연도, 채취년도, 시료채취자, 토양검정일, 용도구분 -->
         <div class="navbar-actions heuktoram-toolbar">
             <select id="yearSelect" class="toolbar-select" style="display:none;"></select>
+            <div class="toolbar-field">
+                <label for="exportFormatSelect">내보내기 양식</label>
+                <select id="exportFormatSelect" class="toolbar-select">
+                    <option value="heuktoram">흙토람 서식</option>
+                    <option value="gongik">공익직불제</option>
+                </select>
+            </div>
             <div class="toolbar-field">
                 <label for="collectYear">채취년도</label>
                 <input type="text" id="collectYear" class="toolbar-input" placeholder="2026" maxlength="4" style="width: 60px;">

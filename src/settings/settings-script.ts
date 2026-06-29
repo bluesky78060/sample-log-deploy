@@ -2976,70 +2976,215 @@ if (document.readyState === 'loading') {
 }
 
 // ========================================
-// 식품안전나라(MRL) OpenAPI 인증키 설정 (SAMPL-1-114)
+// 식품안전나라(MRL) API 설정 + 데이터 동기화 (SAMPL-1-115, 메인 정본 이식)
 // ========================================
 
-/** mrl-api.ts getApiKey()가 최우선으로 읽는 localStorage 키 */
-const MRL_API_KEY_STORAGE = 'mrl_api_key';
-
 /**
- * MRL 키 설정 UI 초기화 — localStorage('mrl_api_key') 직접 조작.
- * (MrlApi 미로딩 컨텍스트 대비. 우선순위: 수동 입력 > 배포본 내장 키)
+ * 식품안전나라 MRL API 설정 UI 초기화.
+ * 키 입력/저장/표시토글 + 캐시 상태 + 지금 동기화(다운로드)·연결 테스트·캐시 삭제 + 진행바.
+ * (메인 src/settings/settings-script.js 의 TypeScript 이식. window.MrlApi 사용 — settings-entry에서 import.)
  */
-function initMrlApiUI(): void {
-  const input = getElement<HTMLInputElement>('mrlApiKey');
-  const saveBtn = getElement<HTMLButtonElement>('saveMrlApiKeyBtn');
-  const statusEl = getElement<HTMLElement>('mrlApiStatus');
-  if (!input) return;
+async function initMrlApiUI(): Promise<void> {
+  const fmtRelative = (ms: number | null): string => {
+    if (!ms) return '없음';
+    const diff = Date.now() - ms;
+    const min = Math.floor(diff / 60000);
+    const hour = Math.floor(diff / 3600000);
+    const day = Math.floor(diff / 86400000);
+    if (day > 0) return `${day}일 전`;
+    if (hour > 0) return `${hour}시간 전`;
+    if (min > 0) return `${min}분 전`;
+    return '방금 전';
+  };
 
-  function setBadge(state: 'manual' | 'embedded' | 'none'): void {
-    if (!statusEl) return;
-    if (state === 'none') {
-      statusEl.className = 'status-badge disconnected';
-      statusEl.textContent = '● 미설정';
+  const fmtDateTime = (ms: number | null): string => {
+    if (!ms) return '없음';
+    const d = new Date(ms);
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const setConnStatus = (text: string, type?: 'ok' | 'warn' | 'error'): void => {
+    const el = getElement<HTMLElement>('mrlConnStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = type === 'ok' ? '#059669'
+      : type === 'warn' ? '#d97706'
+      : type === 'error' ? '#dc2626'
+      : '#64748b';
+  };
+
+  const updateStatusUI = (): void => {
+    const MrlApi = window.MrlApi;
+    if (!MrlApi) { setConnStatus('MrlApi 모듈 로드 실패', 'error'); return; }
+
+    const keyInput = getElement<HTMLInputElement>('mrlApiKey');
+    if (keyInput) keyInput.value = MrlApi.getApiKey() || '';
+
+    const status = MrlApi.getCacheStatus();
+    const countEl = getElement<HTMLElement>('mrlCacheCount');
+    const lastEl = getElement<HTMLElement>('mrlLastSync');
+    const expEl = getElement<HTMLElement>('mrlCacheExpiry');
+
+    if (!status.cached) {
+      if (countEl) countEl.textContent = '없음';
+      if (lastEl) lastEl.textContent = '한 번도 동기화되지 않음';
+      if (expEl) { expEl.textContent = '없음'; expEl.style.color = '#64748b'; }
     } else {
-      statusEl.className = 'status-badge connected';
-      statusEl.textContent = state === 'manual' ? '● 설정됨(직접 입력)' : '● 내장 키 사용 중';
-    }
-  }
-
-  function refreshBadge(): void {
-    let manual = '';
-    try { manual = localStorage.getItem(MRL_API_KEY_STORAGE) || ''; } catch { /* ignore */ }
-    if (manual) { setBadge('manual'); return; }
-    setBadge('none');
-    // 수동 키가 없으면 배포본 내장 키 여부를 비동기 확인 (Electron 한정)
-    const api = (window as Window & { electronAPI?: { mrlGetApiKey?: () => Promise<string> } }).electronAPI;
-    if (api?.mrlGetApiKey) {
-      api.mrlGetApiKey().then((k: string) => {
-        let cur = '';
-        try { cur = localStorage.getItem(MRL_API_KEY_STORAGE) || ''; } catch { /* ignore */ }
-        if (k && !cur) setBadge('embedded');
-      }).catch(() => { /* ignore */ });
-    }
-  }
-
-  // 저장된 키 로드
-  try { input.value = localStorage.getItem(MRL_API_KEY_STORAGE) || ''; } catch { /* ignore */ }
-  refreshBadge();
-
-  saveBtn?.addEventListener('click', () => {
-    const trimmed = input.value.trim();
-    try {
-      if (trimmed) {
-        localStorage.setItem(MRL_API_KEY_STORAGE, trimmed);
-        // SAMPL-1-114(critic M2): 키 변경 후 기존 캐시는 자동 갱신되지 않음 — 재동기화 안내
-        showToast('식품안전나라 인증키를 저장했습니다. 농약 모듈에서 캐시 비우기/재조회가 필요할 수 있습니다.', 'success');
-      } else {
-        localStorage.removeItem(MRL_API_KEY_STORAGE);
-        input.value = '';
-        showToast('식품안전나라 인증키를 삭제했습니다. (배포본 내장 키가 있으면 그대로 사용됩니다.)', 'info');
+      if (countEl) countEl.textContent = `${status.count.toLocaleString()}건`;
+      if (lastEl) lastEl.textContent = `${fmtDateTime(status.timestamp)} (${fmtRelative(status.timestamp)})`;
+      if (expEl) {
+        if (status.expired) {
+          expEl.textContent = '⚠️ 만료됨 (재동기화 권장)';
+          expEl.style.color = '#d97706';
+        } else {
+          const ttlMs = MrlApi.CACHE_TTL_MS - (status.ageMs || 0);
+          const daysLeft = Math.ceil(ttlMs / 86400000);
+          expEl.textContent = `✅ 유효 (${daysLeft}일 남음)`;
+          expEl.style.color = '#059669';
+        }
       }
-      refreshBadge();
-    } catch (e) {
-      showToast('인증키 저장 중 오류가 발생했습니다.', 'error');
-      (window.logger?.error || console.error)('[Settings] MRL 키 저장 실패:', e);
     }
+
+    if (!MrlApi.hasApiKey()) {
+      setConnStatus('API 키 미설정', 'warn');
+    } else if (status.cached && !status.expired) {
+      setConnStatus('정상 (캐시 유효)', 'ok');
+    } else if (status.cached && status.expired) {
+      setConnStatus('캐시 만료 (재동기화 필요)', 'warn');
+    } else {
+      setConnStatus('API 키 있음 - 동기화 대기', 'warn');
+    }
+  };
+
+  const showProgress = (show: boolean): void => {
+    const bar = getElement<HTMLElement>('mrlProgressBar');
+    if (bar) bar.classList.toggle('hidden', !show);
+  };
+
+  const updateProgress = (loaded: number, total: number): void => {
+    const fill = getElement<HTMLElement>('mrlProgressFill');
+    const text = getElement<HTMLElement>('mrlProgressText');
+    const pct = total > 0 ? (loaded / total) * 100 : 0;
+    if (fill) fill.style.width = `${pct}%`;
+    if (text) text.textContent = `${loaded.toLocaleString()} / ${total.toLocaleString()} (${pct.toFixed(0)}%)`;
+  };
+
+  // 내장 키(IPC) 선로드 후 상태 표시 — 키 필드/연결상태가 내장 키를 반영
+  if (window.MrlApi?.ensureEmbeddedKey) {
+    try { await window.MrlApi.ensureEmbeddedKey(); } catch { /* ignore */ }
+  }
+  updateStatusUI();
+
+  // 리스너 멱등성 가드 (재호출 시 상태만 갱신, 핸들러 중복 바인딩 방지)
+  const section = getElement<HTMLElement>('mrlApiSection');
+  if (section?.dataset.mrlWired === '1') return;
+  if (section) section.dataset.mrlWired = '1';
+
+  // API 키 저장
+  getElement<HTMLButtonElement>('mrlApiKeySave')?.addEventListener('click', () => {
+    const MrlApi = window.MrlApi;
+    if (!MrlApi) { showToast('MrlApi 모듈 로드 실패', 'error'); return; }
+    const input = getElement<HTMLInputElement>('mrlApiKey');
+    const key = (input?.value || '').trim();
+    if (!key) {
+      if (confirm('API 키를 비우시겠습니까? MRL 자동 조회가 비활성화됩니다.')) {
+        MrlApi.setApiKey('');
+        MrlApi.clearCache();
+        updateStatusUI();
+        showToast('API 키가 제거되었습니다', 'info');
+      }
+      return;
+    }
+    MrlApi.setApiKey(key);
+    showToast('API 키가 저장되었습니다', 'success');
+    updateStatusUI();
+  });
+
+  // 키 표시/숨김 토글
+  getElement<HTMLButtonElement>('mrlApiKeyToggle')?.addEventListener('click', () => {
+    const input = getElement<HTMLInputElement>('mrlApiKey');
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  // 지금 동기화 (MRL 데이터 다운로드)
+  getElement<HTMLButtonElement>('mrlSyncBtn')?.addEventListener('click', async () => {
+    const MrlApi = window.MrlApi;
+    if (!MrlApi) return;
+    if (!MrlApi.hasApiKey()) { showToast('먼저 API 키를 저장하세요', 'warning'); return; }
+
+    const btn = getElement<HTMLButtonElement>('mrlSyncBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 동기화 중...'; }
+    showProgress(true);
+    updateProgress(0, 1);
+    setConnStatus('다운로드 중...', 'warn');
+
+    try {
+      const result = await MrlApi.sync(({ loaded, total }) => updateProgress(loaded, total));
+      if (result.success) {
+        showToast(`동기화 완료: ${result.count}건`, 'success');
+      } else {
+        showToast(`동기화 실패: ${result.error}`, 'error');
+      }
+    } catch (e) {
+      showToast(`오류: ${(e as Error)?.message || e}`, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '🔄 지금 동기화'; }
+      setTimeout(() => showProgress(false), 1000);
+      updateStatusUI();
+    }
+  });
+
+  // 연결 테스트 (1건 조회로 인증키 검증)
+  getElement<HTMLButtonElement>('mrlTestBtn')?.addEventListener('click', async () => {
+    const MrlApi = window.MrlApi;
+    if (!MrlApi) return;
+    const key = MrlApi.getApiKey();
+    if (!key) { showToast('먼저 API 키를 저장하세요', 'warning'); return; }
+
+    const btn = getElement<HTMLButtonElement>('mrlTestBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 테스트 중...'; }
+    setConnStatus('테스트 중...', 'warn');
+
+    try {
+      const url = `https://openapi.foodsafetykorea.go.kr/api/${encodeURIComponent(key)}/${MrlApi.SERVICE_ID}/json/1/1`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+      if (contentType.includes('text/html') || text.trim().startsWith('<')) {
+        setConnStatus('❌ 인증키 오류 또는 활성화 대기', 'error');
+        showToast('인증키가 유효하지 않거나 아직 활성화되지 않았습니다', 'error');
+        return;
+      }
+
+      const data = JSON.parse(text) as Record<string, { RESULT?: { CODE?: string; MSG?: string }; total_count?: string } | undefined>;
+      const payload = data[MrlApi.SERVICE_ID];
+      if (payload?.RESULT?.CODE === 'INFO-000') {
+        const total = parseInt(payload.total_count || '0', 10);
+        setConnStatus(`✅ 정상 (전체 ${total.toLocaleString()}건)`, 'ok');
+        showToast(`연결 성공! 전체 ${total.toLocaleString()}건`, 'success');
+      } else {
+        setConnStatus(`❌ API 오류: ${payload?.RESULT?.MSG || 'Unknown'}`, 'error');
+        showToast(`API 오류: ${payload?.RESULT?.MSG}`, 'error');
+      }
+    } catch (e) {
+      setConnStatus(`❌ 네트워크 오류: ${(e as Error)?.message || e}`, 'error');
+      showToast(`연결 실패: ${(e as Error)?.message || e}`, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '🔌 연결 테스트'; }
+    }
+  });
+
+  // MRL 캐시 삭제
+  getElement<HTMLButtonElement>('mrlClearCacheBtn')?.addEventListener('click', () => {
+    const MrlApi = window.MrlApi;
+    if (!MrlApi) return;
+    if (!confirm('MRL 캐시를 삭제하시겠습니까?\n다음 조회 시 다시 다운로드됩니다 (약 15초).')) return;
+    MrlApi.clearCache();
+    showToast('MRL 캐시가 삭제되었습니다', 'info');
+    updateStatusUI();
   });
 }
 

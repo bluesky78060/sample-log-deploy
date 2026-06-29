@@ -126,6 +126,67 @@ declare global {
 
 const PYEONG_TO_SQM = 3.3058;
 
+// ========================================
+// 공익직불제 이행점검 일괄입력 양식 — 헤더 템플릿 (SAMPL-1-116, 메인 SAMPL-1-87 이식)
+// 데이터는 C열(절대 인덱스 2)부터 시작. 헤더맵 키는 C 기준 상대 인덱스(0=C, 1=D, ...).
+// ========================================
+const GONGIK_WS_TOTAL_COLS = 40;  // 데이터 열 수 (C~AN)
+const GONGIK_WS_C = 2;            // 데이터 시작 절대 인덱스(C열) — A,B는 빈 열(숨김)
+const GONGIK_WS_GUIDE = '* 아래 형식과 같이 입력되어야만 일괄입력을 할 수 있습니다.\n'
+  + '  - 경영체등록번호는 10자리 숫자로 입력하세요.\n'
+  + '  - 신청자 전화번호는 \'-\' 없이 입력하세요(예: 01023456789).\n'
+  + '  - 대상지면적의 단위는 ㎡(제곱미터)로 숫자만 입력하세요.\n'
+  + '  - 기준년도는 \'직불제 - 이행점검 적합기준 보기\' 메뉴의 \'이행점검명\'을 입력하세요.\n'
+  + '  - 원활한 일괄입력을 위하여 1회당 300건 이하의 자료 입력을 권장드립니다.';
+
+// 2행: 대분류 헤더 (C 기준 상대 인덱스)
+const GONGIK_WS_HEADER2: Record<number, string> = {
+  0: '차수', 1: '시료채취일자', 2: '토양검정일', 3: '분석의뢰일(접수일자)', 4: '용도구분',
+  6: '채취자명', 7: '시료번호', 8: '경영체등록번호', 9: '경작자명', 10: '대상지',
+  17: '상세주소', 18: '경지구분', 20: '경작자 주소', 21: '신청자 전화번호', 22: '대상지면적(㎡)',
+  23: '작물명 또는 작물코드', 24: '기준년도', 25: '화학성분값'
+};
+
+// 3행: 소분류 헤더 (C 기준 상대 인덱스)
+const GONGIK_WS_HEADER3: Record<number, string> = {
+  4: '구분', 5: '시행전후', 10: '시도', 11: '시군구', 12: '읍면동', 13: '리', 14: '일반·산',
+  15: '지번 1', 16: '지번 2', 18: '1차', 19: '2차',
+  25: '점토함량', 26: 'pH', 27: '유기물', 28: '유효인산', 29: '교환성칼륨', 30: '교환성칼슘',
+  31: '교환성마그네슘', 32: '유효규산', 33: '전기전도도', 34: '석회소요량', 35: '질산태질소',
+  36: '양이온치환용량', 37: '암모니아태질소'
+};
+
+/** 0-based 컬럼 인덱스 → A1 컬럼 문자 (0→A, 25→Z, 26→AA, 39→AN). XLSX.utils.encode_col 대체(타입 미노출). */
+function encodeCol(index: number): string {
+  let s = '';
+  let c = index + 1;
+  while (c > 0) {
+    const rem = (c - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    c = Math.floor((c - 1) / 26);
+  }
+  return s;
+}
+
+/**
+ * 공익직불제 양식 행 생성. 맵 키는 C 기준 상대 인덱스 → C 오프셋 적용해 절대 인덱스에 배치.
+ * 0~39 범위를 벗어난 키는 무시하고 경고(외부 양식 열 수 보호).
+ */
+function makeGongikRow(map?: Record<number, string>): string[] {
+  const r = new Array(GONGIK_WS_TOTAL_COLS + GONGIK_WS_C).fill('') as string[];
+  if (map) {
+    for (const k in map) {
+      const i = Number(k);
+      if (Number.isInteger(i) && i >= 0 && i < GONGIK_WS_TOTAL_COLS) {
+        r[GONGIK_WS_C + i] = map[i];
+      } else {
+        (window.logger?.warn || console.warn)(`[공익직불양식] 컬럼 인덱스 범위 초과 무시: ${k}`);
+      }
+    }
+  }
+  return r;
+}
+
 // localStorage 키 접두사 (테스트 프로젝트)
 const STORAGE_PREFIX = 'test_';
 
@@ -201,6 +262,7 @@ class HeuktoramManager {
   private selectAllBtn: HTMLButtonElement | null;
   private applyBulkBtn: HTMLButtonElement | null;
   private exportBtn: HTMLButtonElement | null;
+  private exportFormatSelect: HTMLSelectElement | null;
   private toggleColumnsBtn: HTMLButtonElement | null;
   private tableBody: HTMLElement | null;
   private emptyState: HTMLElement | null;
@@ -246,6 +308,7 @@ class HeuktoramManager {
     this.selectAllBtn = null;
     this.applyBulkBtn = null;
     this.exportBtn = null;
+    this.exportFormatSelect = null;
     this.toggleColumnsBtn = null;
     this.tableBody = null;
     this.emptyState = null;
@@ -336,6 +399,7 @@ class HeuktoramManager {
     this.selectAllBtn = document.getElementById('selectAllBtn') as HTMLButtonElement | null;
     this.applyBulkBtn = document.getElementById('applyBulkBtn') as HTMLButtonElement | null;
     this.exportBtn = document.getElementById('exportBtn') as HTMLButtonElement | null;
+    this.exportFormatSelect = document.getElementById('exportFormatSelect') as HTMLSelectElement | null;
     this.toggleColumnsBtn = document.getElementById('toggleColumnsBtn') as HTMLButtonElement | null;
     this.tableBody = document.getElementById('tableBody');
     this.emptyState = document.getElementById('emptyState');
@@ -434,7 +498,15 @@ class HeuktoramManager {
     });
 
     this.applyBulkBtn?.addEventListener('click', () => this.applyBulkValues());
-    this.exportBtn?.addEventListener('click', () => this.exportToHeuktoram());
+    // 내보내기 — 선택된 양식으로 분기 (SAMPL-1-116)
+    this.exportBtn?.addEventListener('click', () => {
+      const fmt = this.exportFormatSelect?.value || 'heuktoram';
+      if (fmt === 'gongik') {
+        this.exportToGongik();
+      } else {
+        this.exportToHeuktoram();
+      }
+    });
     this.toggleColumnsBtn?.addEventListener('click', () => this.toggleHiddenColumns());
     this.bulkCompleteBtn?.addEventListener('click', () => this.bulkComplete());
     this.applyColumnVisibility();
@@ -1809,6 +1881,310 @@ class HeuktoramManager {
         }
       }
     }
+  }
+
+  // ========================================
+  // 공익직불제 이행점검 일괄입력 양식 내보내기 (SAMPL-1-116, 메인 SAMPL-1-87 이식)
+  // ========================================
+
+  private async exportToGongik(): Promise<void> {
+    let targetRows = this.flatRows;
+    if (this.selectedKeys.size > 0) {
+      targetRows = this.flatRows.filter(r => this.selectedKeys.has(r.key));
+    }
+
+    if (targetRows.length === 0) {
+      window.showToast?.('내보낼 데이터가 없습니다.', 'warning');
+      return;
+    }
+
+    if (targetRows.length > 300) {
+      if (!confirm(`${targetRows.length}건을 내보냅니다. 공익직불제 일괄등록은 1회 300건 이하를 권장합니다. 계속하시겠습니까?`)) {
+        return;
+      }
+    }
+
+    try {
+      const XLSX = window.XLSX;
+      if (!XLSX) throw new Error('XLSX 라이브러리가 로드되지 않았습니다.');
+
+      const wb = XLSX.utils.book_new();
+      const wsData = this.buildGongikWorksheetData(targetRows);
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      const wsRec = ws as Record<string, unknown>;
+      wsRec['!cols'] = this.getGongikColumnWidths();
+      this.applyGongikHeaderStyles(wsRec, wsData);
+      this.applyGongikHeaderMerges(wsRec);
+
+      // 1행(안내문) 높이 — wrapText 멀티라인
+      const rowsArr = (wsRec['!rows'] as Array<{ hpt?: number }> | undefined) ?? [];
+      rowsArr[0] = { hpt: 150 };
+      wsRec['!rows'] = rowsArr;
+
+      XLSX.utils.book_append_sheet(wb, ws, '일괄등록양식');
+
+      const arrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+      const validations = this.buildGongikDataValidations(targetRows.length);
+      const patchedBuffer = await this.injectDataValidations(arrayBuffer, validations);
+
+      const fileName = `공익직불제_이행점검_${this.selectedYear}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      this.downloadBuffer(patchedBuffer, fileName);
+
+      window.showToast?.(`${targetRows.length}건 공익직불제 양식으로 내보냈습니다.`, 'success');
+    } catch (e) {
+      (window.logger?.error || console.error)('공익직불제 내보내기 실패:', e);
+      window.showToast?.('내보내기에 실패했습니다.', 'error');
+    }
+  }
+
+  /** 공익직불제 용도구분 코드 → 라벨 (흙토람 용도구분 라벨과 동일 기준) */
+  private getGongikUsageLabel(usageCode: string): string {
+    const usageLabels: Record<string, string> = {
+      '0': '일반적인토양검정',
+      '1': '토양개량제 규산',
+      '2': '토양개량제 석회질',
+      '3': '녹비작물'
+    };
+    return usageLabels[usageCode] || '일반적인토양검정';
+  }
+
+  /**
+   * 공익직불제 시행전후 표기 (영문 BEFORE/AFTER).
+   * 용도구분 0(일반)이면 AFTER. 시행전후 미선택(해당없음)도 빈값.
+   */
+  private getGongikBeforeAfter(usageCode: string): string {
+    if (usageCode === '0' || usageCode === '') return 'AFTER';
+    const v = this.bulkBeforeAfterSelect?.value || '';
+    if (v === 'Y') return 'AFTER';
+    if (v === 'N') return 'BEFORE';
+    return '';
+  }
+
+  /**
+   * 공익직불제 경지구분 1차 매핑.
+   * landClass1 === '공익직불제' → '직불(일반)', 그 외 값은 원문 출력.
+   */
+  private getGongikLandClass1(landClass1: unknown): string {
+    const v = landClass1 != null ? String(landClass1).trim() : '';
+    return v === '공익직불제' ? '직불(일반)' : v;
+  }
+
+  /**
+   * 공익직불제 AOA(행 배열) 빌드. 40개 데이터 컬럼을 C열(인덱스 2)부터 배치. A·B(0,1)는 비움.
+   */
+  private buildGongikWorksheetData(rows: HeuktoramRow[]): string[][] {
+    const collector = this.collectorInput?.value || '';
+    const data: string[][] = [
+      makeGongikRow({ 0: GONGIK_WS_GUIDE }),
+      makeGongikRow(GONGIK_WS_HEADER2),
+      makeGongikRow(GONGIK_WS_HEADER3),
+    ];
+    for (const row of rows) {
+      data.push(this._buildGongikDataRow(row, collector));
+    }
+    return data;
+  }
+
+  /**
+   * 공익직불제 양식 데이터 행 1건 생성 (C 기준 상대 인덱스 → 절대 인덱스 C+offset).
+   * 메인 레코드에 공익 전용 필드(차수/경영체등록번호/기준년도 등)는 없을 수 있어 옵셔널 캐스팅.
+   */
+  private _buildGongikDataRow(row: HeuktoramRow, collector: string): string[] {
+    const C = GONGIK_WS_C;
+    const r = row as unknown as {
+      key: string;
+      isSubLot?: boolean;
+      baseReceptionNumber?: string;
+      parcel?: { lotAddress?: string; category?: string; purpose?: string; note?: string; isMountain?: boolean };
+      subLot?: { lotAddress?: string; isMountain?: boolean };
+      crop?: { name?: string; code?: string; area?: string | number; unit?: string };
+      log: {
+        gongikOrder?: string; date?: string; businessRegNo?: string; name?: string;
+        landClass1?: string; phoneNumber?: string; addressRoad?: string; address?: string;
+        subCategory?: string; purpose?: string; receptionNumber?: string | number; gongikBaseYear?: string;
+      };
+    };
+    const result = (this.testResults[r.key] ?? {}) as Record<string, string | undefined>;
+
+    const lotAddr = r.isSubLot && r.subLot
+      ? (r.subLot.lotAddress ?? r.parcel?.lotAddress ?? '')
+      : (r.parcel?.lotAddress ?? '');
+
+    let isMountain = false;
+    if (r.isSubLot && r.subLot) {
+      isMountain = r.subLot.isMountain ?? false;
+    } else if (r.parcel) {
+      isMountain = r.parcel.isMountain ?? false;
+    }
+
+    const lotParsed = this.parseLotAddress(lotAddr);
+    if (isMountain) lotParsed.isMountain = true;
+
+    const category = r.parcel?.category || r.log.subCategory || '';
+    const purpose = r.parcel?.purpose || r.log.purpose || '';
+    const usageCode = this.getUsageCode(purpose, result.usageCode, this.bulkUsageCodeSelect?.value);
+
+    // 면적: 평이면 ㎡로 변환 (흙토람 export 로직과 동일)
+    let areaM2: string | number = r.crop?.area ?? '';
+    if (areaM2 && r.crop?.unit === 'pyeong') {
+      const parsed = parseFloat(String(areaM2));
+      if (!isNaN(parsed)) areaM2 = Math.round(parsed * PYEONG_TO_SQM);
+    }
+
+    const dataRow = new Array(GONGIK_WS_TOTAL_COLS + C).fill('') as string[];
+    dataRow[C + 0] = r.log.gongikOrder || '1';                                            // C 차수
+    dataRow[C + 1] = r.log.date || '';                                                    // D 시료채취일자
+    dataRow[C + 2] = result.testDate || '';                                               // E 토양검정일
+    dataRow[C + 3] = r.log.date || '';                                                    // F 분석의뢰일
+    dataRow[C + 4] = this.getGongikUsageLabel(usageCode);                                 // G 용도구분-구분
+    dataRow[C + 5] = this.getGongikBeforeAfter(usageCode);                                // H 시행전후
+    dataRow[C + 6] = collector || r.log.name || '';                                       // I 채취자명
+    dataRow[C + 7] = r.baseReceptionNumber || String(r.log.receptionNumber ?? '').replace(/-\d+$/, '') || ''; // J 시료번호
+    dataRow[C + 8] = r.log.businessRegNo || '';                                           // K 경영체등록번호
+    dataRow[C + 9] = r.log.name || '';                                                    // L 경작자명
+    dataRow[C + 10] = lotParsed.sido;                                                     // M 시도
+    dataRow[C + 11] = lotParsed.sigungu;                                                  // N 시군구
+    dataRow[C + 12] = lotParsed.eupmyeondong;                                             // O 읍면동
+    dataRow[C + 13] = lotParsed.ri;                                                       // P 리
+    dataRow[C + 14] = lotParsed.isMountain ? '산' : '일반';                               // Q 일반·산
+    dataRow[C + 15] = lotParsed.jibun1;                                                   // R 지번1
+    dataRow[C + 16] = lotParsed.jibun2;                                                   // S 지번2
+    dataRow[C + 17] = r.parcel?.note || '';                                               // T 상세주소
+    dataRow[C + 18] = this.getGongikLandClass1(r.log.landClass1);                         // U 경지구분 1차
+    dataRow[C + 19] = this.getCategoryCode(category);                                     // V 경지구분 2차
+    dataRow[C + 20] = r.log.addressRoad || r.log.address || '';                           // W 경작자 주소
+    dataRow[C + 21] = (r.log.phoneNumber || '').replace(/-/g, '');                        // X 신청자 전화번호
+    dataRow[C + 22] = String(areaM2);                                                     // Y 대상지면적
+    dataRow[C + 23] = r.crop?.name || r.crop?.code || '';                                 // Z 작물명/코드
+    dataRow[C + 24] = r.log.gongikBaseYear || '';                                         // AA 기준년도
+    dataRow[C + 25] = result.clay || '';                                                  // 점토함량
+    dataRow[C + 26] = result.pH || '';                                                    // pH
+    dataRow[C + 27] = result.organicMatter || '';                                         // 유기물
+    dataRow[C + 28] = result.availableP || '';                                            // 유효인산
+    dataRow[C + 29] = result.exK || '';                                                   // 교환성칼륨
+    dataRow[C + 30] = result.exCa || '';                                                  // 교환성칼슘
+    dataRow[C + 31] = result.exMg || '';                                                  // 교환성마그네슘
+    dataRow[C + 32] = result.silica || '';                                                // 유효규산
+    dataRow[C + 33] = result.ec || '';                                                    // 전기전도도
+    dataRow[C + 34] = result.limeReq || '';                                               // 석회소요량
+    dataRow[C + 35] = result.NO3N || '';                                                  // 질산태질소
+    dataRow[C + 36] = result.cec || '';                                                   // 양이온치환용량
+    dataRow[C + 37] = result.NH4N || '';                                                  // 암모니아태질소
+    return dataRow;
+  }
+
+  private getGongikColumnWidths(): Array<{ wch?: number; hidden?: boolean }> {
+    const widths: Array<{ wch?: number; hidden?: boolean }> = [{ hidden: true }, { hidden: true }];
+    const dataWidths = [
+      6, 14, 14, 18, 18, 10, 10, 10, 16, 10,
+      12, 10, 10, 8, 8, 8, 8, 16, 12, 10,
+      24, 16, 12, 18, 14, 10, 6, 8, 10, 12,
+      12, 12, 10, 12, 12, 12, 12, 12
+    ];
+    for (const w of dataWidths) widths.push({ wch: w });
+    return widths;
+  }
+
+  /**
+   * 공익직불제 헤더 스타일. 2행(대분류)·3행(소분류) 회색 배경 + 테두리, 4행~ 데이터 테두리.
+   * 데이터 영역 C(2) ~ AN(39).
+   */
+  private applyGongikHeaderStyles(ws: Record<string, unknown>, wsData: string[][]): void {
+    const cells = ws as Record<string, { v?: unknown; t?: string; s?: unknown }>;
+    const DATA_START = 2;
+    const DATA_END = 40;
+    const rowCount = wsData.length;
+
+    const headerBorder = {
+      top: { style: 'thin', color: { rgb: '808080' } },
+      bottom: { style: 'thin', color: { rgb: '808080' } },
+      left: { style: 'thin', color: { rgb: '808080' } },
+      right: { style: 'thin', color: { rgb: '808080' } }
+    };
+    const headerBase = {
+      fill: { fgColor: { rgb: 'C0C0C0' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: headerBorder
+    };
+    const row2Style = { ...headerBase, font: { bold: true, sz: 10 } };
+    const row3Style = { ...headerBase, font: { bold: true, sz: 9 } };
+    const dataStyle = {
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: headerBorder
+    };
+
+    for (let c = DATA_START; c < DATA_END; c++) {
+      const col = encodeCol(c);
+
+      const cell2 = col + '2';
+      if (!cells[cell2]) cells[cell2] = { v: '', t: 's' };
+      cells[cell2].s = row2Style;
+
+      const cell3 = col + '3';
+      if (!cells[cell3]) cells[cell3] = { v: '', t: 's' };
+      cells[cell3].s = row3Style;
+
+      for (let r = 3; r < rowCount; r++) {
+        const addr = col + (r + 1);
+        if (!cells[addr]) cells[addr] = { v: '', t: 's' };
+        cells[addr].s = dataStyle;
+      }
+    }
+
+    const cellC1 = cells['C1'];
+    if (cellC1) {
+      cellC1.s = {
+        alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+        font: { sz: 11, name: '맑은 고딕' }
+      };
+    }
+  }
+
+  /** 공익직불제 헤더 병합 (2단 구조). 절대 인덱스 C=2 ... AN=39. */
+  private applyGongikHeaderMerges(ws: Record<string, unknown>): void {
+    const C = 2;
+    const merges = [
+      { s: { r: 0, c: C }, e: { r: 0, c: C + 37 } },
+      { s: { r: 1, c: C + 0 }, e: { r: 2, c: C + 0 } },
+      { s: { r: 1, c: C + 1 }, e: { r: 2, c: C + 1 } },
+      { s: { r: 1, c: C + 2 }, e: { r: 2, c: C + 2 } },
+      { s: { r: 1, c: C + 3 }, e: { r: 2, c: C + 3 } },
+      { s: { r: 1, c: C + 6 }, e: { r: 2, c: C + 6 } },
+      { s: { r: 1, c: C + 7 }, e: { r: 2, c: C + 7 } },
+      { s: { r: 1, c: C + 8 }, e: { r: 2, c: C + 8 } },
+      { s: { r: 1, c: C + 9 }, e: { r: 2, c: C + 9 } },
+      { s: { r: 1, c: C + 17 }, e: { r: 2, c: C + 17 } },
+      { s: { r: 1, c: C + 20 }, e: { r: 2, c: C + 20 } },
+      { s: { r: 1, c: C + 21 }, e: { r: 2, c: C + 21 } },
+      { s: { r: 1, c: C + 22 }, e: { r: 2, c: C + 22 } },
+      { s: { r: 1, c: C + 23 }, e: { r: 2, c: C + 23 } },
+      { s: { r: 1, c: C + 24 }, e: { r: 2, c: C + 24 } },
+      { s: { r: 1, c: C + 4 }, e: { r: 1, c: C + 5 } },
+      { s: { r: 1, c: C + 10 }, e: { r: 1, c: C + 16 } },
+      { s: { r: 1, c: C + 18 }, e: { r: 1, c: C + 19 } },
+      { s: { r: 1, c: C + 25 }, e: { r: 1, c: C + 37 } },
+    ];
+    const cur = (ws['!merges'] as Array<unknown>) || [];
+    ws['!merges'] = cur.concat(merges);
+  }
+
+  /**
+   * 공익직불제 데이터 유효성(드롭다운) 규칙.
+   * 절대열: G=용도구분 구분(C+4), H=시행전후(C+5), Q=일반·산(C+14).
+   */
+  private buildGongikDataValidations(dataRowCount: number): Array<{ sqref: string; options: string[] }> {
+    if (dataRowCount <= 0) return [];
+    const startRow = 4;
+    const endRow = 3 + dataRowCount;
+    const colG = encodeCol(2 + 4);
+    const colH = encodeCol(2 + 5);
+    const colQ = encodeCol(2 + 14);
+    return [
+      { sqref: `${colG}${startRow}:${colG}${endRow}`, options: ['일반적인토양검정', '토양개량제 규산', '토양개량제 석회질', '녹비작물'] },
+      { sqref: `${colH}${startRow}:${colH}${endRow}`, options: ['BEFORE', 'AFTER'] },
+      { sqref: `${colQ}${startRow}:${colQ}${endRow}`, options: ['일반', '산'] }
+    ];
   }
 }
 
