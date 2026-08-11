@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>컬렉션 이름 테스트</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 2rem;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        pre {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 1rem;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .warning {
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <h1>Firebase 컬렉션 이름 테스트</h1>
+    <p>아래 결과에서 모든 컬렉션 이름이 <code>test_</code>로 시작하는지 확인하세요.</p>
+    <pre id="output">테스트 실행 중...</pre>
+
+    <script type="module">
+        // firestore-db.js의 코드 복사
+        const COLLECTION_PREFIX = 'test_';
+        const COLLECTION_MAP = {
+            'soil': 'soilSamples',
+            'water': 'waterSamples',
+            'compost': 'compostSamples',
+            'heavyMetal': 'heavyMetalSamples',
+            'heavy-metal': 'heavyMetalSamples',
+            'pesticide': 'pesticideSamples'
+        };
+
+        function getCollectionName(sampleType, year) {
+            const baseName = COLLECTION_MAP[sampleType] || sampleType;
+            const collectionName = `${COLLECTION_PREFIX}${baseName}_${year}`;
+
+            console.log('COLLECTION_PREFIX:', COLLECTION_PREFIX);
+            console.log('baseName:', baseName);
+            console.log('year:', year);
+            console.log('Final collection name:', collectionName);
+
+            // 안전 체크
+            if (!collectionName.startsWith('test_')) {
+                console.warn('WARNING: Collection name missing test_ prefix:', collectionName);
+                return `test_${baseName}_${year}`;
+            }
+
+            return collectionName;
+        }
+
+        // 테스트 실행
+        const output = document.getElementById('output');
+        let result = '='.repeat(60) + '\n';
+        result += 'Firebase 컬렉션 이름 테스트\n';
+        result += '='.repeat(60) + '\n\n';
+
+        result += `COLLECTION_PREFIX: "${COLLECTION_PREFIX}"\n\n`;
+
+        const types = ['soil', 'water', 'compost', 'heavyMetal', 'pesticide'];
+        const year = 2026;
+
+        result += `테스트 연도: ${year}\n\n`;
+        result += '-'.repeat(60) + '\n';
+
+        let allPassed = true;
+
+        types.forEach(type => {
+            const name = getCollectionName(type, year);
+            const hasPrefix = name.startsWith('test_');
+            const expected = `test_${COLLECTION_MAP[type]}_${year}`;
+            const match = name === expected;
+
+            if (!hasPrefix || !match) {
+                allPassed = false;
+            }
+
+            result += `시료 타입: ${type}\n`;
+            result += `  생성된 이름: ${name}\n`;
+            result += `  예상 이름:   ${expected}\n`;
+            result += `  test_ 접두사: ${hasPrefix ? '✅ 있음' : '❌ 없음'}\n`;
+            result += `  일치 여부:    ${match ? '✅ 일치' : '❌ 불일치'}\n`;
+            result += '\n';
+        });
+
+        result += '-'.repeat(60) + '\n';
+        result += '\n';
+
+        if (allPassed) {
+            result += '✅ 모든 테스트 통과\n';
+        } else {
+            result += '❌ 일부 테스트 실패 - 위 결과를 확인하세요.\n';
+        }
+
+        output.textContent = result;
+        console.log(result);
+
+        // 추가 검증: 실제 firestoreDb 모듈이 로드된 경우
+        setTimeout(() => {
+            if (window.firestoreDb && typeof window.firestoreDb.getCollectionName === 'function') {
+                let moduleResult = '\n\n' + '='.repeat(60) + '\n';
+                moduleResult += '실제 firestoreDb 모듈 검증\n';
+                moduleResult += '='.repeat(60) + '\n\n';
+
+                types.forEach(type => {
+                    const actualName = window.firestoreDb.getCollectionName(type, year);
+                    const hasPrefix = actualName.startsWith('test_');
+                    moduleResult += `${type}: ${actualName} ${hasPrefix ? '✅' : '❌ MISSING PREFIX'}\n`;
+                });
+
+                output.textContent += moduleResult;
+                console.log(moduleResult);
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

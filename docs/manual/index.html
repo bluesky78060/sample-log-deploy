@@ -345,6 +345,31 @@
             box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
         }
 
+        .back-link:focus-visible {
+            outline: 2px solid #15803d;
+            outline-offset: 3px;
+        }
+
+        .back-link-floating {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            margin-top: 0;
+            z-index: 1000;
+            padding: 10px 18px;
+            font-size: 0.9rem;
+            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.35);
+        }
+
+        @media (max-width: 768px) {
+            .back-link-floating {
+                top: 12px;
+                left: 12px;
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+        }
+
         .footer {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             color: #94a3b8;
@@ -541,15 +566,19 @@
             .toc li a:hover { transform: none; box-shadow: none; }
             .feature-card:hover { transform: none; box-shadow: none; }
             .back-link { display: none; }
+            .back-link-floating { display: none; }
         }
     </style>
 </head>
 <body>
+    <a href="../index.html" class="back-link back-link-floating" aria-label="메인 화면으로 돌아가기">
+        ← 메인
+    </a>
     <div class="manual-container">
         <div class="header">
             <h1>시료 접수 대장 사용 설명서</h1>
             <p>봉화군농업기술센터 안전성분석센터</p>
-            <span class="version-badge">v1.8.0 - 2026년 2월 업데이트</span>
+            <span class="version-badge">v1.9.0 - 2026년 3월 업데이트</span>
         </div>
 
         <div class="toc">
@@ -792,7 +821,7 @@
                 </div>
 
                 <div class="screenshot">
-                    <img src="../assets/09-label-print-DHS_bYH5.png" alt="라벨 인쇄 화면">
+                    <img src="../assets/09-label-print-vAvW0jJF.png" alt="라벨 인쇄 화면">
                     <div class="screenshot-caption">라벨 인쇄 페이지 - 엑셀 파일 업로드 및 미리보기</div>
                 </div>
 
@@ -1321,7 +1350,7 @@
                 <h3>버전 정보</h3>
                 <table class="data-table">
                     <tbody>
-                        <tr><td><strong>현재 버전</strong></td><td>v1.8.0</td></tr>
+                        <tr><td><strong>현재 버전</strong></td><td>v1.9.0</td></tr>
                         <tr><td><strong>최신 업데이트</strong></td><td>2026년 2월</td></tr>
                     </tbody>
                 </table>
@@ -1392,7 +1421,7 @@
         </div>
 
         <div class="footer">
-            <p>시료 접수 대장 v1.8.0 | 봉화군농업기술센터 안전성분석센터</p>
+            <p>시료 접수 대장 v1.9.0 | 봉화군농업기술센터 안전성분석센터</p>
         </div>
     </div>
 </body>

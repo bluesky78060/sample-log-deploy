@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// ============================================================
+// 시료 접수 대장 — Firestore 보안 규칙 (SAMPL-2-18)
+// ------------------------------------------------------------
+// 이 앱은 사용자별로 "자신의 Firebase 프로젝트"(설정 페이지에서 구성)에
+// 시료 데이터를 저장한다. 클라이언트는 익명 인증(signInAnonymously)으로
+// 접속한다 — src/shared/firebase-config.ts 의 signInAnonymously() 참고.
+//
+// 따라서 최소 방어선은 "인증된 컨텍스트(익명 포함)만 접근 허용"이며,
+// 인증 없는(SDK 외부) 직접 접근은 전부 거부한다.
+//
+// ⚠️ 배포(필수, 별도 액션):
+//   Firebase 콘솔 > Firestore Database > 규칙 탭에 붙여넣고 게시.
+//   (이 파일을 리포에 두는 것만으로는 보안이 발효되지 않는다.)
+//
+// ⚠️ 배포 전 확인:
+//   Firebase 콘솔 > Authentication > 로그인 방법에서 "익명"이 사용 설정돼
+//   있어야 한다. 익명 인증이 꺼진 상태로 이 규칙을 배포하면
+//   request.auth 가 항상 null 이 되어 모든 동기화가 차단된다.
+//
+// 컬렉션 명명 (src/shared/firestore-db.ts):
+//   - 시료 데이터: test_{base}_{year}   (예: test_soilSampleLogs_2026)
+//   - 암호화/시스템: test_system, 폴백 test__system / _system
+//   - 연결 진단: _connection_test
+//   → 규칙은 'test_' 접두사만 검사한다(연도 패턴 강제 금지). 그래야
+//     연도가 없는 test_system 도 함께 허용된다.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 시료 데이터 + 암호화/시스템 컬렉션 (test_ 접두사 전부)
+    // 문서 ID/하위 경로까지 재귀 매칭.
+    match /{col}/{document=**} {
+      allow read, write: if isSignedIn() && col.matches('test_.*');
+    }
+
+    // 시스템/진단 폴백 컬렉션 (접두사 없는 레거시 명칭).
+    match /_system/{document=**} {
+      allow read, write: if isSignedIn();
+    }
+    match /_connection_test/{document=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 위에 매칭되지 않는 모든 경로는 기본 거부(명시적 deny).
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

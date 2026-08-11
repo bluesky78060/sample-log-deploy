@@ -1,0 +1,49 @@
+{
+  "project_id": "2f0cf691-4d0f-49b9-8a61-2531ae879ead",
+  "project_name": "TypeScript Migration - Sample Log",
+  "epics": {
+    "phase1": {
+      "id": "ce436c63-e40a-4b79-8cbd-2ade171110c9",
+      "name": "Phase 1: 타입 인프라 구축",
+      "status": "completed"
+    },
+    "phase2": {
+      "id": "1434b7c6-4364-44d8-a9d5-ba9f1fd92ba2",
+      "name": "Phase 2: water 모듈",
+      "status": "completed"
+    },
+    "phase3": {
+      "id": "7ef2165c-fe7d-471e-bafe-d3f743d54071",
+      "name": "Phase 3: heavy-metal 모듈",
+      "status": "completed"
+    },
+    "phase4": {
+      "id": "37f98baf-ae32-4967-8518-955570a649f1",
+      "name": "Phase 4: compost 모듈",
+      "status": "completed"
+    },
+    "phase5_1": {
+      "id": "3d0b6738-db36-4280-97c3-3189623eb2d4",
+      "name": "Phase 5-1: pesticide 모듈",
+      "status": "completed"
+    },
+    "phase5_2": {
+      "id": "7c1d11d5-17fb-4677-af42-eca8d4947d2f",
+      "name": "Phase 5-2: soil 모듈",
+      "status": "completed"
+    },
+    "phase6": {
+      "id": "956250be-9317-4dcb-97b2-8cb511ca2cea",
+      "name": "Phase 6: shared 모듈",
+      "status": "completed"
+    },
+    "phase7": {
+      "id": "255b48a4-dea7-4b83-aaa4-a98730b8b496",
+      "name": "Phase 7: 데이터/설정 모듈",
+      "status": "completed"
+    }
+  },
+  "created_at": "2026-03-04T04:28:00.000Z",
+  "completed_at": "2026-03-04T05:07:00.000Z",
+  "description": "TypeScript 마이그레이션 프로젝트 - 5,127개 에러를 0개로 완료"
+}

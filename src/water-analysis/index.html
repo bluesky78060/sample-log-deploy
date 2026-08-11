@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light" data-sample-type="water-analysis">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수질분석 결과 입력</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet" href="../shared/tailwind-output.css">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="water-analysis-style.css">
+</head>
+
+<body class="water-analysis-page">
+    <!-- 네비게이션 바 -->
+    <nav class="navbar water-analysis-navbar">
+        <!-- 뒤로가기 버튼 -->
+        <button type="button" class="back-btn" id="backBtn" title="이전 페이지로"><span class="material-icons-outlined">arrow_back</span></button>
+        <!-- 로고 -->
+        <div class="navbar-brand">
+            <span class="brand-icon">💧</span>
+            <span class="brand-text">수질분석 결과 입력</span>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 툴바 -->
+        <div class="navbar-actions water-analysis-toolbar">
+            <select id="yearSelect" class="toolbar-select" style="display:none;"></select>
+            <div class="toolbar-field">
+                <label for="bulkTestDate">검사일자</label>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                    <input type="date" id="bulkTestDate" class="toolbar-input">
+                    <button type="button" id="clearTestDateBtn" class="toolbar-btn-small" title="검사일자 일괄 삭제" aria-label="검사일자 일괄 삭제">✕</button>
+                </div>
+            </div>
+            <div class="toolbar-field">
+                <label for="testItemFilter">검사항목</label>
+                <select id="testItemFilter" class="toolbar-select">
+                    <option value="all">전체</option>
+                    <option value="생활용수">생활용수</option>
+                    <option value="농업용수">농업용수</option>
+                </select>
+            </div>
+            <div class="toolbar-field">
+                <label for="bulkResult">판정 일괄</label>
+                <select id="bulkResult" class="toolbar-select">
+                    <option value="">선택</option>
+                    <option value="pass">적합</option>
+                    <option value="fail">부적합</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="navbar-spacer"></div>
+
+        <!-- 유틸리티 -->
+        <div class="navbar-utils">
+            <button type="button" id="selectAllBtn" class="util-btn" title="전체 선택/해제">
+                <span class="material-icons-outlined">select_all</span>
+                <span class="util-btn-label">전체선택</span>
+            </button>
+            <button type="button" id="applyBulkBtn" class="util-btn" title="일괄 적용">
+                <span class="material-icons-outlined">playlist_add_check</span>
+                <span class="util-btn-label">일괄적용</span>
+            </button>
+            <button type="button" id="toggleColumnsBtn" class="util-btn" title="숨긴 컬럼 표시/숨김">
+                <span class="material-icons-outlined">visibility</span>
+                <span class="util-btn-label">전체보기</span>
+            </button>
+            <button type="button" id="exportBtn" class="util-btn export-btn" title="수질분석 결과 내보내기">
+                <span class="material-icons-outlined">download</span>
+                <span class="util-btn-label">내보내기</span>
+            </button>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <!-- 다크 모드 토글 -->
+        <div class="theme-toggle" id="themeToggleContainer">
+            <span class="theme-icon sun"><span class="material-icons-outlined">light_mode</span></span>
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="다크 모드 전환"></button>
+            <span class="theme-icon moon"><span class="material-icons-outlined">dark_mode</span></span>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="water-analysis-info-bar">
+            <span class="info-text">
+                <span class="material-icons-outlined" style="font-size: 16px; vertical-align: middle;">info</span>
+                수질 접수 데이터를 기반으로 분석 결과를 입력합니다. 지하수법 시행규칙 기준 (생활용수 21항목 / 농업용수 17항목).
+            </span>
+            <span class="record-count" id="recordCount">0건</span>
+        </div>
+
+        <div class="table-wrapper" id="tableWrapper">
+            <table class="water-analysis-table" id="waterAnalysisTable">
+                <thead>
+                    <tr class="header-group">
+                        <th colspan="8" class="header-group-label group-info">접수 정보</th>
+                        <th colspan="1" class="header-group-label group-common">공통</th>
+                        <th colspan="6" class="header-group-label group-general">일반오염물질 (6항목)</th>
+                        <th colspan="11" class="header-group-label group-hazardous">특정유해물질 (11항목)</th>
+                        <th colspan="4" class="header-group-label group-living-only">생활용수 전용 (4항목)</th>
+                        <th colspan="1" class="header-group-label group-result">판정</th>
+                    </tr>
+                    <tr>
+                        <th class="col-checkbox sticky-col"><input type="checkbox" id="selectAll" title="전체 선택"></th>
+                        <th class="col-num sticky-col">접수번호</th>
+                        <th class="col-name sticky-col">성명</th>
+                        <th class="col-location sticky-col">채취장소</th>
+                        <th class="col-sample-name sticky-col">시료명</th>
+                        <th class="col-test-items sticky-col">검사항목</th>
+                        <th class="col-purpose sticky-col">목적</th>
+                        <th class="col-date sticky-col">접수일자</th>
+                        <!-- 공통: 검사일자 -->
+                        <th class="col-testdate">검사일자</th>
+                        <!-- 일반오염물질 5항목 -->
+                        <th class="col-general">pH</th>
+                        <th class="col-general">EC</th>
+                        <th class="col-general">총대장균군</th>
+                        <th class="col-general">질산성질소</th>
+                        <th class="col-general">염소이온</th>
+                        <th class="col-general">카드뮴</th>
+                        <!-- 특정유해물질 11항목 (공통) -->
+                        <th class="col-hazardous">비소</th>
+                        <th class="col-hazardous">시안</th>
+                        <th class="col-hazardous">수은</th>
+                        <th class="col-hazardous">다이아지논</th>
+                        <th class="col-hazardous">파라티온</th>
+                        <th class="col-hazardous">페놀</th>
+                        <th class="col-hazardous">납</th>
+                        <th class="col-hazardous">6가크롬</th>
+                        <th class="col-hazardous">TCE</th>
+                        <th class="col-hazardous">PCE</th>
+                        <th class="col-hazardous">TCA</th>
+                        <!-- 생활용수 전용 4항목 -->
+                        <th class="col-living-only">벤젠</th>
+                        <th class="col-living-only">톨루엔</th>
+                        <th class="col-living-only">에틸벤젠</th>
+                        <th class="col-living-only">크실렌</th>
+                        <!-- 판정 -->
+                        <th class="col-judgment">판정</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+
+            <div id="emptyState" class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p>수질분석 접수 데이터가 없습니다</p>
+                <p class="empty-sub">먼저 수질분석 시료 접수 페이지에서 데이터를 등록하세요.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- 토스트 메시지 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script type="module" src="water-analysis-entry.ts"></script>
+</body>
+
+</html>

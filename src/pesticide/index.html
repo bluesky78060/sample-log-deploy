@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://openapi.foodsafetykorea.go.kr; frame-src 'self';">
     <title>잔류농약 시료 접수 대장</title>
     <!-- 폰트 preconnect 및 preload로 성능 최적화 (bundle-defer-third-party) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -129,6 +130,10 @@
                 <span class="util-btn-label">가져오기</span>
                 <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" hidden>
             </label>
+            <button type="button" id="pesticideAnalysisBtn" class="util-btn pa-view-btn" title="잔류농약 분석결과 조회">
+                <span class="material-icons-outlined">biotech</span>
+                <span class="util-btn-label">분석결과</span>
+            </button>
         </div>
 
         <div class="navbar-divider"></div>
@@ -395,6 +400,9 @@
                     <button type="button" id="openSearchModalBtn" class="btn-search-open" title="검색">
                         🔍 검색
                     </button>
+                    <button type="button" id="openMrlSearchModalBtn" class="btn-mrl-search-open" title="MRL 검색">
+                        🔬 MRL 검색
+                    </button>
                 </div>
             </div>
 
@@ -402,16 +410,16 @@
                 <table id="logTable" class="data-table">
                     <thead>
                         <tr>
-                            <th class="col-checkbox"><input type="checkbox" id="selectAll" title="전체 선택"></th>
-                            <th class="col-complete">완료</th>
-                            <th class="col-result">판정</th>
-                            <th>접수번호</th>
-                            <th>접수일자</th>
+                            <th class="sticky-col col-checkbox"><input type="checkbox" id="selectAll" title="전체 선택"></th>
+                            <th class="sticky-col col-complete">완료</th>
+                            <th class="sticky-col col-result">판정</th>
+                            <th class="sticky-col col-num">접수번호</th>
+                            <th class="sticky-col col-date">접수일자</th>
                             <th class="col-applicant-type col-hidden">법인여부</th>
                             <th class="col-birth-corp col-hidden">생년월일/법인번호</th>
-                            <th>구분</th>
-                            <th>목적(용도)</th>
-                            <th class="col-name">성명</th>
+                            <th class="sticky-col col-category">구분</th>
+                            <th class="sticky-col col-purpose">목적(용도)</th>
+                            <th class="sticky-col col-name">성명</th>
                             <th class="col-zipcode col-hidden">우편번호</th>
                             <th>주소</th>
                             <th>생산자 성명</th>
@@ -421,6 +429,7 @@
                             <th>수령 방법</th>
                             <th class="col-note">비고</th>
                             <th class="col-mail-date">발송일자</th>
+                            <th class="col-analysis">분석결과</th>
                             <th class="col-action">관리</th>
                         </tr>
                     </thead>
@@ -578,6 +587,79 @@
         </div>
     </div>
 
+    <!-- MRL 검색 모달 -->
+    <div id="mrlSearchModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>🔬 MRL 검색 (식품별 농약 잔류허용기준)</h3>
+                <button type="button" class="modal-close" id="closeMrlSearchModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- 상태 안내줄 -->
+                <div id="mrlSearchStatus" class="mrl-search-status hidden">
+                    <span class="mrl-search-dot"></span>
+                    <span id="mrlSearchStatusText">MRL 데이터 준비 중...</span>
+                    <button type="button" id="mrlSearchSetKeyBtn" class="mrl-search-link-btn hidden">API 키 설정</button>
+                </div>
+
+                <!-- 농약명 검색 입력 -->
+                <div class="mrl-search-input-row">
+                    <span class="material-icons-outlined mrl-search-input-icon">search</span>
+                    <input type="text" id="mrlSearchInput" class="mrl-search-input"
+                        placeholder="농약명 입력 (한글 또는 영문, 예: 다이아지논 / Diazinon)" autocomplete="off">
+                    <button type="button" id="mrlSearchClearBtn" class="mrl-search-clear-btn hidden" title="지우기">&times;</button>
+                </div>
+
+                <!-- 농약 후보 리스트 -->
+                <div id="mrlCandidateSection" class="mrl-candidate-section hidden">
+                    <div class="mrl-candidate-info"><span id="mrlCandidateCount">0개 농약</span></div>
+                    <ul id="mrlCandidateList" class="mrl-candidate-list"></ul>
+                </div>
+
+                <!-- 선택된 농약의 식품별 MRL 테이블 -->
+                <div id="mrlResultSection" class="mrl-result-section hidden">
+                    <div class="mrl-result-header">
+                        <div id="mrlResultTitle" class="mrl-result-title">
+                            <span id="mrlResultPesticideKor" class="mrl-result-kor"></span>
+                            <span id="mrlResultPesticideEng" class="mrl-result-eng"></span>
+                        </div>
+                        <button type="button" id="mrlBackToCandidatesBtn" class="mrl-back-btn hidden" title="농약 목록으로">
+                            <span class="material-icons-outlined" style="font-size:16px;">arrow_back</span> 목록
+                        </button>
+                    </div>
+                    <div class="mrl-food-filter-row">
+                        <span class="material-icons-outlined mrl-food-filter-icon">filter_list</span>
+                        <input type="text" id="mrlFoodFilterInput" class="mrl-food-filter-input"
+                            placeholder="식품명 필터 (예: 사과, 고추...)" autocomplete="off">
+                        <span id="mrlResultCount" class="mrl-result-count">0건</span>
+                    </div>
+                    <div class="mrl-result-table-wrapper">
+                        <table class="mrl-result-table">
+                            <thead>
+                                <tr>
+                                    <th class="mrl-col-food">식품(작물)명</th>
+                                    <th class="mrl-col-category">분류</th>
+                                    <th class="mrl-col-value">MRL 값</th>
+                                    <th class="mrl-col-unit">단위</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mrlResultTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 빈/안내 상태 -->
+                <div id="mrlSearchEmpty" class="mrl-search-empty">
+                    농약명을 입력하면 식품별 잔류허용기준(MRL)을 검색합니다.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="closeMrlSearchBtn" class="btn-cancel">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 주소 검색 모달 -->
     <div id="addressModal" class="modal hidden">
         <div class="modal-overlay"></div>
@@ -677,6 +759,12 @@
 
                     <!-- 상세 통계 -->
                     <div class="stats-details">
+                        <!-- 구분별 통계 -->
+                        <div class="stats-section">
+                            <h4>📂 구분별</h4>
+                            <div class="stats-chart" id="statsByCategory"></div>
+                        </div>
+
                         <!-- 목적(용도)별 통계 -->
                         <div class="stats-section">
                             <h4>🎯 목적(용도)별</h4>
@@ -811,8 +899,109 @@
         </div>
     </div>
 
-    <script src="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script type="module" src="pesticide-entry.js"></script>
+    <!-- 잔류농약 분석결과 입력 모달 -->
+    <div id="pesticideAnalysisModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-pesticide-analysis">
+            <div class="modal-header pesticide-analysis-header">
+                <h3><span class="material-icons-outlined" style="font-size:20px;vertical-align:middle;">biotech</span> 잔류농약 분석결과 입력</h3>
+                <button type="button" class="modal-close" id="closePesticideAnalysisModal">&times;</button>
+            </div>
+            <div class="modal-body pesticide-analysis-body">
+                <!-- 시료 정보 -->
+                <div class="pa-sample-info">
+                    <div class="info-row">
+                        <span class="info-label">접수번호</span>
+                        <span class="info-value" id="paReceptionNumber">-</span>
+                        <span class="info-label">접수일자</span>
+                        <span class="info-value" id="paDate">-</span>
+                        <span class="info-label">구분</span>
+                        <span class="info-value" id="paCategory">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">성명</span>
+                        <span class="info-value" id="paName">-</span>
+                        <span class="info-label">의뢰물품</span>
+                        <span class="info-value" id="paCrop">-</span>
+                        <span class="info-label">목적</span>
+                        <span class="info-value" id="paPurpose">-</span>
+                    </div>
+                </div>
+
+                <!-- 검사일자 + 판정 -->
+                <div class="pa-meta-row">
+                    <div class="pa-field">
+                        <label for="paTestDate">검사일자</label>
+                        <input type="date" id="paTestDate" class="pa-input">
+                    </div>
+                    <div class="pa-field">
+                        <label>판정</label>
+                        <div class="judgment-options">
+                            <label class="judgment-option"><input type="radio" name="paJudgment" value=""><span class="judgment-chip">미판정</span></label>
+                            <label class="judgment-option"><input type="radio" name="paJudgment" value="pass"><span class="judgment-chip chip-pass">불검출</span></label>
+                            <label class="judgment-option"><input type="radio" name="paJudgment" value="fail"><span class="judgment-chip chip-fail">검출</span></label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 검출 농약 입력 영역 -->
+                <div class="pa-detections-header">
+                    <span class="pa-detections-title">검출 농약</span>
+                    <span class="pa-detections-count" id="paDetectionCount">0건</span>
+                    <button type="button" id="paAllNdBtn" class="pa-nd-all-btn" title="전체 불검출 처리">
+                        <span class="material-icons-outlined" style="font-size:16px;">check_circle</span> 전체 불검출
+                    </button>
+                    <button type="button" id="paAddRowBtn" class="pa-add-btn" title="검출 농약 추가">
+                        <span class="material-icons-outlined" style="font-size:16px;">add_circle</span> 추가
+                    </button>
+                    <button type="button" id="paMrlLookupBtn" class="pa-mrl-btn" title="MRL 일괄 조회">
+                        <span class="material-icons-outlined" style="font-size:16px;">search</span> MRL 일괄 조회
+                    </button>
+                </div>
+
+                <div class="pa-detections-wrapper">
+                    <table class="pa-detections-table">
+                        <thead>
+                            <tr>
+                                <th class="pa-col-no">No.</th>
+                                <th class="pa-col-equip">장비</th>
+                                <th class="pa-col-name">농약명</th>
+                                <th class="pa-col-type">구분</th>
+                                <th class="pa-col-raw">분석값(ng/kg)</th>
+                                <th class="pa-col-dilution">희석배수</th>
+                                <th class="pa-col-value">검출량(mg/kg)</th>
+                                <th class="pa-col-mrl">MRL(mg/kg)</th>
+                                <th class="pa-col-judgment">판정</th>
+                                <th class="pa-col-del"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="paDetectionsBody">
+                        </tbody>
+                    </table>
+                    <!-- MRL API 상태 표시줄 -->
+                    <div id="paMrlStatus" class="pa-mrl-status hidden">
+                        <span class="pa-mrl-dot"></span>
+                        <span id="paMrlStatusText">MRL API 준비 중...</span>
+                        <button type="button" id="paMrlSetKeyBtn" class="pa-mrl-link-btn">API 키 설정</button>
+                    </div>
+                    <div id="paEmptyMsg" class="pa-empty-msg">
+                        검출된 농약이 없습니다. "추가"로 검출 농약을 입력하거나 "전체 불검출"을 선택하세요.
+                    </div>
+                    <div id="paNdStatus" class="pa-nd-status hidden">
+                        <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;color:#16a34a;">check_circle</span>
+                        <span>전체 불검출 처리됨</span>
+                        <button type="button" id="paCancelNdBtn" class="pa-cancel-nd-btn">해제</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer pesticide-analysis-footer">
+                <button type="button" id="cancelPesticideAnalysisBtn" class="btn-cancel">닫기</button>
+                <button type="button" id="savePesticideAnalysisBtn" class="btn-confirm btn-pa-save">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="pesticide-entry.ts"></script>
 </body>
 
 </html>

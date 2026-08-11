@@ -8,6 +8,9 @@ export default defineConfig({
     port: 3001,
     open: true
   },
+  resolve: {
+    extensions: ['.ts', '.js', '.mjs', '.json']
+  },
   build: {
     outDir: '../docs',
     emptyOutDir: true,
@@ -21,7 +24,13 @@ export default defineConfig({
         pesticide: resolve(__dirname, 'src/pesticide/index.html'),
         settings: resolve(__dirname, 'src/settings/index.html'),
         labelPrint: resolve(__dirname, 'src/label-print/index.html'),
-        manual: resolve(__dirname, 'src/manual/index.html')
+        manual: resolve(__dirname, 'src/manual/index.html'),
+        heuktoram: resolve(__dirname, 'src/heuktoram/index.html'),
+        release: resolve(__dirname, 'src/release/index.html'),
+        waterAnalysis: resolve(__dirname, 'src/water-analysis/index.html'),
+        pesticideAnalysis: resolve(__dirname, 'src/pesticide-analysis/index.html'),
+        heavyMetalAnalysis: resolve(__dirname, 'src/heavy-metal-analysis/index.html'),
+        compostAnalysis: resolve(__dirname, 'src/compost-analysis/index.html')
       }
     }
   }

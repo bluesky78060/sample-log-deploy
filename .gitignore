@@ -90,6 +90,7 @@ typings/
 
 # Electron-Forge
 out/
+dist/
 
 # Firebase 인증 파일 (민감 정보)
 firebase-auth.key
@@ -99,3 +100,42 @@ firebase-auth.json
 # 네트워크 접근 제어 설정 (내부 IP 정보)
 **/network-config.js
 auto-save-*.json
+
+# Vite build output (hashed assets)
+# HTML files are kept for GitHub Pages routing
+docs/assets/
+
+# Playwright 실행 산출물
+test-results/
+playwright-report/
+
+# OMC 오케스트레이션 — 일회성 세션 상태만 제외한다.
+# .omc/의 문서·스크립트·skills(프로젝트 스코프 스킬)는 의도적 커밋 대상이라
+# 추적을 유지한다 — 통째로 ignore하면 그 12개가 추적에서 빠진다.
+#
+# `.omc/state/*`(별표)를 쓰는 이유: 디렉터리 자체를 ignore하면 git이 그 안으로
+# 내려가지 않아 아래 `!` 예외가 동작하지 않는다.
+.omc/state/*
+# ai-pm-context.json은 일회성 상태가 아니라 손으로 쓴 완료 기록이고,
+# 추적 중인 문서 3곳이 참조한다 — CLAUDE.md, .omc/AI-PM-SETUP.md,
+# .omc/scripts/restore-ai-pm-context.sh. 빼면 그 문서들의 안내가 거짓이 된다.
+!.omc/state/ai-pm-context.json
+.omc/sessions/
+.omc/project-memory.json
+src/shared/.omc/
+# `.omc/notepads/`는 ignore하지 않는다 — OMC 런타임 경로는 `.omc/notepad.md`(단수
+# 파일)이고, 이 디렉터리에 있는 것은 손으로 쓴 티켓별 기록이다(phase-2.4/ 2개는
+# 이미 추적 중). ignore하면 걷어내는 것 없이 새 기록만 조용히 숨는다.
+
+# 설명서 이미지 사본 — 선제 규칙. **현재 이 프로젝트에는 이 경로가 없다**:
+# Vite가 설명서 이미지를 docs/assets/로 해시 처리하고(docs/manual/index.html의
+# images/ 참조 0건), emptyOutDir가 매 빌드마다 docs/를 비운다.
+# 그럼에도 두는 이유 — SAMPL-1-124 작업 중 이 경로에 남아 있던 낡은 PNG 9개(1.5MB)가
+# `git add -A`로 커밋에 딸려 들어갔다. 메인↔테스트 동기화로 재유입될 수 있다.
+# 원본은 src/manual/images/(추적 중)이며 건드리지 않는다.
+docs/manual/images/
+
+# 세션별 활성 티켓 포인터 (훅용 상태, 커밋 대상 아님).
+# 메인 프로젝트는 이 파일을 추적한다 — 의도적 분기다.
+# 메인↔테스트 동기화 시 "메인과 맞춘다"며 되돌리지 말 것.
+.claude/active-ticket

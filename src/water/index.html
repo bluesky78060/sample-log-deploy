@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:* ws://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src 'self';">
     <title>수질분석 의뢰서</title>
     <!-- 폰트 preconnect 및 preload로 성능 최적화 (bundle-defer-third-party) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -129,6 +130,10 @@
                 <span class="util-btn-label">가져오기</span>
                 <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" hidden>
             </label>
+            <button type="button" id="waterAnalysisBtn" class="util-btn water-analysis-link-btn" title="수질분석 결과 입력">
+                <span class="material-icons-outlined">science</span>
+                <span class="util-btn-label">분석결과</span>
+            </button>
         </div>
 
         <div class="navbar-divider"></div>
@@ -312,7 +317,7 @@
                                 <h3>비고</h3>
                             </div>
                             <div class="card-body">
-                                <textarea id="note" name="note" rows="2" placeholder="추가 메모 사항을 입력하세요"></textarea>
+                                <textarea id="note" name="note" rows="1" placeholder="추가 메모 사항을 입력하세요"></textarea>
                             </div>
                         </div>
                     </div>
@@ -476,6 +481,7 @@
                             <th>통보방법</th>
                             <th class="col-note">비고</th>
                             <th class="col-mail-date">발송일자</th>
+                            <th class="col-analysis">분석결과</th>
                             <th class="col-action">관리</th>
                         </tr>
                     </thead>
@@ -572,6 +578,10 @@
                         <div class="stats-section">
                             <h4>🔬 검사항목별</h4>
                             <div class="stats-chart" id="statsByTestItems"></div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>📮 수령 방법별</h4>
+                            <div class="stats-chart" id="statsByReceptionMethod"></div>
                         </div>
                         <div class="stats-section stats-section-full">
                             <h4>📅 월별 접수 현황</h4>
@@ -784,11 +794,89 @@
         </div>
     </div>
 
+    <!-- 분석결과 입력 모달 -->
+    <div id="analysisResultModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-analysis">
+            <div class="modal-header analysis-modal-header">
+                <h3><span class="material-icons-outlined" style="font-size:20px;vertical-align:middle;">science</span> 수질분석 결과 입력</h3>
+                <button type="button" class="modal-close" id="closeAnalysisModal">&times;</button>
+            </div>
+            <div class="modal-body analysis-modal-body">
+                <!-- 접수 정보 요약 -->
+                <div class="analysis-sample-info">
+                    <div class="info-row">
+                        <span class="info-label">접수번호</span>
+                        <span class="info-value" id="analysisReceptionNumber">-</span>
+                        <span class="info-label">접수일자</span>
+                        <span class="info-value" id="analysisDate">-</span>
+                        <span class="info-label">검사항목</span>
+                        <span class="info-value analysis-badge" id="analysisTestItems">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">성명</span>
+                        <span class="info-value" id="analysisName">-</span>
+                        <span class="info-label">시료명</span>
+                        <span class="info-value" id="analysisSampleName">-</span>
+                        <span class="info-label">채취장소</span>
+                        <span class="info-value" id="analysisLocation">-</span>
+                    </div>
+                </div>
+
+                <!-- 검사일자 -->
+                <div class="analysis-test-date-row">
+                    <label for="analysisTestDate">검사일자</label>
+                    <input type="date" id="analysisTestDate" class="analysis-input">
+                </div>
+
+                <!-- 분석 항목 입력 테이블 -->
+                <div class="analysis-fields-wrapper">
+                    <table class="analysis-fields-table">
+                        <thead>
+                            <tr>
+                                <th class="af-col-no">No.</th>
+                                <th class="af-col-name">분석항목</th>
+                                <th class="af-col-unit">단위</th>
+                                <th class="af-col-standard">기준</th>
+                                <th class="af-col-value">결과값</th>
+                                <th class="af-col-status">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysisFieldsBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 판정 -->
+                <div class="analysis-judgment-row">
+                    <label>판정</label>
+                    <div class="judgment-options">
+                        <label class="judgment-option">
+                            <input type="radio" name="analysisJudgment" value="">
+                            <span class="judgment-chip">미판정</span>
+                        </label>
+                        <label class="judgment-option">
+                            <input type="radio" name="analysisJudgment" value="pass">
+                            <span class="judgment-chip chip-pass">적합</span>
+                        </label>
+                        <label class="judgment-option">
+                            <input type="radio" name="analysisJudgment" value="fail">
+                            <span class="judgment-chip chip-fail">부적합</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer analysis-modal-footer">
+                <button type="button" id="cancelAnalysisBtn" class="btn-cancel">닫기</button>
+                <button type="button" id="saveAnalysisBtn" class="btn-confirm btn-analysis-save">저장</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 토스트 메시지 -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script type="module" src="water-entry.js"></script>
+    <script type="module" src="water-entry.ts"></script>
 </body>
 
 </html>

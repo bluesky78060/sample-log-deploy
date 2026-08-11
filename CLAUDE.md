@@ -81,6 +81,50 @@ Main process (`index.js`)와 Renderer 간 통신:
 - **localStorage**: 브라우저/앱 내 데이터 저장 (연도별 키)
 - **JSON 파일**: 자동 저장 및 내보내기/가져오기
 
+## AI-PM Project Management
+
+이 프로젝트는 ai-pm MCP 서버를 사용하여 작업을 추적합니다.
+
+### Project Information
+
+- **Project ID**: `2f0cf691-4d0f-49b9-8a61-2531ae879ead`
+- **Project Name**: TypeScript Migration - Sample Log
+- **Status**: Completed (2026-03-04)
+
+### Epic IDs
+
+| Phase | Epic ID | Status |
+|-------|---------|--------|
+| Phase 1: 타입 인프라 구축 | `ce436c63-e40a-4b79-8cbd-2ade171110c9` | ✅ Completed |
+| Phase 2: water 모듈 | `1434b7c6-4364-44d8-a9d5-ba9f1fd92ba2` | ✅ Completed |
+| Phase 3: heavy-metal 모듈 | `7ef2165c-fe7d-471e-bafe-d3f743d54071` | ✅ Completed |
+| Phase 4: compost 모듈 | `37f98baf-ae32-4967-8518-955570a649f1` | ✅ Completed |
+| Phase 5-1: pesticide 모듈 | `3d0b6738-db36-4280-97c3-3189623eb2d4` | ✅ Completed |
+| Phase 5-2: soil 모듈 | `7c1d11d5-17fb-4677-af42-eca8d4947d2f` | ✅ Completed |
+| Phase 6: shared 모듈 | `956250be-9317-4dcb-97b2-8cb511ca2cea` | ✅ Completed |
+| Phase 7: 데이터/설정 모듈 | `255b48a4-dea7-4b83-aaa4-a98730b8b496` | ✅ Completed |
+
+### TypeScript Migration Summary
+
+- **Total Errors**: 5,127 → 0 (100% resolved)
+- **Files Converted**: 42 TypeScript files
+- **Workers Used**: 15 parallel workers
+- **Duration**: ~39 minutes
+
+### Using AI-PM
+
+컴팩션 후에도 ai-pm 컨텍스트를 유지하려면 `.omc/state/ai-pm-context.json`을 참조하세요.
+
+새로운 작업 생성 시:
+```bash
+# Epic 조회
+mcp__ai-pm__get_project --project_id 2f0cf691-4d0f-49b9-8a61-2531ae879ead
+
+# Task 생성 (새 Epic 필요 시)
+mcp__ai-pm__create_epic --project_id <ID> --title "New Feature"
+mcp__ai-pm__create_task --epic_id <EPIC_ID> --title "Task Name"
+```
+
 ## Development Notes
 
 ### src와 docs 동기화

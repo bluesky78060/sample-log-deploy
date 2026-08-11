@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>캐시 클리어 도구</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .subtitle {
+            color: #718096;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .cache-info {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .cache-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .cache-item:last-child {
+            border-bottom: none;
+        }
+
+        .cache-label {
+            font-size: 0.9rem;
+            color: #4a5568;
+        }
+
+        .cache-value {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .cache-value.has-data {
+            color: #f59e0b;
+        }
+
+        .cache-value.empty {
+            color: #10b981;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-danger:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+        }
+
+        .log-container {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-line {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .log-line.success {
+            color: #86efac;
+        }
+
+        .log-line.error {
+            color: #fca5a5;
+        }
+
+        .log-line.info {
+            color: #93c5fd;
+        }
+
+        .log-line.warning {
+            color: #fcd34d;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .warning-box h4 {
+            color: #92400e;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .warning-box p {
+            color: #78350f;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        .success-box {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .success-box.show {
+            display: block;
+        }
+
+        .success-box h4 {
+            color: #065f46;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .success-box p {
+            color: #047857;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 캐시 클리어 도구</h1>
+        <p class="subtitle">localStorage에 저장된 test_ 데이터 캐시 삭제</p>
+
+        <div class="warning-box">
+            <h4>⚠️ 주의사항</h4>
+            <p>
+                이 도구는 localStorage에 캐시된 <strong>test_</strong> 관련 데이터를 모두 삭제합니다.<br>
+                Firebase의 실제 데이터는 영향을 받지 않으며, 로컬 캐시만 삭제됩니다.
+            </p>
+        </div>
+
+        <div class="success-box" id="successBox">
+            <h4>✅ 캐시 클리어 완료</h4>
+            <p>
+                모든 test_ 캐시가 삭제되었습니다.<br>
+                이제 앱을 새로고침하면 비어있는 상태로 표시됩니다.
+            </p>
+        </div>
+
+        <div class="cache-info" id="cacheInfo">
+            <!-- 캐시 정보가 여기에 동적으로 추가됩니다 -->
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-primary" id="btnCheck">
+                📊 캐시 상태 확인
+            </button>
+            <button class="btn btn-danger" id="btnClear">
+                🗑️ 캐시 모두 삭제
+            </button>
+        </div>
+
+        <div class="log-container" id="logContainer">
+            <div class="log-line info">> 캐시 클리어 도구가 준비되었습니다.</div>
+            <div class="log-line info">> "캐시 상태 확인" 버튼을 눌러 시작하세요.</div>
+        </div>
+    </div>
+
+    <script>
+        const cacheInfo = document.getElementById('cacheInfo');
+        const btnCheck = document.getElementById('btnCheck');
+        const btnClear = document.getElementById('btnClear');
+        const logContainer = document.getElementById('logContainer');
+        const successBox = document.getElementById('successBox');
+
+        // 확인할 localStorage 키 목록
+        const CACHE_KEYS = [
+            'test_soilSampleLogs_2026',
+            'test_waterSampleLogs_2026',
+            'test_compostSampleLogs_2026',
+            'test_heavyMetalSampleLogs_2026',
+            'test_pesticideSampleLogs_2026',
+            'soilSampleLogs_2026',
+            'waterSampleLogs_2026',
+            'compostSampleLogs_2026',
+            'heavyMetalSampleLogs_2026',
+            'pesticideSampleLogs_2026'
+        ];
+
+        const KEY_NAMES = {
+            'test_soilSampleLogs_2026': '토양 (test_)',
+            'test_waterSampleLogs_2026': '수질분석 (test_)',
+            'test_compostSampleLogs_2026': '퇴·액비 (test_)',
+            'test_heavyMetalSampleLogs_2026': '토양 중금속 (test_)',
+            'test_pesticideSampleLogs_2026': '잔류농약 (test_)',
+            'soilSampleLogs_2026': '토양 (원본)',
+            'waterSampleLogs_2026': '수질분석 (원본)',
+            'compostSampleLogs_2026': '퇴·액비 (원본)',
+            'heavyMetalSampleLogs_2026': '토양 중금속 (원본)',
+            'pesticideSampleLogs_2026': '잔류농약 (원본)'
+        };
+
+        function addLog(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = `> ${message}`;
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+        }
+
+        function checkCache() {
+            clearLog();
+            successBox.classList.remove('show');
+            addLog('localStorage 캐시 확인 중...', 'info');
+
+            const cacheStatus = [];
+            let totalCached = 0;
+
+            CACHE_KEYS.forEach(key => {
+                const data = localStorage.getItem(key);
+                let count = 0;
+
+                if (data) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        count = Array.isArray(parsed) ? parsed.length : 0;
+                    } catch (e) {
+                        count = -1; // 파싱 오류
+                    }
+                }
+
+                cacheStatus.push({ key, count, hasData: count > 0 });
+
+                if (count > 0) {
+                    totalCached += count;
+                    addLog(`${KEY_NAMES[key]}: ${count}건`, count > 0 ? 'warning' : 'info');
+                }
+            });
+
+            // UI 업데이트
+            cacheInfo.innerHTML = '';
+
+            cacheStatus.forEach(item => {
+                if (item.count > 0 || item.key.startsWith('test_')) {
+                    const div = document.createElement('div');
+                    div.className = 'cache-item';
+                    div.innerHTML = `
+                        <span class="cache-label">${KEY_NAMES[item.key]}</span>
+                        <span class="cache-value ${item.count > 0 ? 'has-data' : 'empty'}">
+                            ${item.count > 0 ? item.count + '건' : '비어있음'}
+                        </span>
+                    `;
+                    cacheInfo.appendChild(div);
+                }
+            });
+
+            if (totalCached > 0) {
+                addLog('', 'info');
+                addLog(`⚠️  총 ${totalCached}건의 캐시된 데이터가 있습니다.`, 'warning');
+                addLog('"캐시 모두 삭제" 버튼을 눌러 삭제할 수 있습니다.', 'info');
+            } else {
+                addLog('', 'success');
+                addLog('✅ 캐시가 이미 비어있습니다.', 'success');
+            }
+
+            return cacheStatus;
+        }
+
+        function clearCache() {
+            if (!confirm('모든 test_ 캐시를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) {
+                return;
+            }
+
+            clearLog();
+            addLog('캐시 삭제 시작...', 'info');
+
+            let deletedCount = 0;
+            let deletedKeys = [];
+
+            CACHE_KEYS.forEach(key => {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        const count = Array.isArray(parsed) ? parsed.length : 0;
+
+                        if (count > 0) {
+                            localStorage.removeItem(key);
+                            deletedCount += count;
+                            deletedKeys.push(key);
+                            addLog(`✅ ${KEY_NAMES[key]}: ${count}건 삭제`, 'success');
+                        }
+                    } catch (e) {
+                        localStorage.removeItem(key);
+                        deletedKeys.push(key);
+                        addLog(`✅ ${KEY_NAMES[key]}: 삭제 (파싱 오류)`, 'success');
+                    }
+                }
+            });
+
+            addLog('', 'info');
+            if (deletedKeys.length > 0) {
+                addLog(`🎉 총 ${deletedCount}건의 캐시가 삭제되었습니다.`, 'success');
+                addLog('앱을 새로고침하면 비어있는 상태로 표시됩니다.', 'success');
+                successBox.classList.add('show');
+            } else {
+                addLog('삭제할 캐시가 없습니다.', 'info');
+            }
+
+            // 상태 재확인
+            setTimeout(() => {
+                checkCache();
+            }, 1000);
+        }
+
+        btnCheck.addEventListener('click', checkCache);
+        btnClear.addEventListener('click', clearCache);
+
+        // 초기 상태 확인
+        checkCache();
+    </script>
+</body>
+</html>

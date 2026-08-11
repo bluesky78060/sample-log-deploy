@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light" data-sample-type="pesticide-analysis">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>잔류농약 분석결과 조회</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet" href="../shared/tailwind-output.css">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="pesticide-analysis-style.css">
+</head>
+
+<body class="pesticide-analysis-page">
+    <nav class="navbar pa-navbar">
+        <button type="button" class="back-btn" id="backBtn" title="이전 페이지로"><span class="material-icons-outlined">arrow_back</span></button>
+        <div class="navbar-brand">
+            <span class="brand-icon">🧪</span>
+            <span class="brand-text">잔류농약 분석결과</span>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <div class="navbar-actions pa-toolbar">
+            <select id="yearSelect" class="toolbar-select" style="display:none;"></select>
+            <div class="toolbar-field">
+                <label for="filterStatus">필터</label>
+                <select id="filterStatus" class="toolbar-select">
+                    <option value="all">전체</option>
+                    <option value="detected">검출</option>
+                    <option value="clean">불검출(전체)</option>
+                    <option value="noResult">미입력</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="navbar-spacer"></div>
+
+        <div class="navbar-utils">
+            <button type="button" id="exportBtn" class="util-btn export-btn" title="엑셀 내보내기">
+                <span class="material-icons-outlined">download</span>
+                <span class="util-btn-label">내보내기</span>
+            </button>
+        </div>
+
+        <div class="navbar-divider"></div>
+
+        <div class="theme-toggle" id="themeToggleContainer">
+            <span class="theme-icon sun"><span class="material-icons-outlined">light_mode</span></span>
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="다크 모드 전환"></button>
+            <span class="theme-icon moon"><span class="material-icons-outlined">dark_mode</span></span>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="pa-info-bar">
+            <span class="info-text">
+                <span class="material-icons-outlined" style="font-size: 16px; vertical-align: middle;">info</span>
+                접수 시료별 잔류농약 분석 결과를 조회합니다. 검출된 농약명과 검출량이 표시됩니다.
+            </span>
+            <span class="record-count" id="recordCount">0건</span>
+        </div>
+
+        <div class="table-wrapper" id="tableWrapper">
+            <table class="pa-table" id="paTable">
+                <thead>
+                    <tr>
+                        <th class="col-num sticky-col">접수번호</th>
+                        <th class="col-date sticky-col">접수일자</th>
+                        <th class="col-name sticky-col">성명</th>
+                        <th class="col-crop sticky-col">의뢰물품</th>
+                        <th class="col-purpose sticky-col">목적</th>
+                        <th class="col-test-date">검사일자</th>
+                        <th class="col-detection-count">검출수</th>
+                        <th class="col-det-equip">장비</th>
+                        <th class="col-det-name">농약명</th>
+                        <th class="col-det-raw">분석값(ng/kg)</th>
+                        <th class="col-det-dil">희석배수</th>
+                        <th class="col-det-value">검출량(mg/kg)</th>
+                        <th class="col-det-type">분석법</th>
+                        <th class="col-judgment">판정</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+
+            <div id="emptyState" class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p>잔류농약 접수 데이터가 없습니다</p>
+                <p class="empty-sub">먼저 잔류농약 시료 접수 페이지에서 데이터를 등록하세요.</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script type="module" src="pesticide-analysis-entry.ts"></script>
+</body>
+
+</html>

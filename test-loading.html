@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로딩 매니저 테스트</title>
+    <link rel="stylesheet" href="src/style.css">
+</head>
+<body style="padding: 40px;">
+    <h1>Loading Manager 테스트</h1>
+
+    <div style="display: flex; flex-direction: column; gap: 12px; max-width: 400px;">
+        <h2>기본 테스트</h2>
+        <button onclick="testBasicLoading()" class="btn btn-primary">
+            기본 로딩 (3초)
+        </button>
+
+        <h2>진행률 테스트</h2>
+        <button onclick="testProgressLoading()" class="btn btn-primary">
+            진행률 표시 (0-100%)
+        </button>
+
+        <h2>취소 버튼 테스트</h2>
+        <button onclick="testCancellableLoading()" class="btn btn-primary">
+            취소 가능 작업
+        </button>
+
+        <h2>메시지 업데이트 테스트</h2>
+        <button onclick="testMessageUpdate()" class="btn btn-primary">
+            메시지 변경 (5단계)
+        </button>
+
+        <h2>다중 작업 테스트</h2>
+        <button onclick="testMultipleOperations()" class="btn btn-primary">
+            여러 작업 동시 실행
+        </button>
+
+        <h2>실제 시나리오 테스트</h2>
+        <button onclick="testFirebaseSync()" class="btn btn-primary">
+            Firebase 동기화 시뮬레이션
+        </button>
+    </div>
+
+    <script type="module" src="src/shared/loading-manager.js"></script>
+    <script>
+        // 기본 로딩 테스트
+        function testBasicLoading() {
+            console.log('기본 로딩 테스트 시작');
+            loadingManager.show('test', '테스트 중...');
+            setTimeout(() => {
+                loadingManager.hide('test');
+                console.log('기본 로딩 테스트 완료');
+            }, 3000);
+        }
+
+        // 진행률 테스트
+        function testProgressLoading() {
+            console.log('진행률 테스트 시작');
+            loadingManager.show('progress', '진행률 테스트...', { showProgress: true });
+
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                loadingManager.updateProgress('progress', progress, `처리 중... ${progress}%`);
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        loadingManager.hide('progress');
+                        console.log('진행률 테스트 완료');
+                    }, 500);
+                }
+            }, 300);
+        }
+
+        // 취소 버튼 테스트
+        function testCancellableLoading() {
+            console.log('취소 가능 작업 테스트 시작');
+            let cancelled = false;
+
+            loadingManager.show('cancel', '취소 가능 작업...', {
+                cancellable: true,
+                onCancel: () => {
+                    cancelled = true;
+                    console.log('작업이 취소되었습니다!');
+                }
+            });
+
+            setTimeout(() => {
+                if (!cancelled) {
+                    loadingManager.hide('cancel');
+                    console.log('작업이 정상 완료되었습니다');
+                }
+            }, 5000);
+        }
+
+        // 메시지 업데이트 테스트
+        function testMessageUpdate() {
+            console.log('메시지 업데이트 테스트 시작');
+            const messages = [
+                '데이터 검증 중...',
+                'Firebase 연결 중...',
+                '데이터 업로드 중...',
+                '캐시 업데이트 중...',
+                '완료 중...'
+            ];
+
+            loadingManager.show('messages', messages[0]);
+
+            let index = 0;
+            const interval = setInterval(() => {
+                index++;
+                if (index < messages.length) {
+                    loadingManager.updateMessage('messages', messages[index]);
+                } else {
+                    clearInterval(interval);
+                    loadingManager.hide('messages');
+                    console.log('메시지 업데이트 테스트 완료');
+                }
+            }, 1000);
+        }
+
+        // 다중 작업 테스트
+        function testMultipleOperations() {
+            console.log('다중 작업 테스트 시작 (첫 번째 작업만 표시됨)');
+
+            loadingManager.show('op1', '작업 1 실행 중...');
+            loadingManager.show('op2', '작업 2 실행 중...');
+            loadingManager.show('op3', '작업 3 실행 중...');
+
+            setTimeout(() => loadingManager.hide('op1'), 2000);
+            setTimeout(() => loadingManager.hide('op2'), 3000);
+            setTimeout(() => loadingManager.hide('op3'), 4000);
+
+            console.log('상태:', loadingManager.getStatus());
+        }
+
+        // Firebase 동기화 시뮬레이션
+        function testFirebaseSync() {
+            console.log('Firebase 동기화 시뮬레이션 시작');
+
+            const totalChunks = 5;
+            loadingManager.show('firebase', `Firebase 동기화 중... (0/${totalChunks})`, {
+                showProgress: true
+            });
+
+            let currentChunk = 0;
+            const interval = setInterval(() => {
+                currentChunk++;
+                const progress = (currentChunk / totalChunks) * 100;
+
+                loadingManager.updateProgress(
+                    'firebase',
+                    progress,
+                    `Firebase 동기화 중... (${currentChunk}/${totalChunks})`
+                );
+
+                console.log(`청크 ${currentChunk}/${totalChunks} 완료`);
+
+                if (currentChunk >= totalChunks) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        loadingManager.hide('firebase');
+                        console.log('Firebase 동기화 시뮬레이션 완료');
+                    }, 500);
+                }
+            }, 800);
+        }
+    </script>
+</body>
+</html>

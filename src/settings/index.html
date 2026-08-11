@@ -72,7 +72,8 @@
             margin-bottom: 0.5rem;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             width: 100%;
             padding: 0.75rem 1rem;
             border: 1.5px solid #E8E4DF;
@@ -82,7 +83,8 @@
             background: #FAFAF9;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #7C9082;
             box-shadow: 0 0 0 3px rgba(124, 144, 130, 0.12);
@@ -365,13 +367,15 @@
             color: #A8A29E;
         }
 
-        [data-theme="dark"] .form-group input {
+        [data-theme="dark"] .form-group input,
+        [data-theme="dark"] .form-group select {
             background: #1C1917;
             border-color: #57534E;
             color: #E7E5E4;
         }
 
-        [data-theme="dark"] .form-group input:focus {
+        [data-theme="dark"] .form-group input:focus,
+        [data-theme="dark"] .form-group select:focus {
             border-color: #7C9082;
         }
 
@@ -740,7 +744,7 @@
 
             <!-- Firebase 수동 설정 (인증 파일 카드 내 하단) -->
             <div style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
-                <h3 style="cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #475569; display: flex; align-items: center; gap: 0.5rem;" onclick="toggleManualSettings()">
+                <h3 style="cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #475569; display: flex; align-items: center; gap: 0.5rem;" onclick="window.toggleManualSettings()">
                     <span>☁️</span>
                     수동 설정
                     <span id="connectionStatus" class="status-badge disconnected">● 미연결</span>
@@ -748,7 +752,62 @@
                 </h3>
 
                 <div id="manualSettingsContent" style="display: none; margin-top: 1rem;">
-                    <div class="alert alert-warning">
+                    <!-- 빠른 설정 (한 번에 붙여넣기) -->
+                    <div class="alert alert-success" style="background: linear-gradient(135deg, #22c55e15, #16a34a15); border-color: #22c55e;">
+                        <strong>⚡ 빠른 설정 (권장)</strong><br>
+                        Firebase Console에서 복사한 설정 코드를 아래에 붙여넣으세요. 자동으로 모든 필드가 채워집니다.
+
+                        <details style="margin-top: 12px; cursor: pointer;">
+                            <summary style="font-weight: 600; color: #16a34a; user-select: none;">📖 설정 복사 방법 보기</summary>
+                            <div style="margin-top: 12px; padding: 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <ol style="margin: 0; padding-left: 20px; font-size: 0.9rem; line-height: 1.8;">
+                                    <li><a href="https://console.firebase.google.com/" target="_blank" style="color: #3b82f6;">Firebase Console</a> 접속</li>
+                                    <li>프로젝트 선택 (또는 새 프로젝트 만들기)</li>
+                                    <li>⚙️ 프로젝트 설정 → 일반 탭</li>
+                                    <li>"내 앱" 섹션에서 웹 앱(&lt;/&gt;) 추가</li>
+                                    <li>"Firebase SDK 추가" 화면에서 <code>firebaseConfig</code> 객체 전체를 복사</li>
+                                    <li>아래 입력창에 붙여넣기</li>
+                                </ol>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quickSetupPaste" style="font-weight: 600; color: #16a34a;">
+                            🚀 설정 코드 붙여넣기 (권장)
+                        </label>
+                        <textarea
+                            id="quickSetupPaste"
+                            placeholder="const firebaseConfig = {
+  apiKey: &quot;AIzaSy...&quot;,
+  authDomain: &quot;...&quot;,
+  projectId: &quot;...&quot;,
+  storageBucket: &quot;...&quot;,
+  messagingSenderId: &quot;...&quot;,
+  appId: &quot;...&quot;
+};
+
+또는 JSON 형태도 가능:
+{
+  &quot;apiKey&quot;: &quot;AIzaSy...&quot;,
+  &quot;authDomain&quot;: &quot;...&quot;,
+  ...
+}"
+                            rows="8"
+                            style="width: 100%; padding: 12px; border: 2px dashed #22c55e; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; background: #f0fdf4;"
+                        ></textarea>
+                        <button type="button" onclick="window.parseQuickSetup()" class="btn btn-primary" style="margin-top: 8px; background: linear-gradient(135deg, #22c55e, #16a34a);">
+                            ✨ 자동 입력
+                        </button>
+                    </div>
+
+                    <div style="margin: 1.5rem 0; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+                        <p style="font-size: 0.85rem; color: #64748b; text-align: center;">
+                            또는 수동으로 입력하세요
+                        </p>
+                    </div>
+
+                    <div class="alert alert-warning" style="display: none;">
                         <strong>참고:</strong> Electron 앱에서는 인증 파일 사용을 권장합니다.
                         웹 환경이거나 직접 설정이 필요한 경우에만 사용하세요.
                     </div>
@@ -795,6 +854,74 @@
                     </form>
                 </div>
             </div>
+        </div>
+
+        <!-- 식품안전나라 MRL API 설정 (SAMPL-1-115, 메인 정본 이식) -->
+        <div class="settings-card" id="mrlApiSection">
+            <h2>
+                <span>🧪</span>
+                식품안전나라 MRL API
+            </h2>
+
+            <div class="alert alert-info">
+                <strong>잔류농약 분석결과 입력 시 작물별 잔류허용기준(MRL)을 자동 조회</strong>하기 위한 API 설정입니다.<br>
+                <small style="color: #64748b;">
+                    배포본에는 키가 내장돼 있을 수 있어 비워둬도 됩니다. 직접 발급한 키를 쓰려면 입력하세요.
+                    키 발급: <a href="https://openapi.foodsafetykorea.go.kr/" target="_blank" style="color: #3b82f6;">openapi.foodsafetykorea.go.kr</a>
+                    → 회원가입 → OpenAPI 이용신청 → <strong>식품별 농약잔류허용기준 (I1050)</strong> 서비스 신청
+                </small>
+            </div>
+
+            <!-- API 키 입력 -->
+            <div style="margin-top: 1rem;">
+                <label for="mrlApiKey" style="display: block; font-size: 0.85rem; color: #475569; font-weight: 600; margin-bottom: 0.4rem;">
+                    API 인증키
+                </label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="password" id="mrlApiKey" placeholder="식품안전나라 OpenAPI 인증키 입력" autocomplete="off"
+                           style="flex: 1; padding: 0.55rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 0.85rem;">
+                    <button type="button" id="mrlApiKeyToggle" class="btn btn-secondary" style="padding: 0.5rem 0.75rem;" title="표시/숨김">👁</button>
+                    <button type="button" id="mrlApiKeySave" class="btn btn-primary">저장</button>
+                </div>
+                <p class="help-text" style="margin-top: 0.4rem;">
+                    저장된 키는 로컬(localStorage)에만 보관되며 외부로 전송되지 않습니다.
+                </p>
+            </div>
+
+            <!-- 캐시 상태 -->
+            <div id="mrlCacheStatus" style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 0.85rem; color: #64748b;">
+                    <div style="margin-bottom: 0.5rem;">연결 상태: <strong id="mrlConnStatus">확인 중...</strong></div>
+                    <div style="margin-bottom: 0.5rem;">캐시된 MRL 레코드: <strong id="mrlCacheCount">-</strong></div>
+                    <div style="margin-bottom: 0.5rem;">마지막 동기화: <strong id="mrlLastSync">-</strong></div>
+                    <div>캐시 상태: <strong id="mrlCacheExpiry">-</strong></div>
+                </div>
+            </div>
+
+            <!-- 액션 버튼 -->
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;">
+                <button type="button" id="mrlSyncBtn" class="btn btn-primary">
+                    🔄 지금 동기화
+                </button>
+                <button type="button" id="mrlTestBtn" class="btn btn-secondary">
+                    🔌 연결 테스트
+                </button>
+                <button type="button" id="mrlClearCacheBtn" class="btn btn-warning">
+                    🗑️ MRL 캐시 삭제
+                </button>
+            </div>
+
+            <!-- 진행률 표시 -->
+            <div id="mrlProgressBar" class="hidden" style="margin-top: 1rem;">
+                <div style="background: #e2e8f0; border-radius: 4px; overflow: hidden; height: 8px;">
+                    <div id="mrlProgressFill" style="background: linear-gradient(90deg, #10b981, #059669); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <div id="mrlProgressText" style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; text-align: center;">0 / 0</div>
+            </div>
+
+            <p class="help-text" style="margin-top: 0.75rem;">
+                캐시는 7일간 유효하며, 약 18,000건의 MRL 기준 데이터를 포함합니다 (~2MB). 오프라인에서도 조회 가능합니다.
+            </p>
         </div>
 
         <!-- 암호화 설정 -->
@@ -928,6 +1055,49 @@
             </p>
         </div>
 
+        <!-- 기본 시·도 설정 (필지 주소 검증용) -->
+        <div class="settings-card">
+            <h2>
+                <span>🗺️</span>
+                기본 시·도 설정
+            </h2>
+
+            <div class="form-group">
+                <label for="defaultSido">기본 시·도 (필지 주소 검증 기준)</label>
+                <select id="defaultSido">
+                    <option value="">선택 안 함 (시·도 없는 주소는 검증 건너뜀)</option>
+                    <option value="서울특별시">서울특별시</option>
+                    <option value="부산광역시">부산광역시</option>
+                    <option value="대구광역시">대구광역시</option>
+                    <option value="인천광역시">인천광역시</option>
+                    <option value="광주광역시">광주광역시</option>
+                    <option value="대전광역시">대전광역시</option>
+                    <option value="울산광역시">울산광역시</option>
+                    <option value="세종특별자치시">세종특별자치시</option>
+                    <option value="경기도">경기도</option>
+                    <option value="강원특별자치도">강원특별자치도</option>
+                    <option value="충청북도">충청북도</option>
+                    <option value="충청남도">충청남도</option>
+                    <option value="전북특별자치도">전북특별자치도</option>
+                    <option value="전라남도">전라남도</option>
+                    <option value="경상북도">경상북도</option>
+                    <option value="경상남도">경상남도</option>
+                    <option value="제주특별자치도">제주특별자치도</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button type="button" id="saveDefaultSidoBtn" class="btn btn-primary">저장</button>
+                <span id="defaultSidoSaveStatus" style="font-size: 0.8rem; color: #16a34a; display: none;">저장됨</span>
+            </div>
+
+            <p class="help-text">
+                필지 주소를 시·도 없이 "리+지번"으로 입력했을 때, VWORLD 검증에 사용할 기관 소재 시·도입니다.
+                자동완성으로 선택한 주소는 해당 주소의 시·도를 우선 사용합니다.
+                "선택 안 함"이면 시·도가 없는 주소는 오검증을 막기 위해 검증을 건너뜁니다.
+            </p>
+        </div>
+
         <!-- 네트워크 접근 제어 (웹 환경용) -->
         <div class="settings-card" id="networkAccessSection">
             <h2>
@@ -1046,7 +1216,10 @@
         </div>
     </div>
 
-    <script type="module" src="settings-entry.js"></script>
+    <!-- Toast Container -->
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
+
+    <script type="module" src="settings-entry.ts"></script>
 </body>
 
 </html>

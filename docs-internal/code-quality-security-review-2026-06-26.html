@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시료접수대장 — 코드 품질 · 보안 리뷰 (2026-06-26)</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d212a; --text:#e6e9ef; --muted:#9aa3b2;
+    --line:#2a2f3a; --crit:#ff5d5d; --high:#ff9f43; --med:#ffd866; --low:#6bcB77;
+    --ok:#42c97a; --accent:#5b9dff; --code:#11141a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 24px 96px}
+  header.hero{border:1px solid var(--line);border-radius:16px;padding:32px 36px;
+    background:linear-gradient(135deg,#1a1f2b,#14171f);margin-bottom:32px}
+  .hero h1{margin:0 0 6px;font-size:28px;letter-spacing:-.3px}
+  .hero .sub{color:var(--muted);font-size:14px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  .chip{font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--muted)}
+  .risk{font-weight:700;color:#fff}
+  .risk.medhigh{background:linear-gradient(90deg,var(--high),var(--crit));border:none}
+  .scorecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:28px 0}
+  .card{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel);text-align:center}
+  .card .n{font-size:34px;font-weight:800;line-height:1}
+  .card .l{font-size:12px;color:var(--muted);margin-top:8px;letter-spacing:.3px;text-transform:uppercase}
+  .c-crit .n{color:var(--crit)} .c-high .n{color:var(--high)} .c-med .n{color:var(--med)} .c-low .n{color:var(--low)} .c-ok .n{color:var(--ok)}
+  h2{margin:46px 0 16px;font-size:20px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h2 .e{margin-right:8px}
+  .finding{border:1px solid var(--line);border-left-width:4px;border-radius:12px;padding:18px 20px;margin:14px 0;background:var(--panel)}
+  .finding.crit{border-left-color:var(--crit)} .finding.high{border-left-color:var(--high)}
+  .finding.med{border-left-color:var(--med)} .finding.low{border-left-color:var(--low)}
+  .ftitle{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:700;font-size:15.5px}
+  .sev{font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px;color:#0f1115;letter-spacing:.4px}
+  .sev.crit{background:var(--crit)} .sev.high{background:var(--high)} .sev.med{background:var(--med)} .sev.low{background:var(--low)}
+  .verified{font-size:11px;color:var(--ok);border:1px solid var(--ok);border-radius:6px;padding:2px 7px}
+  .relay{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .finding p{margin:10px 0 6px}
+  .finding .loc{font-size:12.5px;color:var(--muted)}
+  code,.path{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--code);
+    padding:2px 6px;border-radius:5px;border:1px solid var(--line);color:#cfd6e4}
+  .fix{margin-top:10px;font-size:14px}
+  .fix b{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  td .path{font-size:11.5px}
+  ul.good{list-style:none;padding:0;margin:0}
+  ul.good li{padding:10px 14px;margin:8px 0;border:1px solid var(--line);border-left:4px solid var(--ok);
+    border-radius:10px;background:var(--panel);font-size:14px}
+  ol.top{counter-reset:t;list-style:none;padding:0}
+  ol.top li{counter-increment:t;position:relative;padding:14px 16px 14px 56px;margin:10px 0;
+    border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+  ol.top li::before{content:counter(t);position:absolute;left:16px;top:14px;width:28px;height:28px;
+    background:var(--accent);color:#0f1115;font-weight:800;border-radius:50%;display:grid;place-items:center;font-size:14px}
+  .tag{font-size:11px;color:var(--muted)}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;text-align:center}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:50%}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>시료접수대장 — 코드 품질 · 보안 리뷰</h1>
+    <div class="sub">봉화군 농업기술센터용 Electron + 웹 하이브리드 앱 · TypeScript ~62k LOC · v1.9.0(테스트)</div>
+    <div class="meta">
+      <span class="chip">📅 2026-06-26</span>
+      <span class="chip">🗂 대상: <code>project/src</code></span>
+      <span class="chip risk medhigh">종합 위험도: MEDIUM-HIGH</span>
+      <span class="chip">발견 14+ 건</span>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--ok)"></span>✅ 직접 검증함 (명령 재현)</span>
+      <span><span class="dot" style="background:var(--muted)"></span>relay = agent 보고(추가 확인 권장)</span>
+    </div>
+  </header>
+
+  <div class="scorecards">
+    <div class="card c-crit"><div class="n">3</div><div class="l">Critical</div></div>
+    <div class="card c-high"><div class="n">3</div><div class="l">High</div></div>
+    <div class="card c-med"><div class="n">8</div><div class="l">Medium</div></div>
+    <div class="card c-low"><div class="n">3</div><div class="l">Low</div></div>
+    <div class="card c-ok"><div class="n">6</div><div class="l">양호 항목</div></div>
+  </div>
+
+  <h2><span class="e">🔴</span>즉시 조치 — Critical / High</h2>
+
+  <div class="finding crit">
+    <div class="ftitle"><span class="sev crit">CRITICAL</span><span class="verified">✅ 검증됨</span>
+      타입 검사가 빌드를 게이트하지 않음 — 실제 <b>761개</b> 타입 에러 방치</div>
+    <p><code>npx tsc --noEmit</code> → <b>761 errors</b> (그중 <span class="path">src/soil/soil-script.ts</span> 혼자 <b>728개</b>).
+       그러나 <code>"build"</code>는 <code>vite build</code>만 돌고 <code>tsc</code>를 호출하지 않아 에러가 빌드를 막지 못함.
+       CLAUDE.md의 "5,127 → 0 errors (100% resolved)" 기록은 현재 사실이 아님.</p>
+    <p class="loc">근거: <span class="path">package.json</span> build 스크립트 · <span class="path">src/soil/soil-script.ts:4851</span> (<code>log.lotAddress</code> — 타입에 없는 필드)</p>
+    <div class="fix"><b>조치 →</b> build에 <code>tsc --noEmit</code> 게이트(또는 CI) 추가 · soil-script.ts 부채부터 단계 해소 · CLAUDE.md 기록 정정</div>
+  </div>
+
+  <div class="finding crit">
+    <div class="ftitle"><span class="sev crit">CRITICAL</span><span class="verified">✅ 검증됨</span>
+      VWORLD API 키 하드코딩 + git 커밋됨</div>
+    <p>평문 키가 소스에 박혀 있고 <code>git ls-files</code>에 추적 중. <code>docs/</code>로도 동기화되어 GitHub Pages 공개 가능 → 누구나 키 수집 → 쿼터 소진/비용/서비스 거부.</p>
+    <p class="loc">근거: <span class="path">src/shared/network-config.ts:16</span> · 사용처 <span class="path">src/soil/soil-script.ts:4777</span></p>
+    <div class="fix"><b>조치 →</b> 키 즉시 <b>폐기·재발급</b> · 클라이언트 번들에서 제거 · 메인 프로세스 env/safeStorage로 주입 · VWORLD IP/Referer 제한 적용</div>
+  </div>
+
+  <div class="finding crit">
+    <div class="ftitle"><span class="sev crit">CRITICAL</span><span class="relay">relay</span>
+      프로덕션 의존성 Critical CVE (protobufjs via firebase/grpc)</div>
+    <p><code>npm audit --omit=dev</code> 기준 prod 5건(critical 1, high 1, moderate 3). protobuf 디코드 경로 RCE/프로토타입 오염 가능. dompurify moderate(GHSA-cmwh-pvxp-8882) 포함.</p>
+    <p class="loc">근거: <span class="path">package.json</span> · firebase → @grpc/grpc-js → protobufjs</p>
+    <div class="fix"><b>조치 →</b> <code>npm update firebase dompurify</code> 후 <code>npm ls protobufjs</code>로 패치 확인 · <code>npm audit</code> 재확인</div>
+  </div>
+
+  <div class="finding high">
+    <div class="ftitle"><span class="sev high">HIGH</span><span class="verified">✅ 검증됨</span>
+      <code>setWindowOpenHandler</code> 부재 — 임의 새 창/외부 네비게이션 미차단</div>
+    <p><span class="path">src/index.ts</span>에 <code>setWindowOpenHandler</code> <b>0건</b>, <code>will-navigate</code>만 2건.
+       will-navigate는 같은 창 이동만 막고 <code>window.open()</code>/<code>target=_blank</code> 새 창 생성은 못 막음 → XSS·악성 링크가 임의 URL을 새 창에 로드.</p>
+    <div class="fix"><b>조치 →</b> <code>setWindowOpenHandler(()=>({action:'deny'}))</code> + 외부 링크는 <code>shell.openExternal</code> · <code>web-contents-created</code>에도 적용</div>
+  </div>
+
+  <div class="finding high">
+    <div class="ftitle"><span class="sev high">HIGH</span><span class="verified">✅ 검증됨</span>
+      HTML meta CSP가 <code>unsafe-eval</code> + <code>unsafe-inline</code> 허용</div>
+    <p>프로덕션은 <code>loadFile(docsPath)</code>로 약한 meta CSP 문서를 로드. 헤더 CSP는 강하나 meta가 약화시킴.
+       사용자 입력(시료/생산자) 렌더링에 직접 <code>innerHTML=</code> 다수(189곳 중 일부 DOMPurify 미경유).</p>
+    <p class="loc">근거: <span class="path">src/index.html:8</span> · <span class="path">docs/index.html:8</span> · <span class="path">src/water/water-script.ts:2483</span></p>
+    <div class="fix"><b>조치 →</b> meta CSP에서 <code>unsafe-eval</code> 제거(nonce/hash) · 직접 <code>innerHTML</code>을 <code>setInnerHTML</code>(sanitize 래퍼)/<code>textContent</code>로 일원화</div>
+  </div>
+
+  <div class="finding high">
+    <div class="ftitle"><span class="sev high">HIGH</span><span class="verified">✅ 검증됨</span>
+      <code>firestore.rules</code> 부재 — 서버측 인가 미확인</div>
+    <p>리포에 <code>firestore.rules</code>/<code>firebase.json</code> 없음. Firebase 클라이언트 config는 공개이므로 규칙이 없거나 공개면 누구나 시료/생산자 PII 읽기·쓰기 가능.</p>
+    <div class="fix"><b>조치 →</b> 인증 필수 규칙을 리포에 두고 배포(IaC). 콘솔에 이미 있어도 회귀 방지 위해 코드화</div>
+  </div>
+
+  <h2><span class="e">🟡</span>구조 · 품질 — High / Medium</h2>
+  <table>
+    <thead><tr><th style="width:30px">#</th><th>항목</th><th style="width:32%">위치</th><th style="width:26%">조치</th></tr></thead>
+    <tbody>
+      <tr><td>7</td><td><b>5개 도메인 모듈 35~45% 복붙</b> — <code>generateNextReceptionNumber</code>가 모듈마다 달라 <b>접수번호 중복 발번</b> 위험</td>
+        <td><span class="path">soil/water/compost/heavy-metal/pesticide *-script.ts</span></td>
+        <td>95% 동일 함수를 <span class="path">BaseSampleManager.ts</span> template method로 통합</td></tr>
+      <tr><td>8</td><td><b>settings-script.ts 3,041줄</b>, 책임 8종 혼재 (SRP 위반)</td>
+        <td><span class="path">src/settings/settings-script.ts</span></td>
+        <td>auth-file / firebase-config / migration / network-acl / encryption로 분리</td></tr>
+      <tr><td>9</td><td><b><code>any</code> 363회</b> (PesticideSampleManager 95, settings 55…)</td>
+        <td><span class="path">도메인 매니저 다수</span></td>
+        <td><code>unknown</code>+가드로 치환 (<span class="path">form-validator.ts</span> 모범)</td></tr>
+      <tr><td>10</td><td><b>1.5MB JSON 동기 파싱 + localStorage 동기 I/O</b> → UI 프리징. saveLargeFile 청크 진행률은 실제론 일괄 쓰기("가짜")</td>
+        <td><span class="path">BaseSampleManager.ts:649</span> · <span class="path">file-api.ts:410</span></td>
+        <td>대용량은 IndexedDB/Web Worker로 이전</td></tr>
+      <tr><td>11</td><td>Firestore 동기화 실패가 조용히 삼켜짐(<code>return true</code>)</td>
+        <td><span class="path">src/shared/storage-manager.ts:273</span></td>
+        <td>반환값에 cloud 성공 여부 분리</td></tr>
+      <tr><td>12</td><td>메인/팝업 창 4/5개 <code>sandbox</code> 미적용 (heuktoram만 적용)</td>
+        <td><span class="path">src/index.ts:350</span> 등</td>
+        <td><code>sandbox:true</code> 추가 (preload는 invoke만 써 호환)</td></tr>
+      <tr><td>13</td><td><code>vworld-geocode</code> IPC에 <code>isValidSender</code>·rate-limit·<code>encodeURIComponent</code> 누락</td>
+        <td><span class="path">src/index.ts:1580</span></td>
+        <td>sender 검증 + address 검증 + 키 인코딩</td></tr>
+      <tr><td>14</td><td><code>console.log</code> 126회 잔존 (프로덕션 로깅 누수)</td>
+        <td><span class="path">전 모듈</span></td>
+        <td><code>logger</code> 일원화 + <code>no-console</code> lint</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="e">✅</span>잘 된 점 — 그대로 유지</h2>
+  <ul class="good">
+    <li><b>메인 프로세스 path traversal 방어가 모범적</b> — <code>validateFilePath</code>가 realpath·화이트리스트·null byte·URL 인코딩 다중 검증, write/read 핸들러에 실제 적용</li>
+    <li><b>Electron 보안 기본값 준수</b> — <code>contextIsolation:true</code> / <code>nodeIntegration:false</code> 전 창, preload는 화이트리스트 API만 contextBridge 노출</li>
+    <li><b>자격 저장 <code>safeStorage</code> + PBKDF2 600K / AES-256-GCM</b> (OWASP 권장 부합)</li>
+    <li><b>Electron Fuses</b> — RunAsNode off, ASAR 무결성/OnlyLoadFromAsar on · 민감 IPC <code>isValidSender</code> + rate limiter</li>
+    <li><b>시크릿 위생</b> — <code>firebase-auth.json</code>/<code>.env</code>/<code>*.key</code>는 <code>.gitignore</code> 처리되어 미커밋(확인됨)</li>
+    <li><b><code>form-validator.ts</code>는 타입 모범 사례</b> — <code>unknown</code> 기반 입력 + 명시 인터페이스 + factory 패턴, 리팩터링 레퍼런스</li>
+  </ul>
+
+  <h2><span class="e">🎯</span>우선순위 Top 5</h2>
+  <ol class="top">
+    <li>빌드에 <code>tsc --noEmit</code> 게이트 추가 + soil-script.ts 728개 에러 해소 시작 <span class="tag">— 품질 최대 리스크</span></li>
+    <li>VWORLD 키 폐기·재발급 후 클라이언트에서 제거 <span class="tag">— 단순 수정, 즉시</span></li>
+    <li><code>setWindowOpenHandler</code> 추가 + meta CSP <code>unsafe-eval</code> 제거 <span class="tag">— Electron XSS 표면</span></li>
+    <li><code>firestore.rules</code> 추가·배포 <span class="tag">— 서버측 인가의 유일한 방어선</span></li>
+    <li><code>generateNextReceptionNumber</code> 등 발산 중복을 BaseSampleManager로 통합 <span class="tag">— 데이터 정합성 버그 예방</span></li>
+  </ol>
+
+  <footer>
+    생성: Claude Code (oh-my-claudecode) · 리뷰 에이전트 code-reviewer + security-reviewer · 핵심 주장은 <code>tsc</code>/<code>grep</code>/<code>git ls-files</code>로 직접 재현 검증<br>
+    문서 경로: <code>project/docs-internal/code-quality-security-review-2026-06-26.html</code>
+  </footer>
+
+</div>
+</body>
+</html>

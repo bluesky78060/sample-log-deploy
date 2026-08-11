@@ -716,7 +716,7 @@
 /* 농장주소 입력창 크기 확대 및 전체 너비 */
 .compost-navbar ~ .main-content #farmAddressFull {
     height: 44px;
-    font-size: 1rem;
+    font-size: 0.875rem;
     padding: 0.625rem 0.875rem;
     width: 100%;
 }
@@ -1666,4 +1666,25 @@ div.animal-type-options label.checkbox-card.small div.checkbox-content {
 }
 [data-theme="dark"] .col-name:hover {
     background-color: rgba(74, 222, 128, 0.15);
+}
+
+/* ========================================
+   농장주소 자동완성 드롭다운 카드 클리핑 해소
+   .form-card { overflow: hidden } 으로 인해
+   position:absolute 드롭다운이 카드 아래쪽에서 잘리던 문제 수정.
+   의뢰자 카드(form-left-column)에만 overflow:visible 적용.
+   ======================================== */
+.compost-navbar ~ .main-content .form-left-column .form-card {
+    overflow: visible;
+}
+
+/* overflow:visible 시 form-card 의 둥근 모서리가 card-header 에 적용되지 않으므로 명시적으로 보존 */
+.compost-navbar ~ .main-content .form-left-column .form-card .card-header {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+}
+
+/* 자동완성 드롭다운이 옆 카드 위로 떠 보이도록 z-index 보강 */
+.compost-navbar ~ .main-content .lot-address-autocomplete-list {
+    z-index: 1050;
 }
