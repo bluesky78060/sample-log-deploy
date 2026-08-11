@@ -17,6 +17,7 @@
         /* 다크 모드 select 강제 적용 - 최우선 */
         [data-theme="dark"] select#subCategory,
         [data-theme="dark"] select#purpose,
+        [data-theme="dark"] select#landClass1,
         [data-theme="dark"] select#sampleName,
         [data-theme="dark"] .form-card .card-body select {
             -webkit-appearance: none !important;
@@ -33,16 +34,17 @@
         }
         [data-theme="dark"] select#subCategory option,
         [data-theme="dark"] select#purpose option,
+        [data-theme="dark"] select#landClass1 option,
         [data-theme="dark"] select#sampleName option,
         [data-theme="dark"] .form-card .card-body select option {
             background-color: #14532d !important;
             color: #86efac !important;
         }
     </style>
-  <script type="module" crossorigin src="../assets/soil-DmQz8sAH.js"></script>
+  <script type="module" crossorigin src="../assets/soil-nDats322.js"></script>
   <link rel="modulepreload" crossorigin href="../assets/theme-D9sRrs2f.js">
   <link rel="modulepreload" crossorigin href="../assets/tooltip-JbT2gDAN.js">
-  <link rel="modulepreload" crossorigin href="../assets/xlsx-CY41JvjH.js">
+  <link rel="modulepreload" crossorigin href="../assets/xlsx-CXTp_kRf.js">
   <link rel="modulepreload" crossorigin href="../assets/excel-import-manager-CosnIa9F.js">
   <link rel="modulepreload" crossorigin href="../assets/toast-BwdSIJOp.js">
   <link rel="modulepreload" crossorigin href="../assets/bonghwaData-BqvCNwT_.js">
@@ -50,9 +52,9 @@
   <link rel="modulepreload" crossorigin href="../assets/storage-manager-Lyka0lzb.js">
   <link rel="modulepreload" crossorigin href="../assets/firestore-db-Czbcv-7H.js">
   <link rel="modulepreload" crossorigin href="../assets/analysis-db---SrSwsE.js">
-  <link rel="modulepreload" crossorigin href="../assets/cropData---HVh3r7.js">
+  <link rel="modulepreload" crossorigin href="../assets/cropData-CFQUf1e0.js">
   <link rel="stylesheet" crossorigin href="../assets/tooltip-LSJ6cXiO.css">
-  <link rel="stylesheet" crossorigin href="../assets/soil-ByfBTnFm.css">
+  <link rel="stylesheet" crossorigin href="../assets/soil-Dbxe0vKu.css">
   <link rel="stylesheet" crossorigin href="../assets/tailwind-output-D4cT4cf1.css">
 </head>
 
@@ -137,11 +139,13 @@
                 <input type="file" id="loadJsonInput" accept=".json" hidden>
             </label>
             <button type="button" id="downloadTemplateNavBtn" class="util-btn" title="엑셀 서식 다운로드"><span class="material-icons-outlined">file_download</span><span class="util-btn-label">서식</span></button>
-            <label for="excelImportInput" class="util-btn" title="엑셀 가져오기">
+            <button type="button" id="soilImportBtn" class="util-btn" title="엑셀 가져오기">
                 <span class="material-icons-outlined">upload</span>
                 <span class="util-btn-label">가져오기</span>
-                <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" hidden>
-            </label>
+            </button>
+            <!-- ExcelImportManager(서식 다운로드 전용) 바인딩용 — 사용자 트리거 없음(숨김) -->
+            <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" hidden>
+            <label for="excelImportInput" hidden></label>
             <button type="button" id="heuktoramBtn" class="util-btn" title="흙토람 내보내기" style="color:#8B5CF6;"><span class="material-icons-outlined">agriculture</span><span class="util-btn-label">흙토람</span></button>
         </div>
 
@@ -265,6 +269,11 @@
                             <div class="card-body">
                                 <div class="form-row">
                                     <div class="form-field">
+                                        <label for="landClass1">경지구분</label>
+                                        <!-- option은 LAND_CLASS1_OPTIONS로 JS 동적 생성 (농가의뢰 기본) -->
+                                        <select id="landClass1" name="landClass1"></select>
+                                    </div>
+                                    <div class="form-field">
                                         <label for="subCategory">구분</label>
                                         <select id="subCategory" name="subCategory">
                                             <option value="">선택하세요</option>
@@ -341,6 +350,8 @@
                         <option value="2029">2029년</option>
                         <option value="2030">2030년</option>
                     </select>
+                    <!-- option은 LAND_CLASS1_OPTIONS로 JS 동적 생성 ("전체 경지구분" + 12값) -->
+                    <select id="landClass1Tab" class="landclass1-tab appearance-none" title="경지구분 1차"></select>
                     <select id="purposeFilter" class="purpose-filter appearance-none">
                         <option value="">전체 용도</option>
                         <option value="일반재배">🌾 일반재배</option>
@@ -355,6 +366,15 @@
                         <option value="completed">✅ 완료</option>
                     </select>
                     <span class="record-count" id="recordCount">0건</span>
+                    <div id="gongikBulkBar" class="gongik-bulk-bar" style="display:none;">
+                        <span class="gbb-label">공익직불제 일괄</span>
+                        <select id="gongikBulkOrder" class="appearance-none" title="차수">
+                            <option value="1">1차</option>
+                            <option value="2">2차</option>
+                        </select>
+                        <select id="gongikBulkBaseYear" class="appearance-none" title="기준년도"></select>
+                        <button type="button" id="gongikBulkApplyBtn" class="btn-search">일괄 적용</button>
+                    </div>
                 </div>
                 <div class="header-right">
                     <div class="view-toggle">
@@ -391,10 +411,13 @@
                             <th class="col-checkbox"><input type="checkbox" id="selectAll" title="전체 선택"></th>
                             <th class="col-complete">완료</th>
                             <th>접수번호</th>
+                            <th class="col-order gongik-col">차수</th>
                             <th>접수일자</th>
                             <th>구분</th>
-                            <th>목적(용도)</th>
+                            <th class="col-purpose gongik-hide">목적(용도)</th>
+                            <th class="col-landclass1">경지구분</th>
                             <th>성명</th>
+                            <th class="col-bizreg gongik-col">경영체등록번호</th>
                             <th class="col-zipcode">우편번호</th>
                             <th>주소</th>
                             <th>필지 주소</th>
@@ -402,9 +425,10 @@
                             <th>작물명</th>
                             <th>면적</th>
                             <th>전화번호</th>
-                            <th>수령 방법</th>
-                            <th class="col-note">비고</th>
-                            <th class="col-mail-date">발송일자</th>
+                            <th class="col-method gongik-hide">수령 방법</th>
+                            <th class="col-note gongik-hide">비고</th>
+                            <th class="col-mail-date gongik-hide">발송일자</th>
+                            <th class="col-baseyear gongik-col">기준년도</th>
                             <th class="col-action">관리</th>
                         </tr>
                     </thead>
@@ -694,6 +718,10 @@
                         <div class="stats-section">
                             <h4>목적(용도)별</h4>
                             <div class="stats-chart" id="statsByPurpose"></div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>경지구분 1차별</h4>
+                            <div class="stats-chart" id="statsByLandClass"></div>
                         </div>
                     </div>
 

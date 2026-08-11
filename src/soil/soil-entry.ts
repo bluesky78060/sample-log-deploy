@@ -51,3 +51,5 @@ import '../bonghwaData.ts';
 
 // Main script
 import './soil-script.ts';
+// 엑셀 가져오기 5단계 모달 (soil-script 이후 로드 — window.soilManager 위임, SAMPL-1-124)
+import './soil-result-importer.ts';
