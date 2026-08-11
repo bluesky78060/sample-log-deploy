@@ -75,6 +75,8 @@ interface SoilManagerLike {
     sampleLogs?: ExistingLogLike[];
     selectedYear?: number | string;
     getNextNumberForClass?(year: number | string, landClass1: string): number;
+    /** 성토 다음 접수번호 — 'F3' 형태의 문자열을 돌려준다 */
+    generateNextFillReceptionNumber?(landClass1?: string): string;
     addImportedRecord?(record: PreviewRecord): unknown;
 }
 
@@ -908,9 +910,18 @@ export class SoilResultImporter {
         const { rows } = this._parseInput();
         const mgr = getManager();
         const landClass1 = this._state.bulkLandClass || LAND_CLASS1_DEFAULT;
-        const existing = collectExistingNumbers(this._existingLogs(), landClass1);
+        const logs = this._existingLogs();
+
+        // 일반과 성토(F 접두)는 완전히 분리된 채번이라 양쪽을 다 넘겨야 한다.
+        // 한쪽만 넘기면 성토 행 미리보기가 실제 저장 번호와 어긋난다.
+        const existing = collectExistingNumbers(logs, landClass1);
+        const existingFill = collectExistingNumbers(logs, landClass1, { fill: true });
         const nextNumber = typeof mgr?.getNextNumberForClass === 'function'
             ? mgr.getNextNumberForClass(currentYear(mgr), landClass1)
+            : null;
+        // 매니저는 'F3' 문자열을 주므로 숫자만 뽑아 커서로 쓴다
+        const nextFillNumber = typeof mgr?.generateNextFillReceptionNumber === 'function'
+            ? Number.parseInt(mgr.generateNextFillReceptionNumber(landClass1).replace('F', ''), 10)
             : null;
 
         this._state.preview = computePreview({
@@ -921,6 +932,8 @@ export class SoilResultImporter {
             dupPolicy: this._state.dupPolicy,
             existing,
             nextNumber,
+            existingFill,
+            nextFillNumber: Number.isNaN(nextFillNumber) ? null : nextFillNumber,
         });
     }
 

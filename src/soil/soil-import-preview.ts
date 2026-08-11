@@ -78,37 +78,53 @@ export interface ComputePreviewOptions {
     autoNumber?: boolean;
     /** 중복 시 정책 */
     dupPolicy?: DupPolicy;
-    /** 기존 접수번호 집합 (collectExistingNumbers 결과) */
+    /** 기존 접수번호 집합 — 일반 시퀀스 (collectExistingNumbers 결과) */
     existing?: ReadonlySet<string>;
     /**
      * 자동부여 시작 번호. 매니저의 `getNextNumberForClass()` 결과를 넘긴다.
      * 넘기지 않으면 `existing`의 최대값 + 1로 계산한다(매니저 미준비 시 폴백).
      */
     nextNumber?: number | null;
+    /** 기존 접수번호 집합 — 성토 시퀀스 (collectExistingNumbers(logs, class, {fill:true})) */
+    existingFill?: ReadonlySet<string>;
+    /**
+     * 성토 자동부여 시작 번호(정수, F 접두 없이). 매니저의
+     * `generateNextFillReceptionNumber()`가 만드는 값과 같아야 한다.
+     */
+    nextFillNumber?: number | null;
+}
+
+export interface CollectExistingOptions {
+    /** true면 성토(F) 시퀀스 풀, false(기본)면 일반 시퀀스 풀 */
+    fill?: boolean;
 }
 
 /**
- * 기존 레코드에서 "같은 연도 + 같은 경지구분1차" 범위의 접수번호 집합을 만든다.
+ * 기존 레코드에서 "같은 경지구분1차 + 같은 시퀀스(일반/성토)" 범위의 접수번호 집합을 만든다.
  *
- * 제외 조건은 매니저의 `getNextNumberForClass`와 같아야 한다 — 어긋나면
- * 미리보기가 보여준 번호와 실제 저장 번호가 달라진다:
- * - 성토(`subCategory === '성토'`)는 별도 시퀀스
- * - `F` 접두 번호(성토 채번)도 제외
- * - 서브넘버(`5-1`)는 기본번호(`5`)로 접어 넣는다
+ * 이 함수의 분류 규칙은 매니저 `reception-number.ts`의 `computeNextNumber`와
+ * **한 줄씩 같아야 한다** — 어긋나면 미리보기가 보여준 번호와 실제 저장 번호가 달라진다:
+ * - 성토(`subCategory === '성토'`)는 F 접두의 별 시퀀스이고, 두 시퀀스는 서로를 제외한다
+ * - 일반 시퀀스에서는 `F` 접두 번호를 제외한다
+ * - 성토 시퀀스에서는 `F`를 떼고 숫자만 비교한다
+ * - 서브넘버(`5-1`)는 본번(`5`)으로 접어 넣는다
  */
 export function collectExistingNumbers(
     logs: readonly ExistingLogLike[] | null | undefined,
     landClass1: string,
+    opts?: CollectExistingOptions,
 ): Set<string> {
+    const fill = !!opts?.fill;
     const set = new Set<string>();
     for (const log of logs ?? []) {
         if (!log || !log.receptionNumber) continue;
         if ((log.landClass1 || LAND_CLASS1_DEFAULT) !== landClass1) continue;
-        if (log.subCategory === '성토') continue;
+        // 성토/일반 체계 분리 (computeNextNumber와 동일 조건)
+        if (fill !== (log.subCategory === '성토')) continue;
 
         const base = String(log.receptionNumber).split('-')[0].trim();
-        if (base.startsWith('F')) continue;
-        set.add(base);
+        if (!fill && base.startsWith('F')) continue;
+        set.add(fill ? base.replace('F', '') : base);
     }
     return set;
 }
@@ -138,6 +154,7 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
     const landClass1 = opts.landClass1 || LAND_CLASS1_DEFAULT;
     const dupPolicy: DupPolicy = opts.dupPolicy ?? 'skip';
     const existing = opts.existing ?? new Set<string>();
+    const existingFill = opts.existingFill ?? new Set<string>();
 
     const mappedKeys = Object.keys(mapping);
     const hasIdentity = mapping.name != null || mapping.lotAddress != null || mapping.receptionNumber != null;
@@ -155,9 +172,15 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
      * (다음 행부터는 `null + 1 = 1`로 이어져 1번부터 다시 시작한다.)
      */
     let nextNum: number = opts.nextNumber ?? inferNextNumber(existing);
+    /** 성토(F) 시퀀스 커서 — 일반과 완전히 분리된 채번이다 */
+    let nextFill: number = opts.nextFillNumber ?? inferNextNumber(existingFill);
 
-    /** 이 배치 안에서 이미 쓴 번호 — 기존 레코드와 별도로 추적해야 배치 내 충돌을 잡는다 */
+    /**
+     * 이 배치 안에서 이미 쓴 번호 — 기존 레코드와 별도로 추적해야 배치 내 충돌을 잡는다.
+     * 두 시퀀스가 독립이므로 집합도 따로 둔다(일반 5와 성토 F5는 충돌이 아니다).
+     */
     const seenInBatch = new Set<string>();
+    const seenFillInBatch = new Set<string>();
     const items: PreviewItem[] = [];
     const stats: PreviewStats = { total: rows.length, new: 0, dup: 0, err: 0 };
 
@@ -198,27 +221,40 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
             if (!recNo) useAuto = true;
         }
 
+        // 성토는 F 접두의 별 시퀀스다. 이 분기가 없으면 성토 행에 일반 번호가 찍히고,
+        // 저장된 성토 레코드는 일반 풀에서 제외돼 카운터가 전진하지 않아 전 행이 같은
+        // 번호로 저장된다 (SAMPL-1-124 적대적 검증에서 1,1,1 재현).
+        const isFill = rec.subCategory === '성토';
+        const pool = isFill ? existingFill : existing;
+        const seenPool = isFill ? seenFillInBatch : seenInBatch;
+
         if (useAuto) {
             // 기존·배치 양쪽을 피해 증가시킨다
-            let candidate = nextNum;
-            while (existing.has(String(candidate)) || seenInBatch.has(String(candidate))) candidate++;
-            recNo = String(candidate);
-            nextNum = candidate + 1;
-            seenInBatch.add(recNo);
+            let candidate = isFill ? nextFill : nextNum;
+            while (pool.has(String(candidate)) || seenPool.has(String(candidate))) candidate++;
+            seenPool.add(String(candidate));
+            recNo = isFill ? `F${candidate}` : String(candidate);
+            if (isFill) nextFill = candidate + 1;
+            else nextNum = candidate + 1;
             stats.new++;
             items.push({ status: 'new', display: recNo, rec: { ...rec }, auto: true });
         } else {
             const base = recNo.split('-')[0].trim();
-            const isDup = existing.has(base) || seenInBatch.has(base);
+            // 성토 시퀀스는 F를 떼고 숫자만 비교한다 (computeNextNumber와 동일)
+            const key = isFill ? base.replace('F', '') : base;
+            const isDup = pool.has(key) || seenPool.has(key);
             const willBeSaved = !(isDup && dupPolicy === 'skip');
-            seenInBatch.add(base);
+            seenPool.add(key);
 
             // 수동 번호가 실제로 저장되면 매니저의 max+1 채번이 그 번호를 넘어간다.
             // 미리보기 커서도 같이 올려야 뒤따르는 자동부여 행의 표시 번호가 실제와 맞는다
             // (예: 기존 최대 10에 수동 50을 저장하면 다음 자동번호는 11이 아니라 51이다).
             if (willBeSaved) {
-                const baseNum = Number.parseInt(base, 10);
-                if (!Number.isNaN(baseNum) && baseNum + 1 > nextNum) nextNum = baseNum + 1;
+                const baseNum = Number.parseInt(key, 10);
+                if (!Number.isNaN(baseNum)) {
+                    if (isFill) { if (baseNum + 1 > nextFill) nextFill = baseNum + 1; }
+                    else if (baseNum + 1 > nextNum) nextNum = baseNum + 1;
+                }
             }
 
             if (isDup) {

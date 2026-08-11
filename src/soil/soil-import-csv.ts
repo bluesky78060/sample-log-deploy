@@ -17,10 +17,15 @@ export const ERROR_CSV_HEADER = [
  * 인젝션 방지: 엑셀·구글시트는 `=`/`+`/`-`/`@`/`|`로 시작하는 셀을 수식으로 해석한다.
  * `=cmd|'/c calc'!A1` 같은 값이 그대로 들어가면 파일을 연 사람의 기기에서 실행될 수 있어
  * 앞에 작은따옴표를 넣어 문자열로 고정한다.
+ *
+ * **선행 공백·제어문자를 벗긴 뒤 판정한다.** 엑셀은 셀 앞의 탭(0x09)·CR(0x0d)을
+ * 버리고 그 뒤를 수식으로 읽으므로, 첫 글자만 보면 `\t=cmd|...`가 방어를 그대로 통과한다
+ * (탭은 인용 트리거 목록에도 없어 무가공으로 나간다 — SAMPL-1-124 적대적 검증).
  */
 export function csvCell(val: unknown): string {
     let s = String(val ?? '');
-    if (s.length > 0 && '=+-@|'.includes(s[0])) s = "'" + s;
+    const head = s.replace(/^[\s\u0000-\u001f\u00a0]+/, '')[0];
+    if (head && '=+-@|'.includes(head)) s = "'" + s;
     if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
         s = '"' + s.replace(/"/g, '""') + '"';
     }

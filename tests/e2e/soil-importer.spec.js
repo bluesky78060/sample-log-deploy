@@ -21,6 +21,39 @@ const PASTE_ROWS = [
     '김철수\t010-3333-4444\t물야면 오전리 45\t고추\t800\t밭\t일반재배',
 ];
 
+/**
+ * 저장된 레코드를 **localStorage에서** 읽는다.
+ *
+ * 메모리 배열(`soilManager.sampleLogs`)만 보면 `saveLogs()`를 통째로 no-op으로 만들어도
+ * 테스트가 통과한다. 새로고침 후 저장소를 읽어야 지속성까지 검증된다.
+ */
+async function readPersisted(page) {
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+    return page.evaluate(() => {
+        const year = window.soilManager.selectedYear;
+        const raw = localStorage.getItem(`test_soilSampleLogs_${year}`);
+        return (raw ? JSON.parse(raw) : []).map((l) => ({
+            receptionNumber: String(l.receptionNumber ?? ''),
+            name: l.name ?? '',
+            subCategory: l.subCategory ?? '',
+            landClass1: l.landClass1 ?? '',
+        }));
+    });
+}
+
+/** 접수번호가 모두 채워져 있고 중복이 없는지 단정한다 */
+function expectUniqueReceptionNumbers(records) {
+    const nums = records.map((r) => r.receptionNumber);
+    for (const n of nums) {
+        expect(n).not.toBe('');
+        expect(n).not.toBe('null');
+        expect(n).not.toBe('undefined');
+    }
+    expect(new Set(nums).size, `접수번호 중복: ${nums.join(', ')}`).toBe(nums.length);
+}
+
 /** 모달을 열고 붙여넣기 모드로 데이터를 입력한다 */
 async function openWithPastedData(page, text) {
     await page.click('#soilImportBtn');
@@ -146,11 +179,94 @@ test.describe('토양 엑셀 가져오기 모달', () => {
         expect(saved).toHaveLength(2);
         expect(saved.map((s) => s.name)).toEqual(['홍길동', '김철수']);
         expect(saved.every((s) => s.landClass1 === '농가의뢰')).toBe(true);
-        // 자동부여이므로 빈 접수번호가 남거나 'null' 문자열이 되어선 안 된다
-        for (const s of saved) {
-            expect(s.receptionNumber).not.toBe('');
-            expect(s.receptionNumber).not.toBe('null');
-        }
+
+        // 메모리가 아니라 저장소를 읽어 지속성까지 확인한다
+        const persisted = await readPersisted(page);
+        expect(persisted.map((s) => s.name)).toEqual(['홍길동', '김철수']);
+        expectUniqueReceptionNumbers(persisted);
+        // 빈 저장소에서 시작했으므로 1, 2가 순서대로 부여된다
+        expect(persisted.map((s) => s.receptionNumber)).toEqual(['1', '2']);
+    });
+
+    test('구분=성토 행은 F 접두 시퀀스로 채번되고 중복되지 않는다', async ({ page }) => {
+        // 수정 전에는 성토 행 전부가 '1'로 저장됐다 (적대적 검증 발견).
+        // 미리보기는 1,2,3을 보여주는데 실제로는 1,1,1이 들어가 대장 무결성이 깨졌다.
+        const modal = await openWithPastedData(page, [
+            PASTE_HEADER,
+            '성토1\t010-1111-1111\t봉화읍 내성리 1\t-\t100\t성토\t일반재배',
+            '성토2\t010-2222-2222\t봉화읍 내성리 2\t-\t200\t성토\t일반재배',
+            '성토3\t010-3333-3333\t봉화읍 내성리 3\t-\t300\t성토\t일반재배',
+        ].join('\n'));
+        await modal.locator('[data-act="automap"]').click();
+
+        // 미리보기가 F 접두를 보여준다
+        const shown = await modal.locator('.sri-pv-table tbody tr td:nth-child(2)').allTextContents();
+        expect(shown).toEqual(['F1', 'F2', 'F3']);
+
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const persisted = await readPersisted(page);
+        expect(persisted).toHaveLength(3);
+        expect(persisted.every((s) => s.subCategory === '성토')).toBe(true);
+        expectUniqueReceptionNumbers(persisted);
+        // 미리보기가 보여준 번호와 실제 저장 번호가 같아야 한다
+        expect(persisted.map((s) => s.receptionNumber)).toEqual(['F1', 'F2', 'F3']);
+    });
+
+    test('일반·성토가 섞인 배치도 각자의 시퀀스로 채번된다', async ({ page }) => {
+        const modal = await openWithPastedData(page, [
+            PASTE_HEADER,
+            '일반A\t010-1111-1111\t봉화읍 내성리 1\t벼\t100\t논\t일반재배',
+            '성토A\t010-2222-2222\t봉화읍 내성리 2\t-\t200\t성토\t일반재배',
+            '일반B\t010-3333-3333\t봉화읍 내성리 3\t고추\t300\t밭\t일반재배',
+            '성토B\t010-4444-4444\t봉화읍 내성리 4\t-\t400\t성토\t일반재배',
+        ].join('\n'));
+        await modal.locator('[data-act="automap"]').click();
+
+        const shown = await modal.locator('.sri-pv-table tbody tr td:nth-child(2)').allTextContents();
+        expect(shown).toEqual(['1', 'F1', '2', 'F2']);
+
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const persisted = await readPersisted(page);
+        expectUniqueReceptionNumbers(persisted);
+        expect(persisted.map((s) => s.receptionNumber)).toEqual(['1', 'F1', '2', 'F2']);
+    });
+
+    test('기존 레코드가 있으면 그 다음 번호부터 이어진다', async ({ page }) => {
+        // beforeEach가 localStorage를 비우므로, 여기서만 기존 레코드를 심어
+        // "빈 저장소에서만 통과하는 테스트" 사각지대를 덮는다.
+        await page.evaluate(() => {
+            const year = window.soilManager.selectedYear;
+            localStorage.setItem(`test_soilSampleLogs_${year}`, JSON.stringify([
+                { id: 'seed-1', receptionNumber: '7', name: '기존일반', landClass1: '농가의뢰', subCategory: '논', parcels: [] },
+                { id: 'seed-2', receptionNumber: 'F4', name: '기존성토', landClass1: '농가의뢰', subCategory: '성토', parcels: [] },
+            ]));
+        });
+        // 매니저는 init 시점에 저장소를 읽으므로, 심은 뒤 새로고침해야 메모리에 반영된다
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => (window.soilManager?.sampleLogs || []).length === 2);
+
+        const modal = await openWithPastedData(page, [
+            PASTE_HEADER,
+            '신규일반\t010-1111-1111\t봉화읍 내성리 9\t벼\t100\t논\t일반재배',
+            '신규성토\t010-2222-2222\t봉화읍 내성리 10\t-\t200\t성토\t일반재배',
+        ].join('\n'));
+        await modal.locator('[data-act="automap"]').click();
+
+        // 기존 최대 일반 7 → 8, 기존 최대 성토 F4 → F5
+        const shown = await modal.locator('.sri-pv-table tbody tr td:nth-child(2)').allTextContents();
+        expect(shown).toEqual(['8', 'F5']);
+
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const persisted = await readPersisted(page);
+        expectUniqueReceptionNumbers(persisted);
+        expect(persisted.map((s) => s.receptionNumber).sort()).toEqual(['7', '8', 'F4', 'F5']);
     });
 
     test('201행이면 미리보기는 200행만 보여주고 전체를 가져온다', async ({ page }) => {
@@ -170,9 +286,13 @@ test.describe('토양 엑셀 가져오기 모달', () => {
         await modal.locator('[data-act="import"]').click();
         await expect(modal).toBeHidden();
 
-        // 표시 제한이 저장까지 자르지 않는다
-        const count = await page.evaluate(() => (window.soilManager.sampleLogs || []).length);
-        expect(count).toBe(201);
+        // 표시 제한이 저장까지 자르지 않는다 — 메모리가 아니라 저장소로 확인한다
+        const persisted = await readPersisted(page);
+        expect(persisted).toHaveLength(201);
+        expectUniqueReceptionNumbers(persisted);
+        // 빈 저장소에서 시작했으므로 1..201이 빠짐없이 부여돼야 한다
+        expect(persisted.map((s) => Number(s.receptionNumber)).sort((a, b) => a - b))
+            .toEqual(Array.from({ length: 201 }, (_, i) => i + 1));
     });
 
     test('실제 .xlsx 파일 업로드 → 시트 선택·헤더 행·자동매핑·가져오기', async ({ page }) => {

@@ -27,6 +27,24 @@ describe('csvCell — CSV 인젝션 방지', () => {
         expect(csvCell('-500')).toBe("'-500");
     });
 
+    it('선행 탭·CR로 가드를 우회할 수 없다 (적대적 검증 발견)', () => {
+        // 엑셀은 셀 앞의 탭/CR을 버리고 그 뒤를 수식으로 읽는다.
+        // 첫 글자만 보면 이 값들이 방어를 그대로 통과한다 — 탭은 인용 트리거도 아니라 무가공으로 나간다.
+        expect(csvCell("\t=cmd|'/c calc'!A1")).toBe("'\t=cmd|'/c calc'!A1");
+        expect(csvCell('\r=1+1')).toBe('"\'\r=1+1"'); // CR은 인용까지 적용된다
+        expect(csvCell('\n=1+1')).toBe('"\'\n=1+1"');
+    });
+
+    it('선행 공백·NBSP도 벗긴 뒤 판정한다', () => {
+        expect(csvCell('  =1+1')).toBe("'  =1+1");
+        expect(csvCell(' =1+1')).toBe("' =1+1");
+    });
+
+    it('선행 공백만 있고 수식이 아니면 접두하지 않는다', () => {
+        expect(csvCell('  홍길동')).toBe('  홍길동');
+        expect(csvCell('\t벼')).toBe('\t벼');
+    });
+
     it('중간에 나오는 수식 문자는 건드리지 않는다', () => {
         expect(csvCell('홍길동=대표')).toBe('홍길동=대표');
         expect(csvCell('010-1234-5678')).toBe('010-1234-5678');

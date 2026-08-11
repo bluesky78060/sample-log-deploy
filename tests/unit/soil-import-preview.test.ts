@@ -277,6 +277,107 @@ describe('computePreview — 수동 번호와 자동부여가 섞인 배치', ()
     });
 });
 
+describe('collectExistingNumbers — 성토 시퀀스', () => {
+    const logs: ExistingLogLike[] = [
+        { receptionNumber: '5', landClass1: '농가의뢰' },
+        { receptionNumber: 'F2', landClass1: '농가의뢰', subCategory: '성토' },
+        { receptionNumber: 'F7-1', landClass1: '농가의뢰', subCategory: '성토' },
+        { receptionNumber: '3', landClass1: '농가의뢰', subCategory: '성토' }, // F 없는 성토
+        { receptionNumber: 'F9', landClass1: '공익직불제', subCategory: '성토' },
+    ];
+
+    it('fill=true면 성토만 모으고 F를 떼서 숫자로 넣는다', () => {
+        const s = collectExistingNumbers(logs, '농가의뢰', { fill: true });
+        expect([...s].sort()).toEqual(['2', '3', '7']);
+    });
+
+    it('두 시퀀스가 서로를 제외한다', () => {
+        const normal = collectExistingNumbers(logs, '농가의뢰');
+        const fill = collectExistingNumbers(logs, '농가의뢰', { fill: true });
+        expect([...normal]).toEqual(['5']);        // 성토 3건 전부 제외
+        expect(fill.has('5')).toBe(false);          // 일반 5는 성토 풀에 없다
+    });
+
+    it('경지구분 범위는 성토에도 적용된다', () => {
+        expect([...collectExistingNumbers(logs, '공익직불제', { fill: true })]).toEqual(['9']);
+    });
+});
+
+describe('computePreview — 성토(F) 시퀀스', () => {
+    // 매니저는 성토를 F 접두의 별 시퀀스로 채번한다(generateNextFillReceptionNumber).
+    // 미리보기가 이를 나누지 않으면 성토 행에 일반 번호가 찍히고,
+    // 저장된 성토 레코드가 일반 풀에서 제외돼 전 행이 같은 번호가 된다.
+    const MAP_FILL = { name: 0, lotAddress: 1, subCategory: 2 };
+
+    it('구분=성토 행은 F 접두로 채번되고 번호가 전진한다 (적대적 검증 발견 회귀)', () => {
+        const r = computePreview({
+            rows: [['A', '주소1', '성토'], ['B', '주소2', '성토'], ['C', '주소3', '성토']],
+            mapping: MAP_FILL, nextFillNumber: 1,
+        })!;
+        expect(r.items.map((i) => i.display)).toEqual(['F1', 'F2', 'F3']);
+        // 수정 전에는 1, 1, 1로 저장돼 유일성이 깨졌다
+        expect(new Set(r.items.map((i) => i.display)).size).toBe(3);
+    });
+
+    it('일반과 성토가 섞이면 각자의 시퀀스로 채번된다', () => {
+        const r = computePreview({
+            rows: [['A', '주소1', '논'], ['B', '주소2', '성토'], ['C', '주소3', '밭'], ['D', '주소4', '성토']],
+            mapping: MAP_FILL, nextNumber: 10, nextFillNumber: 3,
+        })!;
+        expect(r.items.map((i) => i.display)).toEqual(['10', 'F3', '11', 'F4']);
+    });
+
+    it('성토 커서는 기존 성토 번호를 건너뛴다', () => {
+        const r = computePreview({
+            rows: [['A', '주소1', '성토'], ['B', '주소2', '성토']],
+            mapping: MAP_FILL, existingFill: new Set(['3', '4']), nextFillNumber: 3,
+        })!;
+        expect(r.items.map((i) => i.display)).toEqual(['F5', 'F6']);
+    });
+
+    it('일반 5와 성토 F5는 충돌이 아니다', () => {
+        const r = computePreview({
+            rows: [['A', '주소1', '논'], ['B', '주소2', '성토']],
+            mapping: MAP_FILL,
+            existing: new Set(['4']), nextNumber: 5,
+            existingFill: new Set(['4']), nextFillNumber: 5,
+        })!;
+        expect(r.items.map((i) => i.display)).toEqual(['5', 'F5']);
+        expect(r.stats.dup).toBe(0);
+    });
+
+    it('성토 수동 번호는 성토 풀로 중복 판정한다', () => {
+        const r = computePreview({
+            rows: [['F3', 'A', '주소', '성토'], ['F9', 'B', '주소', '성토']],
+            mapping: { receptionNumber: 0, name: 1, lotAddress: 2, subCategory: 3 },
+            existing: new Set(['3']),          // 일반 3은 성토 판정에 영향 없어야 한다
+            existingFill: new Set(['3']),
+        })!;
+        expect(r.items[0].status).toBe('dup');  // 성토 3과 충돌
+        expect(r.items[1].status).toBe('new');
+    });
+
+    it('성토 수동 번호가 저장되면 성토 커서만 올라간다', () => {
+        const r = computePreview({
+            rows: [['F50', 'A', '주소', '성토'], ['', 'B', '주소', '성토'], ['', 'C', '주소', '논']],
+            mapping: { receptionNumber: 0, name: 1, lotAddress: 2, subCategory: 3 },
+            nextNumber: 7, nextFillNumber: 2,
+        })!;
+        expect(r.items[1].display).toBe('F51'); // 성토 커서 상향
+        expect(r.items[2].display).toBe('7');   // 일반 커서는 그대로
+    });
+
+    it('성토 자동부여 행의 rec에는 receptionNumber를 넣지 않는다 (매니저가 채번한다)', () => {
+        const r = computePreview({
+            rows: [['A', '주소', '성토']], mapping: MAP_FILL, nextFillNumber: 4,
+        })!;
+        expect(r.items[0].display).toBe('F4');
+        expect(r.items[0].auto).toBe(true);
+        expect(r.items[0].rec.receptionNumber).toBeUndefined();
+        expect(r.items[0].rec.subCategory).toBe('성토');
+    });
+});
+
 describe('computePreview — 집계와 경지구분', () => {
     it('stats와 willImport가 맞물린다 (new + 덮어쓰기 dup)', () => {
         const r = computePreview({
