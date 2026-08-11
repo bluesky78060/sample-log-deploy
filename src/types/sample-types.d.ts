@@ -158,6 +158,21 @@ interface SoilSample extends BaseSample {
   /** Sub-category */
   subCategory?: string;
 
+  /** 경지구분 1차 (landClass1) — 접수번호 독립 채번/통계/필터 기준 */
+  landClass1?: string;
+
+  /** 공익직불제 전용 — 차수 ('1' | '2') */
+  gongikOrder?: string;
+
+  /** 공익직불제 전용 — 기준년도(이행점검명) */
+  gongikBaseYear?: string;
+
+  /** 공익직불제 전용 — 경영체등록번호 (엑셀 가져오기에서 채워짐, 표시 전용) */
+  businessRegNo?: string;
+
+  /** 필지 PNU 코드 보존 (주소 자동완성/엑셀 가져오기 시 채워짐) */
+  basePnu?: string;
+
   /** Address information */
   address?: string;
   addressRoad?: string;

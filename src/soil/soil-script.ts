@@ -5,6 +5,13 @@
 
 import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow, ParsedParcelAddress, RegionSelectionModalData, SoilStatistics } from '../types/sample-types';
 import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleManager';
+import { computeNextNumber } from './reception-number';
+import {
+    resolveParcelCategory as resolveParcelCategoryPure,
+    resolveParcelPurpose as resolveParcelPurposePure,
+    cropsFromDisplay as cropsFromDisplayPure,
+} from './soil-parcel-fallback';
+import { selectGongikTargets } from './gongik-targets';
 
 /**
  * Soil 전용 검색 필터 (BaseSearchFilter 확장)
@@ -12,6 +19,34 @@ import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleMa
 interface SoilSearchFilter extends BaseSearchFilter {
     lot: string;
     purpose: string;
+    landClass1?: string;
+}
+
+/**
+ * 엑셀 가져오기(SoilResultImporter) → addImportedRecord 입력 레코드.
+ * 컬럼 매핑 결과이므로 모든 필드가 선택적이다.
+ */
+interface ImportedSoilRecord {
+    receptionNumber?: string | number;
+    date?: string;
+    name?: string;
+    phoneNumber?: string;
+    address?: string;
+    addressPostcode?: string;
+    addressRoad?: string;
+    addressDetail?: string;
+    subCategory?: string;
+    purpose?: string;
+    landClass1?: string;
+    receptionMethod?: string;
+    note?: string;
+    businessRegNo?: string;
+    gongikOrder?: string;
+    gongikBaseYear?: string;
+    basePnu?: string;
+    lotAddress?: string;
+    cropsDisplay?: string;
+    area?: string | number;
 }
 
 // ========================================
@@ -19,8 +54,48 @@ interface SoilSearchFilter extends BaseSearchFilter {
 // ========================================
 
 const SAMPLE_TYPE = '토양';
-const STORAGE_KEY = 'test_soilSampleLogs';
+/**
+ * localStorage 키 접두 (연도별로 `_{year}`가 붙는다 — BaseSampleManager.getStorageKey).
+ * 가져오기 모달이 매니저 준비 전에 열릴 때 직접 읽어야 해서 export한다 — 값을 두 곳에
+ * 적어두면 어긋나도 컴파일러가 잡아주지 못하고, 중복 판정이 조용히 전부 '신규'가 된다.
+ */
+export const STORAGE_KEY = 'test_soilSampleLogs';
 const AUTO_SAVE_FILE = 'soil-autosave.json';
+
+// ========================================
+// 경지구분 1차 (landClass1)
+// ========================================
+
+/**
+ * 경지구분 1차 값 목록 (단일 소스 — 폼/탭 option은 이 배열로 JS 동적 생성).
+ * '공익직불제'는 옵션 값으로만 존재하며 전용 UI/로직은 없음(일반 경지구분처럼 동작).
+ */
+const LAND_CLASS1_OPTIONS: readonly string[] = ['개량제', '전략', '직불', '자체', '기타', '친환경', '유기농', '무농약', 'GAP', '농가의뢰', '대표필지', '공익직불제'];
+
+/** 기본 경지구분 1차 */
+const LAND_CLASS1_DEFAULT = '농가의뢰';
+
+/** 공익직불제 기준년도(이행점검명) 선택지 (임시값, 추후 교체 가능) */
+const GONGIK_BASE_YEAR_OPTIONS: readonly string[] = ['2024토양화학성분 기준', '2025토양화학성분 기준', '2026토양화학성분 기준', '2027토양화학성분 기준'];
+
+/**
+ * 통계용 라벨·색상 매핑. LAND_CLASS1_OPTIONS 변경 시 함께 갱신할 것.
+ * 매핑 외 값은 category-other 폴백.
+ */
+const LAND_CLASS1_STATS_MAPPING: Record<string, { label: string; class: string }> = {
+    '농가의뢰': { label: '🧑‍🌾 농가의뢰', class: 'purpose-general' },
+    '공익직불제': { label: '🏛️ 공익직불제', class: 'purpose-gap' },
+    '대표필지': { label: '📍 대표필지', class: 'category-facility' },
+    '개량제': { label: '🧪 개량제', class: 'category-fill' },
+    '전략': { label: '🎯 전략', class: 'category-fruit' },
+    '직불': { label: '💰 직불', class: 'purpose-lowcarbon' },
+    '자체': { label: '🏢 자체', class: 'category-facility' },
+    '친환경': { label: '🌿 친환경', class: 'purpose-nopesticide' },
+    '유기농': { label: '♻️ 유기농', class: 'purpose-organic' },
+    '무농약': { label: '🍃 무농약', class: 'category-field' },
+    'GAP': { label: '✅ GAP', class: 'purpose-gap' },
+    '기타': { label: '📦 기타', class: 'category-other' }
+};
 
 // ========================================
 // SoilSampleManager 클래스
@@ -58,6 +133,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     receptionNumberInput: HTMLInputElement | null;
     subCategorySelect: HTMLSelectElement | null;
     purposeSelect: HTMLSelectElement | null;
+    landClass1Select: HTMLSelectElement | null;
+    landClass1Tab: HTMLSelectElement | null;
     receptionMethodBtns: NodeListOf<HTMLButtonElement> | null;
     receptionMethodInput: HTMLInputElement | null;
     navSubmitBtn: HTMLButtonElement | null;
@@ -163,6 +240,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         this.receptionNumberInput = null;
         this.subCategorySelect = null;
         this.purposeSelect = null;
+        this.landClass1Select = null;
+        this.landClass1Tab = null;
         this.receptionMethodBtns = null;
         this.receptionMethodInput = null;
         this.navSubmitBtn = null;
@@ -252,6 +331,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         this.receptionNumberInput = document.getElementById('receptionNumber');
         this.subCategorySelect = document.getElementById('subCategory');
         this.purposeSelect = document.getElementById('purpose');
+        this.landClass1Select = document.getElementById('landClass1') as HTMLSelectElement | null;
+        this.landClass1Tab = document.getElementById('landClass1Tab') as HTMLSelectElement | null;
+        // 경지구분 1차 폼/탭 option 동적 생성 (LAND_CLASS1_OPTIONS 단일 소스)
+        this.populateLandClass1Options();
         this.receptionMethodBtns = document.querySelectorAll('.reception-method-btn');
         this.receptionMethodInput = document.getElementById('receptionMethod');
         this.navSubmitBtn = document.getElementById('navSubmitBtn');
@@ -618,6 +701,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         if (!this.tableBody) return;
         this.tableBody.innerHTML = '';
 
+        // 공익직불제 탭 선택 시 전용 컬럼(차수·경영체등록번호·기준년도) 표시 + 일괄바
+        const gongikOn = this.currentSearchFilter?.landClass1 === '공익직불제';
+        (document.getElementById('logTable') as HTMLElement | null)?.classList.toggle('gongik-on', gongikOn);
+        this._syncGongikBulkBar();
+
         this.updateRecordCount();
 
         if (!logs || logs.length === 0) {
@@ -649,6 +737,31 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         this.renderCurrentPage();
     }
 
+    /** 공익직불제 탭일 때만 차수·기준년도 일괄 적용 바 표시 */
+    _syncGongikBulkBar(): void {
+        const bar = document.getElementById('gongikBulkBar') as HTMLElement | null;
+        if (bar) bar.style.display = (this.currentSearchFilter?.landClass1 === '공익직불제') ? '' : 'none';
+    }
+
+    /** 공익직불제 전체 레코드에 차수·기준년도 일괄 적용 */
+    applyGongikBulk(): void {
+        const order = (document.getElementById('gongikBulkOrder') as HTMLSelectElement | null)?.value || '1';
+        const baseYear = (document.getElementById('gongikBulkBaseYear') as HTMLSelectElement | null)?.value || '';
+        const targets = selectGongikTargets(this.sampleLogs, LAND_CLASS1_DEFAULT);
+        if (targets.length === 0) {
+            this.showToast('공익직불제 레코드가 없습니다.', 'warning');
+            return;
+        }
+        const orderLabel = order === '2' ? '2차' : '1차';
+        if (!confirm(`${this.selectedYear}년 공익직불제 ${targets.length}건(현재 필터 무관 전체)에 차수=${orderLabel}, 기준년도=${baseYear || '(없음)'}을(를) 일괄 적용합니다. 계속하시겠습니까?`)) return;
+        const now = new Date().toISOString();
+        targets.forEach(l => { l.gongikOrder = order; l.gongikBaseYear = baseYear; (l as any).updatedAt = now; });
+        this.saveLogs();                   // 로컬 저장
+        this.firebaseSaveRecords(targets); // Firebase 동기화
+        this.filterAndRenderLogs();
+        this.showToast(`공익직불제 ${targets.length}건에 일괄 적용했습니다.`, 'success');
+    }
+
     // ========================================
     // Override: setupTableEventDelegation (soil uses its own)
     // ========================================
@@ -659,41 +772,186 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     }
 
     // ========================================
+    // 경지구분 1차 (landClass1) 헬퍼
+    // ========================================
+
+    /**
+     * 폼 select(#landClass1)와 목록 탭 select(#landClass1Tab) option을
+     * LAND_CLASS1_OPTIONS 단일 소스로 동적 생성한다.
+     */
+    populateLandClass1Options(): void {
+        if (this.landClass1Select && this.landClass1Select.options.length === 0) {
+            const frag = document.createDocumentFragment();
+            LAND_CLASS1_OPTIONS.forEach(value => {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = value;
+                if (value === LAND_CLASS1_DEFAULT) opt.selected = true;
+                frag.appendChild(opt);
+            });
+            this.landClass1Select.appendChild(frag);
+            this.landClass1Select.value = LAND_CLASS1_DEFAULT;
+        }
+        if (this.landClass1Tab && this.landClass1Tab.options.length === 0) {
+            const frag = document.createDocumentFragment();
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.textContent = '전체 경지구분';
+            frag.appendChild(allOpt);
+            LAND_CLASS1_OPTIONS.forEach(value => {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = value;
+                frag.appendChild(opt);
+            });
+            this.landClass1Tab.appendChild(frag);
+            this.landClass1Tab.value = LAND_CLASS1_DEFAULT; // 기본 농가의뢰 (전체 옵션은 유지)
+        }
+    }
+
+    /**
+     * 현재 폼의 경지구분 1차 값 (없으면 기본값).
+     */
+    getCurrentLandClass1(): string {
+        return (this.landClass1Select?.value) || LAND_CLASS1_DEFAULT;
+    }
+
+    /**
+     * 추가 마이그레이션: 로드 시 landClass1 누락 레코드를 기본값으로 채움.
+     */
+    protected getAdditionalMigrations(): Array<(logs: SoilSample[]) => SoilSample[] | void> {
+        return [
+            ...super.getAdditionalMigrations(),
+            (logs: SoilSample[]) => {
+                if (!Array.isArray(logs)) return logs;
+                logs.forEach(log => {
+                    if (log && (log.landClass1 === undefined || log.landClass1 === null || log.landClass1 === '')) {
+                        log.landClass1 = LAND_CLASS1_DEFAULT;
+                    }
+                });
+                return logs;
+            },
+            // 공익직불제 전용 메타 기본값 (차수·기준년도)
+            (logs: SoilSample[]) => {
+                if (!Array.isArray(logs)) return logs;
+                logs.forEach(log => {
+                    if (log && log.gongikOrder === undefined) log.gongikOrder = '1';
+                    if (log && log.gongikBaseYear === undefined) log.gongikBaseYear = '';
+                });
+                return logs;
+            }
+        ];
+    }
+
+    // ========================================
     // 접수번호 생성
     // ========================================
 
-    generateNextReceptionNumber() {
-        let maxNumber = 0;
-        this.sampleLogs.forEach(log => {
-            if (log.receptionNumber && log.subCategory !== '성토') {
-                const baseNumber = log.receptionNumber.split('-')[0];
-                if (baseNumber.startsWith('F')) return;
-                const num = parseInt(baseNumber, 10);
-                if (!isNaN(num) && num > maxNumber) {
-                    maxNumber = num;
-                }
-            }
-        });
-        const nextNumber = maxNumber + 1;
-        this.log('다음 접수번호 생성:', nextNumber, '(기존 최대:', maxNumber, ')');
+    /**
+     * 일반 시료 다음 접수번호 (경지구분 1차별 독립 시퀀스).
+     * @param landClass1 기준 경지구분 1차 (미지정 시 현재 폼 값)
+     */
+    generateNextReceptionNumber(landClass1?: string): string {
+        const targetClass = landClass1 || this.getCurrentLandClass1();
+        const nextNumber = computeNextNumber(this.sampleLogs, targetClass);
+        this.log('다음 접수번호 생성:', nextNumber, '(경지구분1차:', targetClass, ')');
         return String(nextNumber);
     }
 
-    generateNextFillReceptionNumber() {
-        let maxNumber = 0;
-        this.sampleLogs.forEach(log => {
-            if (log.receptionNumber && log.subCategory === '성토') {
-                const baseNumber = log.receptionNumber.split('-')[0];
-                const numStr = baseNumber.replace('F', '');
-                const num = parseInt(numStr, 10);
-                if (!isNaN(num) && num > maxNumber) {
-                    maxNumber = num;
-                }
-            }
-        });
-        const nextNumber = maxNumber + 1;
-        this.log('다음 성토 접수번호 생성: F' + nextNumber, '(기존 최대:', maxNumber, ')');
+    /**
+     * 성토 시료 다음 접수번호 (경지구분 1차별 독립 시퀀스, F 접두).
+     * @param landClass1 기준 경지구분 1차 (미지정 시 현재 폼 값)
+     */
+    generateNextFillReceptionNumber(landClass1?: string): string {
+        const targetClass = landClass1 || this.getCurrentLandClass1();
+        const nextNumber = computeNextNumber(this.sampleLogs, targetClass, { fill: true });
+        this.log('다음 성토 접수번호 생성: F' + nextNumber, '(경지구분1차:', targetClass, ')');
         return `F${nextNumber}`;
+    }
+
+    /**
+     * 지정 연도·경지구분 1차의 다음 접수번호(정수). 가져오기 미리보기용.
+     * @param year 대상 연도 (미지정 시 현재 연도)
+     * @param landClass1 경지구분 1차 (미지정 시 농가의뢰)
+     */
+    getNextNumberForClass(year?: number | string, landClass1?: string): number {
+        const targetClass = landClass1 || LAND_CLASS1_DEFAULT;
+        const targetYear = year || this.selectedYear;
+        // 현재 로드된 연도만 대상 (타 연도 저장소 읽기는 Phase 2 엑셀 가져오기에서 확장)
+        const logs = (String(targetYear) === String(this.selectedYear)) ? this.sampleLogs : [];
+        return computeNextNumber(logs, targetClass);
+    }
+
+    /**
+     * 현재 연도 저장소에 가져온 레코드 한 건 추가 (SoilResultImporter 위임 대상).
+     * receptionNumber 미지정 시 landClass1별 독립 번호를 자동 부여한다.
+     * 저장은 saveLogs()(로컬) + firebaseSaveRecords([newLog])(Firebase 개별)로 위임.
+     * @param record 가져오기 원본 레코드 (컬럼 매핑 결과)
+     * @returns 저장된 레코드(부여된 receptionNumber 포함)
+     */
+    addImportedRecord(record: ImportedSoilRecord): SoilLog {
+        const src = record || {};
+        const landClass1 = src.landClass1 || LAND_CLASS1_DEFAULT;
+
+        // 접수번호: 지정값 우선, 없으면 경지구분 1차별 독립 번호 자동 부여
+        const receptionNumber = (src.receptionNumber != null && String(src.receptionNumber).trim() !== '')
+            ? String(src.receptionNumber).trim()
+            : String(this.getNextNumberForClass(this.selectedYear, landClass1));
+
+        const lotAddress = src.lotAddress || '';
+        const cropsDisplay = src.cropsDisplay || '-';
+        const area = (parseFloat(String(src.area ?? '')) || 0).toString();
+        const nowISO = new Date().toISOString();
+
+        const newLog = {
+            id: crypto.randomUUID(),
+            receptionNumber,
+            date: src.date || new Date().toISOString().slice(0, 10),
+            name: src.name || '',
+            phoneNumber: src.phoneNumber || '',
+            address: src.address || '',
+            addressPostcode: src.addressPostcode || '',
+            addressRoad: src.addressRoad || '',
+            addressDetail: src.addressDetail || '',
+            subCategory: src.subCategory || '-',
+            purpose: src.purpose || '',
+            landClass1,
+            receptionMethod: src.receptionMethod || '-',
+            note: src.note || '',
+            // 공익직불제 전용 메타 (가져오기 컬럼 매핑 시 채워짐)
+            businessRegNo: src.businessRegNo || '',
+            gongikOrder: src.gongikOrder || '1',
+            gongikBaseYear: src.gongikBaseYear || '',
+            // 필지 PNU 코드 보존 (주소 자동완성 시 채워짐)
+            basePnu: src.basePnu || '',
+            createdAt: nowISO,
+            updatedAt: nowISO,
+            groupId: crypto.randomUUID(),
+            parcelIndex: 1,
+            totalParcels: 1,
+            parcels: [{
+                id: crypto.randomUUID(),
+                lotAddress,
+                isMountain: false,
+                subLots: [],
+                crops: (cropsDisplay && cropsDisplay !== '-')
+                    ? [{ name: cropsDisplay, area: (parseFloat(area) || 0).toString() }]
+                    : [],
+                category: src.subCategory || '',
+                purpose: src.purpose || '',
+                note: src.note || ''
+            }],
+            lotAddress,
+            area,
+            cropsDisplay
+        } as unknown as SoilLog;
+
+        this.sampleLogs.push(newLog);
+        this.saveLogs();                    // 로컬 저장 (ID 할당 보장)
+        this.firebaseSaveRecords([newLog]); // Firebase 개별 저장
+        this.filterAndRenderLogs();
+        this.log('가져오기 레코드 추가:', receptionNumber, '(경지구분1차:', landClass1, ')');
+        return newLog;
     }
 
     // ========================================
@@ -1603,6 +1861,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 addressRoad: formData.get('addressRoad') as string || '',
                 addressDetail: formData.get('addressDetail') as string || '',
                 subCategory: formData.get('subCategory') || '-',
+                landClass1: (formData.get('landClass1') as string) || LAND_CLASS1_DEFAULT,
                 purpose: formData.get('purpose'),
                 receptionMethod: formData.get('receptionMethod') || '-',
                 note: formData.get('note') || '',
@@ -1699,6 +1958,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 addressDetail: formData.get('addressDetail') as string || '',
                 subCategory: effectiveSubCategory,
                 purpose: effectivePurpose,
+                landClass1: (formData.get('landClass1') as string) || existingLog.landClass1 || LAND_CLASS1_DEFAULT,
                 receptionMethod: formData.get('receptionMethod') || '-',
                 note: formData.get('note') || '',
                 parcels: validParcels.map(p => ({
@@ -1749,8 +2009,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const yearStorageKey = this.getStorageKey(this.selectedYear);
         const latestLogs = SampleUtils.safeParseJSON(yearStorageKey, []);
 
+        // 접수번호는 경지구분 1차별 독립 시퀀스이므로 중복 검사도 현재 경지구분 범위로 한정
+        const currentLandClass1 = this.getCurrentLandClass1();
         const duplicateNumbers = numbersToCheck.filter(numToCheck => {
             return latestLogs.some(log => {
+                if ((log.landClass1 || LAND_CLASS1_DEFAULT) !== currentLandClass1) return false;
                 const logBaseNumber = (log.receptionNumber || '').split('-')[0];
                 return logBaseNumber === numToCheck;
             });
@@ -1776,6 +2039,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             addressRoad: formData.get('addressRoad') as string || '',
             addressDetail: formData.get('addressDetail') as string || '',
             subCategory: formData.get('subCategory') || '-',
+            landClass1: (formData.get('landClass1') as string) || LAND_CLASS1_DEFAULT,
             purpose: formData.get('purpose'),
             receptionMethod: formData.get('receptionMethod') || '-',
             note: formData.get('note') || '',
@@ -1891,6 +2155,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         }
 
         this.form.reset();
+        // landClass1 복원: option.selected는 property로 설정되어 form.reset()이 첫 옵션으로
+        // 되돌리므로 기본값(농가의뢰)을 명시적으로 복원 (SAMPL-1-122 / 메인 SAMPL-1-121)
+        if (this.landClass1Select) this.landClass1Select.value = LAND_CLASS1_DEFAULT;
         const subCatSelect = document.getElementById('subCategory');
         if (subCatSelect) {
             subCatSelect.disabled = false;
@@ -1922,6 +2189,26 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     resetForm() {
         this.cancelEditMode();
+    }
+
+    // ========================================
+    // 폼 복원 폴백 헬퍼 (SAMPL-1-120 / 메인 SAMPL-1-119)
+    // parcels[0]가 비어있는 레코드(레거시/Firestore 동기화/부분저장)는
+    // 수정 폼·목록 복원 시 레코드 최상위 권위 필드로 보완한다.
+    // 정상 데이터(필지별 값 존재)는 truthy 단락으로 발동하지 않아 동작 보존.
+    // ========================================
+
+    // 필지 구분/용도/작물 폴백 헬퍼는 순수 모듈 ./soil-parcel-fallback로 위임 (SAMPL-1-122 code-review 반영)
+    resolveParcelCategory(parcelCategory: string, log: any): string {
+        return resolveParcelCategoryPure(parcelCategory, log);
+    }
+
+    resolveParcelPurpose(parcelPurpose: string, log: any): string {
+        return resolveParcelPurposePure(parcelPurpose, log);
+    }
+
+    cropsFromDisplay(log: any): Array<{ name: string; area: string }> {
+        return cropsFromDisplayPure(log);
     }
 
     populateFormForEdit(log) {
@@ -1968,6 +2255,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             this.purposeSelect.value = log.purpose || '';
         }
 
+        if (this.landClass1Select) {
+            this.landClass1Select.value = log.landClass1 || LAND_CLASS1_DEFAULT;
+        }
+
         const receptionMethodBtns = document.querySelectorAll('.reception-method-btn');
         receptionMethodBtns.forEach(btn => {
             btn.classList.remove('active');
@@ -1987,16 +2278,23 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         if (this.parcelsContainer) this.parcelsContainer.innerHTML = '';
 
         if (log.parcels && log.parcels.length > 0) {
+            const singleParcel = log.parcels.length === 1;
             log.parcels.forEach(parcel => {
                 const parcelId = `parcel-${this.parcelIdCounter++}`;
+                const hasCrops = parcel.crops && parcel.crops.length > 0;
+                // crops 폴백은 단일 필지 로그에서만 (cropsDisplay는 로그 전체 요약이므로
+                // 다필지 단일 로그에 일괄 적용하면 잘못 분배됨)
+                const crops = hasCrops
+                    ? parcel.crops.map(c => ({ ...c }))
+                    : (singleParcel ? this.cropsFromDisplay(log) : []);
                 const newParcel = {
                     id: parcelId,
                     lotAddress: parcel.lotAddress || '',
                     isMountain: parcel.isMountain || false,
                     subLots: parcel.subLots ? [...parcel.subLots] : [],
-                    crops: parcel.crops ? parcel.crops.map(c => ({ ...c })) : [],
-                    category: parcel.category || '',
-                    purpose: parcel.purpose || '',
+                    crops,
+                    category: this.resolveParcelCategory(parcel.category, log),
+                    purpose: this.resolveParcelPurpose(parcel.purpose, log),
                     note: parcel.note || ''
                 };
                 this.parcels.push(newParcel);
@@ -2074,6 +2372,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         }
 
         if (this.purposeSelect) this.purposeSelect.value = firstLog.purpose || '';
+        if (this.landClass1Select) this.landClass1Select.value = firstLog.landClass1 || LAND_CLASS1_DEFAULT;
 
         const receptionMethodBtns = document.querySelectorAll('.reception-method-btn');
         receptionMethodBtns.forEach(btn => {
@@ -2102,27 +2401,29 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         sortedParcelIndices.forEach(pIdx => {
             const logsForParcel = parcelMap.get(pIdx);
             const firstLog = logsForParcel[0];
-            const parcel = firstLog.parcels?.[0];
-            if (!parcel) return;
+            // parcels[0]가 없어도 카드를 건너뛰지 않고 최상위 필드로 합성 (필지 누락 방지)
+            const parcel = firstLog.parcels?.[0] || {};
 
-            // 같은 필지의 여러 작물을 합침
+            // 같은 필지의 여러 작물을 합침 — 각 로그의 crops가 비면 cropsDisplay/area로 폴백
             const mergedCrops = [];
-            logsForParcel.forEach(log => {
-                const logParcel = log.parcels?.[0];
-                if (logParcel?.crops) {
-                    logParcel.crops.forEach(c => mergedCrops.push({ ...c }));
+            logsForParcel.forEach((log: any) => {
+                const logCrops = log.parcels?.[0]?.crops;
+                if (logCrops && logCrops.length > 0) {
+                    logCrops.forEach((c: any) => mergedCrops.push({ ...c }));
+                } else {
+                    this.cropsFromDisplay(log).forEach((c: any) => mergedCrops.push(c));
                 }
             });
 
             const parcelId = `parcel-${this.parcelIdCounter++}`;
             const newParcel = {
                 id: parcelId,
-                lotAddress: parcel.lotAddress || '',
+                lotAddress: parcel.lotAddress || firstLog.lotAddress || '',
                 isMountain: parcel.isMountain || false,
                 subLots: parcel.subLots ? [...parcel.subLots] : [],
                 crops: mergedCrops.length > 0 ? mergedCrops : [{ name: '', area: '' }],
-                category: parcel.category || '',
-                purpose: parcel.purpose || '',
+                category: this.resolveParcelCategory(parcel.category, firstLog),
+                purpose: this.resolveParcelPurpose(parcel.purpose, firstLog),
                 note: parcel.note || ''
             };
             this.parcels.push(newParcel);
@@ -2208,7 +2509,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const matchesPurpose = !this.currentSearchFilter.purpose ||
             (log.purpose || '') === this.currentSearchFilter.purpose;
 
-        return matchesLot && matchesPurpose;
+        // 경지구분 1차 탭 필터 (기존 조건과 AND)
+        const matchesLandClass1 = !this.currentSearchFilter.landClass1 ||
+            (log.landClass1 || LAND_CLASS1_DEFAULT) === this.currentSearchFilter.landClass1;
+
+        return matchesLot && matchesPurpose && matchesLandClass1;
     }
 
     protected updateSearchButtonState(): void {
@@ -2225,6 +2530,15 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 purposeFilter.classList.add('has-filter');
             } else {
                 purposeFilter.classList.remove('has-filter');
+            }
+        }
+        // 경지구분 1차 탭은 openSearchModalBtn 트리거에 포함하지 않고 독립적으로 표시
+        const landClass1Tab = this.landClass1Tab || (document.getElementById('landClass1Tab') as HTMLSelectElement | null);
+        if (landClass1Tab) {
+            if (this.currentSearchFilter.landClass1) {
+                landClass1Tab.classList.add('has-filter');
+            } else {
+                landClass1Tab.classList.remove('has-filter');
             }
         }
     }
@@ -2335,7 +2649,17 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             byReceptionMethod[method].count++;
         });
 
-        return { total, completed, pending, bySubCategory, byPurpose, byMonth, byQuarter, byReceptionMethod };
+        // 경지구분 1차별 집계 (경지구분 간 비교가 목적이므로 탭 필터와 무관하게 전체 기준)
+        const byLandClass: Record<string, any> = {};
+        this.sampleLogs.forEach(log => {
+            const landClass = log.landClass1 || LAND_CLASS1_DEFAULT;
+            if (!byLandClass[landClass]) {
+                byLandClass[landClass] = { count: 0, ...(LAND_CLASS1_STATS_MAPPING[landClass] || { label: landClass, class: 'category-other' }) };
+            }
+            byLandClass[landClass].count++;
+        });
+
+        return { total, completed, pending, bySubCategory, byPurpose, byMonth, byQuarter, byReceptionMethod, byLandClass };
     }
 
     openStatisticsModal() {
@@ -2362,6 +2686,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
         this.renderVerticalBarChart('statsByCategory', stats.bySubCategory);
         this.renderBarChart('statsByPurpose', stats.byPurpose, 'purpose');
+        this.renderBarChart('statsByLandClass', stats.byLandClass, 'landClass1');
         this.renderMonthlyChart('statsByMonth', stats.byMonth);
         this.renderQuarterlySummary('statsQuarterly', stats.byQuarter);
         this.renderMethodCards('statsByReceptionMethod', stats.byReceptionMethod);
@@ -2840,23 +3165,28 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         logs.forEach(log => {
             if (log.parcels && log.parcels.length > 0) {
                 let subLotIndex = 1;
+                const singleParcelLog = log.parcels.length === 1;
                 log.parcels.forEach(parcel => {
-                    const cropsDisplay = parcel.crops && parcel.crops.length > 0
-                        ? parcel.crops.map(c => c.name).join(', ') : '-';
+                    // SAMPL-1-120: parcels[0]가 비어있는 레코드는 단일 필지에 한해
+                    // 최상위 cropsDisplay/area로 폴백 (편집 폼과 동일 동작)
+                    const effectiveCrops = (parcel.crops && parcel.crops.length > 0)
+                        ? parcel.crops
+                        : (singleParcelLog ? this.cropsFromDisplay(log) : []);
+                    const cropsDisplay = effectiveCrops.length > 0
+                        ? effectiveCrops.map(c => c.name).join(', ') : '-';
                     let m2Total = 0;
                     let pyeongTotal = 0;
-                    if (parcel.crops) {
-                        parcel.crops.forEach(c => {
-                            const area = parseFloat(c.area) || 0;
-                            if (c.unit === 'pyeong') { pyeongTotal += area; } else { m2Total += area; }
-                        });
-                    }
+                    effectiveCrops.forEach(c => {
+                        const area = parseFloat(c.area) || 0;
+                        if (c.unit === 'pyeong') { pyeongTotal += area; } else { m2Total += area; }
+                    });
                     const areaParts = [];
                     if (m2Total > 0) areaParts.push(`${m2Total.toLocaleString()}㎡`);
                     if (pyeongTotal > 0) areaParts.push(`${pyeongTotal.toLocaleString()}평`);
                     const areaDisplay = areaParts.length > 0 ? areaParts.join(' / ') : '-';
-                    const lotAddressDisplay = parcel.lotAddress
-                        ? (parcel.isMountain ? `${parcel.lotAddress} (산)` : parcel.lotAddress) : '-';
+                    const effectiveLotAddress = parcel.lotAddress || (singleParcelLog ? log.lotAddress : '');
+                    const lotAddressDisplay = effectiveLotAddress
+                        ? (parcel.isMountain ? `${effectiveLotAddress} (산)` : effectiveLotAddress) : '-';
 
                     rows.push({
                         ...log,
@@ -2866,7 +3196,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                         _lotAddress: lotAddressDisplay,
                         _cropsDisplay: cropsDisplay,
                         _areaDisplay: areaDisplay,
-                        _parcelPurpose: parcel.purpose || ''
+                        _parcelPurpose: this.resolveParcelPurpose(parcel.purpose, log)
                     });
                     subLotIndex++;
 
@@ -2895,7 +3225,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                                 _lotAddress: lotAddress,
                                 _cropsDisplay: subLotCropsDisplay,
                                 _areaDisplay: subAreaDisplay,
-                                _parcelPurpose: parcel.purpose || ''
+                                _parcelPurpose: this.resolveParcelPurpose(parcel.purpose, log)
                             });
                             subLotIndex++;
                         });
@@ -2937,6 +3267,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const endIndex = Math.min(startIndex + this.itemsPerPage, this.currentFlatRows.length);
         const pageRows = this.currentFlatRows.slice(startIndex, endIndex);
 
+        // 공익직불제 ON: +3(차수·경영체·기준년도) −4(목적·수령방법·비고·발송일자) = 19-1 = 18
+        const gongikOn = this.currentSearchFilter?.landClass1 === '공익직불제';
+
         const fragment = document.createDocumentFragment();
         let prevName = startIndex > 0 ? (this.currentFlatRows[startIndex - 1]?.name || null) : null;
 
@@ -2945,7 +3278,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 const separatorTr = document.createElement('tr');
                 separatorTr.className = 'farm-separator';
                 const separatorTd = document.createElement('td');
-                separatorTd.colSpan = 18;
+                separatorTd.colSpan = gongikOn ? 18 : 19;
                 separatorTr.appendChild(separatorTd);
                 fragment.appendChild(separatorTr);
             }
@@ -2994,6 +3327,22 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             tdNumber.textContent = row._displayNumber;
             tr.appendChild(tdNumber);
 
+            // 공익직불제 전용 — 차수 편집 셀 (접수번호 다음, gongik-on일 때만 표시)
+            const tdOrder = document.createElement('td');
+            tdOrder.className = 'col-order gongik-col';
+            const orderSelect = document.createElement('select');
+            orderSelect.className = 'gongik-order-select';
+            orderSelect.dataset.id = row.id;
+            ([['1', '1차'], ['2', '2차']] as const).forEach(([val, label]) => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = label;
+                orderSelect.appendChild(opt);
+            });
+            orderSelect.value = row.gongikOrder || '1';
+            tdOrder.appendChild(orderSelect);
+            tr.appendChild(tdOrder);
+
             // 날짜
             const tdDate = document.createElement('td');
             tdDate.textContent = row.date;
@@ -3006,8 +3355,15 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
             // 목적
             const tdPurpose = document.createElement('td');
+            tdPurpose.className = 'col-purpose gongik-hide';
             tdPurpose.textContent = row._parcelPurpose || row.purpose || '-';
             tr.appendChild(tdPurpose);
+
+            // 경지구분 1차
+            const tdLandClass1 = document.createElement('td');
+            tdLandClass1.className = 'col-landclass1';
+            tdLandClass1.textContent = row.landClass1 || LAND_CLASS1_DEFAULT;
+            tr.appendChild(tdLandClass1);
 
             // 성명 (클릭 시 같은 이름+전화번호 일괄 선택 — 동명이인 구분)
             const tdName = document.createElement('td');
@@ -3017,6 +3373,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             tdName.textContent = row.name;
             tdName.title = `"${row.name}" 클릭하면 같은 이름+전화번호 일괄 선택`;
             tr.appendChild(tdName);
+
+            // 공익직불제 전용 — 경영체등록번호 (성명 다음, gongik-on일 때만 표시)
+            const tdBizReg = document.createElement('td');
+            tdBizReg.className = 'col-bizreg gongik-col';
+            tdBizReg.textContent = row.businessRegNo || '-';
+            tr.appendChild(tdBizReg);
 
             // 우편번호
             const tdZipcode = document.createElement('td');
@@ -3064,12 +3426,13 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
             // 수령방법
             const tdMethod = document.createElement('td');
+            tdMethod.className = 'col-method gongik-hide';
             tdMethod.textContent = methodText;
             tr.appendChild(tdMethod);
 
             // 비고
             const tdNote = document.createElement('td');
-            tdNote.className = 'col-note';
+            tdNote.className = 'col-note gongik-hide';
             tdNote.title = combinedNote;
             const noteDiv = document.createElement('div');
             noteDiv.className = 'note-cell';
@@ -3079,9 +3442,29 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
             // 우편일자
             const tdMailDate = document.createElement('td');
-            tdMailDate.className = 'col-mail-date';
+            tdMailDate.className = 'col-mail-date gongik-hide';
             tdMailDate.textContent = row.mailDate || '-';
             tr.appendChild(tdMailDate);
+
+            // 공익직불제 전용 — 기준년도 편집 셀 (관리 직전, gongik-on일 때만 표시)
+            const tdBaseYear = document.createElement('td');
+            tdBaseYear.className = 'col-baseyear gongik-col';
+            const baseYearSelect = document.createElement('select');
+            baseYearSelect.className = 'gongik-baseyear-select';
+            baseYearSelect.dataset.id = row.id;
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = '(선택)';
+            baseYearSelect.appendChild(emptyOpt);
+            GONGIK_BASE_YEAR_OPTIONS.forEach((val) => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                baseYearSelect.appendChild(opt);
+            });
+            baseYearSelect.value = row.gongikBaseYear || '';
+            tdBaseYear.appendChild(baseYearSelect);
+            tr.appendChild(tdBaseYear);
 
             // 액션 버튼
             const tdAction = document.createElement('td');
@@ -3222,6 +3605,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const receptionNumber = this.receptionNumberInput?.value;
         const date = this.dateInput?.value;
         this.form.reset();
+        // landClass1 복원: form.reset()이 첫 옵션으로 되돌리므로 기본값(농가의뢰)을 동기적으로
+        // 복원 (setTimeout 밖 — SAMPL-1-122 / 메인 SAMPL-1-121 버그 수정)
+        if (this.landClass1Select) this.landClass1Select.value = LAND_CLASS1_DEFAULT;
         setTimeout(() => {
             if (receptionNumber && this.receptionNumberInput) this.receptionNumberInput.value = receptionNumber;
             if (date && this.dateInput) this.dateInput.value = date;
@@ -3279,6 +3665,18 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                         : this.generateNextReceptionNumber();
                 }
                 this.updateParcelCardsMode(isFill);
+            });
+        }
+
+        // 경지구분 1차 변경 시 접수번호를 해당 분류 기준으로 재추천
+        if (this.landClass1Select) {
+            this.landClass1Select.addEventListener('change', () => {
+                if (this.receptionNumberInput) {
+                    const isFill = this.subCategorySelect?.value === '성토';
+                    this.receptionNumberInput.value = isFill
+                        ? this.generateNextFillReceptionNumber()
+                        : this.generateNextReceptionNumber();
+                }
             });
         }
 
@@ -3507,9 +3905,31 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
             // 체크박스 이벤트
             this.tableBody.addEventListener('change', (e) => {
-                if (e.target.classList.contains('row-checkbox')) {
+                const target = e.target as HTMLElement;
+                if (target.classList.contains('row-checkbox')) {
                     this.updateSelectAllState();
                     this.updateSelectedCount();
+                    return;
+                }
+                // 공익직불제 전용 — 차수/기준년도 행별 인라인 편집
+                const isOrder = target.classList.contains('gongik-order-select');
+                const isBaseYear = target.classList.contains('gongik-baseyear-select');
+                if (isOrder || isBaseYear) {
+                    const id = (target as HTMLSelectElement).dataset.id;
+                    const log = this.sampleLogs.find(l => String(l.id) === String(id));
+                    if (log) {
+                        const val = (target as HTMLSelectElement).value;
+                        if (isOrder) log.gongikOrder = val;
+                        else log.gongikBaseYear = val;
+                        (log as any).updatedAt = new Date().toISOString();
+                        this.saveLogs();                 // 로컬 저장
+                        this.firebaseSaveRecords([log]); // Firebase 동기화
+                        // 같은 log가 여러 행(필지)으로 펼쳐진 경우 형제 select 값 동기화
+                        const cls = isOrder ? 'gongik-order-select' : 'gongik-baseyear-select';
+                        this.tableBody.querySelectorAll<HTMLSelectElement>(`.${cls}[data-id="${id}"]`).forEach(sel => {
+                            if (sel !== target) sel.value = val;
+                        });
+                    }
                 }
             });
         }
@@ -3589,6 +4009,24 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             });
         }
 
+        // 경지구분 1차 탭 필터
+        const landClass1Tab = this.landClass1Tab || (document.getElementById('landClass1Tab') as HTMLSelectElement | null);
+        if (landClass1Tab) {
+            landClass1Tab.addEventListener('change', (e) => {
+                this.currentSearchFilter.landClass1 = (e.target as HTMLSelectElement).value;
+                this.filterAndRenderLogs();
+            });
+        }
+
+        // 공익직불제 일괄 적용 바 — 기준년도 옵션 채우기 + 적용 버튼
+        const gbBaseYear = document.getElementById('gongikBulkBaseYear') as HTMLSelectElement | null;
+        if (gbBaseYear) {
+            gbBaseYear.innerHTML = '<option value="">기준년도(선택)</option>'
+                + GONGIK_BASE_YEAR_OPTIONS.map(v => `<option value="${v}">${v}</option>`).join('');
+        }
+        const gbApplyBtn = document.getElementById('gongikBulkApplyBtn');
+        if (gbApplyBtn) gbApplyBtn.addEventListener('click', () => this.applyGongikBulk());
+
         if (openSearchModalBtn) {
             openSearchModalBtn.addEventListener('click', () => {
                 if (searchDateFromInput) searchDateFromInput.value = this.currentSearchFilter.dateFrom;
@@ -3631,7 +4069,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 if (searchLotInput) searchLotInput.value = '';
                 if (purposeFilter) purposeFilter.value = '';
                 if (completedFilter) completedFilter.value = 'incomplete';
-                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', lot: '', purpose: '', completed: 'incomplete' };
+                // 경지구분 1차 탭은 별도 필터이므로 고급검색 초기화 시 유지
+                this.currentSearchFilter = { dateFrom: '', dateTo: '', name: '', receptionFrom: '', receptionTo: '', lot: '', purpose: '', landClass1: this.currentSearchFilter.landClass1 || '', completed: 'incomplete' };
                 this.filterAndRenderLogs();
                 closeSearchModal();
             });
