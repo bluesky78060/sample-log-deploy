@@ -16,8 +16,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock localStorage
 const mockLocalStorage: Record<string, string> = {};
+const lsGetItem = (key: string) => mockLocalStorage[key] || null;
 global.localStorage = {
-    getItem: vi.fn((key: string) => mockLocalStorage[key] || null),
+    getItem: vi.fn(lsGetItem),
     setItem: vi.fn((key: string, value: string) => {
         mockLocalStorage[key] = value;
     }),
@@ -154,7 +155,19 @@ describe('encryption-manager.ts', () => {
         mockFirebaseDoc.exists = false;
         mockFirebaseDoc.data = () => undefined;
         (window as any).firebaseConfig.isEnabled = vi.fn(() => false);
+        // 아래 테스트들이 바꿔 끼우는 목을 되돌린다. clearAllMocks 는 구현·Once 큐를 지우지 않는다.
+        mockFirebaseDb.collection = vi.fn(() => mockFirebaseCollection);
+        vi.mocked(localStorage.getItem).mockReset().mockImplementation(lsGetItem);
+        (window as any).firestoreDb.getCollectionName = vi.fn((type: string, year: number) => `${type}_${year}`);
     });
+
+    // 키 로드·접두사 계산은 import 시점이 아니라 호출 시점에 일어난다.
+    // 모듈 상태(_keySource 등)가 테스트 사이에 새지 않도록 매번 새로 평가한다.
+    const loadManager = async () => {
+        vi.resetModules();
+        await import('../../src/shared/crypto-utils'); // window.CryptoUtils 등록
+        return (await import('../../src/shared/encryption-manager')).default;
+    };
 
     describe('Module Constants', () => {
         it('should have correct PBKDF2 iterations for recovery key', async () => {
@@ -186,25 +199,28 @@ describe('encryption-manager.ts', () => {
                 (window as any).firestoreDb.getCollectionName = vi.fn(
                     () => 'soil_2000'
                 );
+                (window as any).firebaseConfig.isEnabled = vi.fn(() => true);
 
-                // Reimport to trigger collection check
-                const modulePath = '../../src/shared/encryption-manager';
-                delete require.cache[require.resolve(modulePath)];
+                const manager = await loadManager();
+                await manager.checkRecoveryBlobExists();
 
-                await import(modulePath);
                 expect((window as any).firestoreDb.getCollectionName).toHaveBeenCalled();
+                expect(mockFirebaseDb.collection).toHaveBeenCalledWith('_system');
+                expect(mockFirebaseDb.collection).not.toHaveBeenCalledWith('test_system');
             });
 
             it('should return test_ prefix when in test mode', async () => {
                 (window as any).firestoreDb.getCollectionName = vi.fn(
                     () => 'test_soil_2000'
                 );
+                (window as any).firebaseConfig.isEnabled = vi.fn(() => true);
 
-                const modulePath = '../../src/shared/encryption-manager';
-                delete require.cache[require.resolve(modulePath)];
+                const manager = await loadManager();
+                await manager.checkRecoveryBlobExists();
 
-                await import(modulePath);
                 expect((window as any).firestoreDb.getCollectionName).toHaveBeenCalled();
+                expect(mockFirebaseDb.collection).toHaveBeenCalledWith('test_system');
+                expect(mockFirebaseDb.collection).not.toHaveBeenCalledWith('_system');
             });
         });
     });
@@ -213,22 +229,22 @@ describe('encryption-manager.ts', () => {
         describe('loadKeyFileContent', () => {
             it('should return null when no key exists', async () => {
                 // With Firebase disabled and no local key
-                const modulePath = '../../src/shared/encryption-manager';
-                delete require.cache[require.resolve(modulePath)];
+                const manager = await loadManager();
+                expect(await manager.verifyPassword('AnyPass123!')).toBe(false);
 
-                const module = await import(modulePath);
-                // Key loading happens internally during init
-                expect(module).toBeDefined();
+                expect(localStorage.getItem).toHaveBeenCalledWith('encryption_keyFile');
+                expect(manager.getKeySource()).toBeNull();
             });
 
             it('should load from localStorage when available', async () => {
                 mockLocalStorage['encryption_keyFile'] = 'mock-key-content-base64';
 
-                const modulePath = '../../src/shared/encryption-manager';
-                delete require.cache[require.resolve(modulePath)];
+                // verifyPassword 는 키가 없을 때 loadKeyFileContent 를 부르고, salt 가 없어 false 로 끝난다
+                const manager = await loadManager();
+                expect(await manager.verifyPassword('AnyPass123!')).toBe(false);
 
-                await import(modulePath);
-                expect(localStorage.getItem).toHaveBeenCalled();
+                expect(localStorage.getItem).toHaveBeenCalledWith('encryption_keyFile');
+                expect(manager.getKeySource()).toBe('local');
             });
 
             it('should prefer Firebase over localStorage', async () => {
@@ -241,11 +257,12 @@ describe('encryption-manager.ts', () => {
 
                 mockLocalStorage['encryption_keyFile'] = 'local-key-content';
 
-                const modulePath = '../../src/shared/encryption-manager';
-                delete require.cache[require.resolve(modulePath)];
+                const manager = await loadManager();
+                await manager.verifyPassword('AnyPass123!');
 
-                await import(modulePath);
-                expect(mockFirebaseDb.collection).toHaveBeenCalled();
+                expect(mockFirebaseDb.collection).toHaveBeenCalledWith('_system');
+                expect(manager.getKeySource()).toBe('firebase');
+                expect(localStorage.getItem).not.toHaveBeenCalledWith('encryption_keyFile');
             });
         });
 
@@ -332,10 +349,9 @@ describe('encryption-manager.ts', () => {
         it('should acquire lock when available', async () => {
             mockFirebaseDoc.exists = false;
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
-            await import(modulePath);
+            await import('../../src/shared/encryption-manager');
             // Lock acquisition happens internally
             expect(mockFirebaseDb.runTransaction).toBeDefined();
         });
@@ -347,10 +363,9 @@ describe('encryption-manager.ts', () => {
                 lockedAt: new Date().toISOString()
             });
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
-            await import(modulePath);
+            await import('../../src/shared/encryption-manager');
             expect(mockFirebaseDb.runTransaction).toBeDefined();
         });
 
@@ -362,30 +377,27 @@ describe('encryption-manager.ts', () => {
                 lockedAt: fiveMinutesAgo.toISOString()
             });
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
-            await import(modulePath);
+            await import('../../src/shared/encryption-manager');
             expect(mockFirebaseDb.runTransaction).toBeDefined();
         });
     });
 
     describe('Encryption Manager State', () => {
         it('should start in uninitialized state', async () => {
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
-            const module = await import(modulePath);
+            const module = await import('../../src/shared/encryption-manager');
 
             // Module loads but manager needs explicit init
             expect(module).toBeDefined();
         });
 
         it('should track initialization status', async () => {
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
-            await import(modulePath);
+            await import('../../src/shared/encryption-manager');
             // isReady() and getKey() methods exist on window.encryptionManager
             expect((window as any).encryptionManager).toBeDefined();
         });
@@ -398,35 +410,37 @@ describe('encryption-manager.ts', () => {
                 throw new Error('Firebase connection failed');
             });
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            mockLocalStorage['encryption_keyFile'] = 'local-key-content';
 
             // Should not throw, just fall back to local
-            await expect(import(modulePath)).resolves.toBeDefined();
+            const manager = await loadManager();
+            await expect(manager.verifyPassword('AnyPass123!')).resolves.toBe(false);
+            expect(manager.getKeySource()).toBe('local');
         });
 
         it('should handle localStorage errors gracefully', async () => {
-            (localStorage.getItem as any).mockImplementationOnce(() => {
+            const manager = await loadManager();
+            vi.mocked(localStorage.getItem).mockImplementation(() => {
                 throw new Error('localStorage quota exceeded');
             });
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
-
-            await expect(import(modulePath)).resolves.toBeDefined();
+            await expect(manager.verifyPassword('AnyPass123!')).resolves.toBe(false);
+            expect(localStorage.getItem).toHaveBeenCalledWith('encryption_keyFile');
+            expect(manager.getKeySource()).toBeNull();
         });
 
-        it('should handle missing crypto API gracefully', async () => {
+        // SAMPL-2-39: 최상위 _lockId 가 import 시점에 crypto.randomUUID 를 읽어 전역 crypto 가 없으면 TypeError
+        it.fails('should handle missing crypto API gracefully', async () => {
             vi.stubGlobal('crypto', undefined);
+            try {
+                vi.resetModules();
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
-
-            // Should handle missing crypto
-            await expect(import(modulePath)).resolves.toBeDefined();
-
-            // Restore crypto
-            vi.stubGlobal('crypto', mockCrypto);
+                // Should handle missing crypto
+                await expect(import('../../src/shared/encryption-manager')).resolves.toBeDefined();
+            } finally {
+                // 여기서 복원이 빠지면 뒤따르는 테스트가 전부 getRandomValues 오류로 죽는다
+                vi.stubGlobal('crypto', mockCrypto);
+            }
         });
     });
 
@@ -483,29 +497,29 @@ describe('encryption-manager.ts', () => {
                 keyFileContent: 'firebase-key'
             });
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            const manager = await loadManager();
+            expect(manager.getKeySource()).toBeNull();
+            await manager.verifyPassword('AnyPass123!');
 
-            await import(modulePath);
             expect(mockFirebaseDb.collection).toHaveBeenCalled();
+            expect(manager.getKeySource()).toBe('firebase');
         });
 
         it('should track key source as local', async () => {
             mockLocalStorage['encryption_keyFile'] = 'local-key';
 
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            const manager = await loadManager();
+            await manager.verifyPassword('AnyPass123!');
 
-            await import(modulePath);
-            expect(localStorage.getItem).toHaveBeenCalled();
+            expect(localStorage.getItem).toHaveBeenCalledWith('encryption_keyFile');
+            expect(manager.getKeySource()).toBe('local');
         });
 
         it('should track key source as generated', async () => {
             // No key in Firebase or localStorage
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
-            await import(modulePath);
+            await import('../../src/shared/encryption-manager');
             // New key would be generated
             expect(true).toBe(true);
         });
@@ -547,14 +561,13 @@ describe('encryption-manager.ts', () => {
 
     describe('Edge Cases', () => {
         it('should handle concurrent initialization attempts', async () => {
-            const modulePath = '../../src/shared/encryption-manager';
-            delete require.cache[require.resolve(modulePath)];
+            vi.resetModules();
 
             // Simulate concurrent init calls (in practice, handled by _initInProgress flag)
             const imports = await Promise.all([
-                import(modulePath),
-                import(modulePath),
-                import(modulePath)
+                import('../../src/shared/encryption-manager'),
+                import('../../src/shared/encryption-manager'),
+                import('../../src/shared/encryption-manager')
             ]);
 
             expect(imports).toHaveLength(3);

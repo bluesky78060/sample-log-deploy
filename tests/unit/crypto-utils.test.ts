@@ -10,7 +10,8 @@
  * - 에러 핸들링
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
 
 // Mock window.crypto for Web Crypto API
 const mockCrypto = {
@@ -444,10 +445,9 @@ describe('crypto-utils.ts', () => {
                 }
             };
 
-            // Mock decrypt to throw error
-            const originalDecrypt = decrypt;
-            const { decrypt: mockDecrypt } = await import('../../src/shared/crypto-utils');
-            vi.spyOn(mockDecrypt as any, 'decrypt').mockRejectedValueOnce(new Error('Decryption failed'));
+            // decryptRecord 는 모듈 내부 decrypt 를 직접 부르므로 export 를 spy 해도 가로챌 수 없다.
+            // GCM 태그 검증 실패와 같은 자리(subtle.decrypt)에서 던지게 한다.
+            mockCrypto.subtle.decrypt.mockRejectedValueOnce(new Error('Decryption failed'));
 
             const decrypted = await decryptRecord(brokenRecord, testKey);
 
@@ -610,6 +610,66 @@ describe('crypto-utils.ts', () => {
             const decrypted = await decrypt(encrypted!.iv, encrypted!.ct, testKey);
 
             expect(decrypted).toBe(xss);
+        });
+    });
+
+    // 위 테스트들의 XOR 목은 IV·AAD·키를 무시하므로 IV 길이·AAD 바인딩·GCM 태그 검증을 볼 수 없다.
+    // 이 블록만 Node 의 실제 WebCrypto 로 돌린다.
+    describe('Real AES-GCM (node:crypto webcrypto)', () => {
+        let realKey: CryptoKey;
+
+        beforeAll(async () => {
+            vi.stubGlobal('crypto', webcrypto);
+            realKey = (await createMasterKey('testPassword123!', generateKeyFileContent())).key;
+        });
+
+        afterAll(() => {
+            vi.stubGlobal('crypto', mockCrypto);
+        });
+
+        it('uses a 12-byte IV and appends a 16-byte GCM tag', async () => {
+            const encrypted = await encrypt('hello', realKey);
+
+            expect(new Uint8Array(base64ToBuffer(encrypted!.iv)).length).toBe(12);
+            expect(new Uint8Array(base64ToBuffer(encrypted!.ct)).length).toBe(5 + 16);
+            expect(await decrypt(encrypted!.iv, encrypted!.ct, realKey)).toBe('hello');
+        });
+
+        it('uses a fresh IV for each encryption', async () => {
+            const a = await encrypt('same data', realKey);
+            const b = await encrypt('same data', realKey);
+
+            expect(a!.iv).not.toBe(b!.iv);
+            expect(a!.ct).not.toBe(b!.ct);
+        });
+
+        it('rejects decryption with a different or missing AAD', async () => {
+            const encrypted = await encrypt('010-1234-5678', realKey, 'phone');
+
+            expect(await decrypt(encrypted!.iv, encrypted!.ct, realKey, 'phone')).toBe('010-1234-5678');
+            await expect(decrypt(encrypted!.iv, encrypted!.ct, realKey, 'name')).rejects.toThrow();
+            await expect(decrypt(encrypted!.iv, encrypted!.ct, realKey)).rejects.toThrow();
+        });
+
+        it('rejects a tampered ciphertext (tag verification)', async () => {
+            const encrypted = await encrypt('tamper me', realKey);
+            const ct = new Uint8Array(base64ToBuffer(encrypted!.ct));
+            ct[0] ^= 0x01;
+
+            await expect(decrypt(encrypted!.iv, bufferToBase64(ct.buffer), realKey)).rejects.toThrow();
+        });
+
+        it('round-trips a v2.1 record and blocks field substitution', async () => {
+            const original = { id: 'r1', name: '홍길동', phone: '010-1234-5678' };
+            const encrypted = await encryptRecord(original, realKey);
+
+            expect(await decryptRecord(encrypted, realKey)).toEqual(original);
+
+            // 다른 필드의 암호문을 옮겨 심으면 AAD(필드명)가 달라 복호화가 실패해야 한다
+            const swapped = { ...encrypted, _enc: { ...encrypted._enc!, name: encrypted._enc!.phone } };
+            const decrypted = await decryptRecord(swapped, realKey);
+            expect(decrypted.name).toBe('[복호화 실패]');
+            expect(decrypted.phone).toBe('010-1234-5678');
         });
     });
 });
