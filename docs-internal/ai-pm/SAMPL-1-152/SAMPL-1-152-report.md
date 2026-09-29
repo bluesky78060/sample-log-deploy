@@ -62,3 +62,8 @@ E2E는 다른 worktree와 포트가 겹치지 않도록 임시 설정(포트 892
 - SAMPL-2-27 리뷰 m-4(레코드 날짜의 연도와 무관하게 현재 연도 저장소에 넣음)는 바꾸지 않았다.
 - 메인 프로젝트 이식은 별 티켓이다.
 - 독립 리뷰는 코디네이터 몫이다(이 보고서는 자기 승인이 아니다).
+
+## AI PM submit_test
+
+`smart_workflow(SAMPL-1-152, submit_test)` run 1 — build·type·integration pass. unit은 코디네이터 지시대로 사실대로
+`fail`로 적고 output에 "기존 33건 외 신규 실패 0"을 명시했다. 서버가 overall=fail로 판정해 티켓이 **`fixing`으로 전환됐다.**
