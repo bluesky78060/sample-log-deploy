@@ -23,7 +23,7 @@ interface SoilSearchFilter extends BaseSearchFilter {
 }
 
 /**
- * 엑셀 가져오기(SoilResultImporter) → addImportedRecord 입력 레코드.
+ * 엑셀 가져오기(SoilResultImporter) → addImportedRecords 입력 레코드.
  * 컬럼 매핑 결과이므로 모든 필드가 선택적이다.
  */
 interface ImportedSoilRecord {
@@ -48,6 +48,24 @@ interface ImportedSoilRecord {
     cropsDisplay?: string;
     area?: string | number;
 }
+
+interface ImportedRecordsResult {
+    inserted: number;
+    updated: number;
+    failed: number;
+    /** 이번 배치에서 추가되거나 갱신된 레코드 */
+    logs: SoilLog[];
+}
+
+/**
+ * 덮어쓰기 대상 스칼라 필드. 접수번호·경지구분은 매칭 키라 빠진다.
+ * 필지(lotAddress·cropsDisplay·area)는 parcels[0]과 함께 고쳐야 해서 따로 다룬다.
+ */
+const IMPORT_OVERWRITE_FIELDS = [
+    'date', 'name', 'phoneNumber', 'address', 'addressPostcode', 'addressRoad', 'addressDetail',
+    'subCategory', 'purpose', 'receptionMethod', 'note', 'businessRegNo', 'gongikOrder',
+    'gongikBaseYear', 'basePnu',
+] as const;
 
 // ========================================
 // 상수 및 설정
@@ -604,6 +622,20 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         });
     }
 
+    /** 여러 건을 batchSave 한 번으로 저장. batchSave는 실패를 reject가 아니라 false resolve로도 알린다 */
+    firebaseSaveBatch(logs: SoilLog[]): void {
+        if (!window.firestoreDb?.isEnabled() || logs.length === 0) return;
+        const docs = logs.filter(log => log.id) as unknown as Record<string, unknown>[];
+        if (docs.length === 0) return; // 빈 배열도 false가 오므로 실패로 오인하지 않게 먼저 거른다
+        const onFail = (err?: unknown) => {
+            (window.logger?.error || console.error)('Firebase 배치 저장 실패:', docs.length, '건', err ?? '');
+            this._handleCloudSyncFailure();
+        };
+        window.firestoreDb.batchSave('soil', parseInt(this.selectedYear), docs)
+            .then((ok: boolean) => { if (!ok) onFail(); })
+            .catch(onFail);
+    }
+
     firebaseDeleteRecords(ids: string | string[]): void {
         if (!window.firestoreDb?.isEnabled()) return;
         const arr = Array.isArray(ids) ? ids : [ids];
@@ -885,37 +917,70 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     }
 
     /**
-     * 현재 연도 저장소에 가져온 레코드 한 건 추가 (SoilResultImporter 위임 대상).
-     * receptionNumber 미지정 시 landClass1별 독립 번호를 자동 부여한다.
-     * 저장은 saveLogs()(로컬) + firebaseSaveRecords([newLog])(Firebase 개별)로 위임.
-     * @param record 가져오기 원본 레코드 (컬럼 매핑 결과)
-     * @returns 저장된 레코드(부여된 receptionNumber 포함)
+     * 가져온 레코드를 현재 연도 저장소에 반영한다 (SoilResultImporter 위임 대상).
+     * 같은 접수번호 + 같은 경지구분 레코드가 있으면 덮어쓰고, 없으면 추가한다.
+     * 저장·클라우드 동기화·재렌더는 배치 끝에 한 번씩만 한다 — 행마다 하면 수백 행에서 수 초 멈춘다.
      */
-    addImportedRecord(record: ImportedSoilRecord): SoilLog {
-        const src = record || {};
-        const landClass1 = src.landClass1 || LAND_CLASS1_DEFAULT;
+    addImportedRecords(records: ImportedSoilRecord[]): ImportedRecordsResult {
+        const result: ImportedRecordsResult = { inserted: 0, updated: 0, failed: 0, logs: [] };
+        const nowISO = new Date().toISOString();
 
-        // 접수번호: 지정값 우선, 없으면 경지구분 1차별 독립 번호 자동 부여.
-        //
+        for (const record of Array.isArray(records) ? records : []) {
+            try {
+                const src = record || {};
+                const landClass1 = src.landClass1 || LAND_CLASS1_DEFAULT;
+                const receptionNumber = this._resolveImportedNumber(src, landClass1);
+                const existing = this.sampleLogs.find(l =>
+                    String(l.receptionNumber ?? '').trim() === receptionNumber
+                    && (l.landClass1 || LAND_CLASS1_DEFAULT) === landClass1);
+
+                if (existing) {
+                    this._applyImportedValues(existing, src, nowISO);
+                    result.updated++;
+                    if (!result.logs.includes(existing)) result.logs.push(existing);
+                } else {
+                    const newLog = this._buildImportedLog(src, receptionNumber, landClass1, nowISO);
+                    this.sampleLogs.push(newLog);
+                    result.inserted++;
+                    result.logs.push(newLog);
+                }
+            } catch (err) {
+                result.failed++;
+                (window.logger?.error || console.error)('가져오기 레코드 반영 실패:', err, record);
+            }
+        }
+
+        if (result.logs.length > 0) {
+            this.saveLogs();
+            this.firebaseSaveBatch(result.logs);
+            this.filterAndRenderLogs();
+        }
+        this.log('가져오기 반영:', result.inserted, '건 추가,', result.updated, '건 덮어씀,', result.failed, '건 실패');
+        return result;
+    }
+
+    /** 지정 접수번호 우선, 없으면 경지구분 1차별 독립 번호 자동 부여 */
+    private _resolveImportedNumber(src: ImportedSoilRecord, landClass1: string): string {
+        if (src.receptionNumber != null && String(src.receptionNumber).trim() !== '') {
+            return String(src.receptionNumber).trim();
+        }
         // 성토(subCategory='성토')는 F 접두의 **별 시퀀스**를 쓴다. 이 분기가 없으면
         // computeNextNumber가 일반 체계(fill=false)로 계산하면서 방금 저장한 성토 레코드를
         // 제외하므로 카운터가 전진하지 않고 성토 행 전부가 '1'로 저장된다 (SAMPL-1-124 적대적 검증).
-        const isFill = src.subCategory === '성토';
-        const receptionNumber = (src.receptionNumber != null && String(src.receptionNumber).trim() !== '')
-            ? String(src.receptionNumber).trim()
-            : (isFill
-                ? this.generateNextFillReceptionNumber(landClass1)
-                : String(this.getNextNumberForClass(this.selectedYear, landClass1)));
+        return src.subCategory === '성토'
+            ? this.generateNextFillReceptionNumber(landClass1)
+            : String(this.getNextNumberForClass(this.selectedYear, landClass1));
+    }
 
+    private _buildImportedLog(src: ImportedSoilRecord, receptionNumber: string, landClass1: string, nowISO: string): SoilLog {
         const lotAddress = src.lotAddress || '';
         const cropsDisplay = src.cropsDisplay || '-';
         const area = (parseFloat(String(src.area ?? '')) || 0).toString();
-        const nowISO = new Date().toISOString();
 
-        const newLog = {
+        return {
             id: crypto.randomUUID(),
             receptionNumber,
-            date: src.date || new Date().toISOString().slice(0, 10),
+            date: src.date || nowISO.slice(0, 10),
             name: src.name || '',
             phoneNumber: src.phoneNumber || '',
             address: src.address || '',
@@ -954,13 +1019,39 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             area,
             cropsDisplay
         } as unknown as SoilLog;
+    }
 
-        this.sampleLogs.push(newLog);
-        this.saveLogs();                    // 로컬 저장 (ID 할당 보장)
-        this.firebaseSaveRecords([newLog]); // Firebase 개별 저장
-        this.filterAndRenderLogs();
-        this.log('가져오기 레코드 추가:', receptionNumber, '(경지구분1차:', landClass1, ')');
-        return newLog;
+    /**
+     * 기존 레코드에 가져온 값을 덮어쓴다. id·createdAt·groupId는 그대로 두고 updatedAt만 새로 찍는다.
+     * 빈 칸은 건너뛴다 — 미리보기 레코드는 매핑하지 않은 열도 ''로 채우므로, 빈 값까지 쓰면
+     * 가져오기와 무관한 연락처·완료 여부가 지워진다.
+     */
+    private _applyImportedValues(target: SoilLog, src: ImportedSoilRecord, nowISO: string): void {
+        const t = target as unknown as Record<string, unknown>;
+        const has = (v: unknown): boolean => v != null && String(v).trim() !== '';
+
+        for (const key of IMPORT_OVERWRITE_FIELDS) {
+            if (has(src[key])) t[key] = src[key];
+        }
+
+        const parcels = Array.isArray(t.parcels) ? (t.parcels as Array<Record<string, unknown>>) : [];
+        if (parcels.length === 0) {
+            parcels.push({ id: crypto.randomUUID(), lotAddress: '', isMountain: false, subLots: [], crops: [], category: '', purpose: '', note: '' });
+            t.parcels = parcels;
+        }
+        const parcel = parcels[0];
+        if (has(src.lotAddress)) { t.lotAddress = src.lotAddress; parcel.lotAddress = src.lotAddress; }
+        if (has(src.subCategory)) parcel.category = src.subCategory;
+        if (has(src.purpose)) parcel.purpose = src.purpose;
+        if (has(src.note)) parcel.note = src.note;
+        if (has(src.cropsDisplay) || has(src.area)) {
+            const area = has(src.area) ? (parseFloat(String(src.area)) || 0).toString() : String(t.area ?? '0');
+            const cropsDisplay = has(src.cropsDisplay) ? String(src.cropsDisplay) : String(t.cropsDisplay ?? '-');
+            t.area = area;
+            t.cropsDisplay = cropsDisplay;
+            parcel.crops = cropsDisplay !== '-' ? [{ name: cropsDisplay, area }] : [];
+        }
+        t.updatedAt = nowISO;
     }
 
     // ========================================

@@ -210,7 +210,7 @@ describe('computePreview — 접수번호 자동부여', () => {
 });
 
 describe('computePreview — 수동 번호와 자동부여가 섞인 배치', () => {
-    // 매니저의 addImportedRecord는 레코드마다 max+1로 다시 채번한다.
+    // 매니저의 addImportedRecords는 레코드마다 max+1로 다시 채번한다.
     // 따라서 수동 번호가 먼저 저장되면 뒤따르는 자동부여 번호가 그 위로 올라간다.
     // 미리보기가 이를 반영하지 않으면 사용자가 본 번호와 대장에 들어간 번호가 달라진다.
 

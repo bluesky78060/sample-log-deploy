@@ -371,3 +371,139 @@ test.describe('토양 엑셀 가져오기 모달', () => {
         await expect(modal.locator('input[name="sriMode"][value="file"]')).toBeChecked();
     });
 });
+
+/** 저장소 원본 레코드 전체 (새로고침 후) */
+async function readPersistedRaw(page) {
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+    return page.evaluate(() => {
+        const raw = localStorage.getItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`);
+        return raw ? JSON.parse(raw) : [];
+    });
+}
+
+test.describe('토양 가져오기 — 덮어쓰기(upsert)와 배치 저장 (SAMPL-1-152)', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await page.evaluate(() => localStorage.clear());
+    });
+
+    test('덮어쓰기로 같은 접수번호를 다시 가져오면 레코드 수가 늘지 않고 값만 갱신된다', async ({ page }) => {
+        const OLD = '2020-01-01T00:00:00.000Z';
+        await page.evaluate((old) => {
+            const parcel = (id, lot) => ({ id, lotAddress: lot, isMountain: false, subLots: [],
+                crops: [{ name: '벼', area: '100' }], category: '논', purpose: '일반재배', note: '' });
+            localStorage.setItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`, JSON.stringify([
+                { id: 'keep-7', receptionNumber: '7', name: '옛이름', phoneNumber: '010-9999-9999',
+                  landClass1: '농가의뢰', subCategory: '논', purpose: '일반재배', isComplete: true,
+                  createdAt: old, updatedAt: old, groupId: 'grp-7', lotAddress: '옛주소',
+                  parcels: [parcel('p-7', '옛주소')] },
+                // 같은 번호지만 경지구분이 다르다 — 건드리면 안 된다
+                { id: 'other-7', receptionNumber: '7', name: '공익농가', landClass1: '공익직불제',
+                  subCategory: '논', createdAt: old, updatedAt: old, groupId: 'grp-o7',
+                  parcels: [parcel('p-o7', '공익주소')] },
+            ]));
+        }, OLD);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => (window.soilManager?.sampleLogs || []).length === 2);
+
+        const modal = await openWithPastedData(page, [
+            '접수번호\t성명\t지번주소\t작물\t면적',
+            '7\t새이름\t봉화읍 내성리 77\t고추\t300',
+            // 같은 배치 안의 같은 번호 두 행 — 뒤 행이 이긴다
+            '9\t먼저\t봉화읍 내성리 90\t벼\t100',
+            '9\t나중\t봉화읍 내성리 91\t벼\t200',
+        ].join('\n'));
+        await modal.locator('[data-el="autoNumber"]').uncheck();
+        await modal.locator('input[name="sriDup"][value="overwrite"]').check();
+        await modal.locator('[data-act="automap"]').click();
+        await expect(modal.locator('select[data-field-key="receptionNumber"]')).not.toHaveValue('-1');
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const logs = await readPersistedRaw(page);
+        expect(logs).toHaveLength(3); // keep-7, other-7, 9 한 건
+
+        const updated = logs.find((l) => l.id === 'keep-7');
+        expect(updated).toBeTruthy();
+        expect(updated.receptionNumber).toBe('7');
+        expect(updated.name).toBe('새이름');
+        expect(updated.lotAddress).toBe('봉화읍 내성리 77');
+        expect(updated.parcels[0].lotAddress).toBe('봉화읍 내성리 77');
+        expect(updated.parcels[0].crops[0].name).toBe('고추');
+        expect(updated.createdAt).toBe(OLD);
+        expect(updated.groupId).toBe('grp-7');
+        expect(updated.updatedAt).not.toBe(OLD);
+        // 가져오기에 없던 값은 지우지 않는다
+        expect(updated.phoneNumber).toBe('010-9999-9999');
+        expect(updated.isComplete).toBe(true);
+
+        const other = logs.find((l) => l.id === 'other-7');
+        expect(other.name).toBe('공익농가');
+        expect(other.updatedAt).toBe(OLD);
+
+        const nines = logs.filter((l) => l.receptionNumber === '9');
+        expect(nines).toHaveLength(1);
+        expect(nines[0].name).toBe('나중');
+    });
+
+    test('201행 가져오기는 저장·재렌더를 한 번씩만 한다', async ({ page }) => {
+        const rows = Array.from({ length: 201 }, (_, i) =>
+            `농가${i + 1}\t010-0000-0000\t봉화읍 내성리 ${i + 1}\t벼\t100\t논\t일반재배`,
+        );
+        const modal = await openWithPastedData(page, [PASTE_HEADER, ...rows].join('\n'));
+        await modal.locator('[data-act="automap"]').click();
+        await expect(modal.locator('[data-act="import"]')).toContainText('201건 가져오기');
+
+        await page.evaluate(() => {
+            const mgr = window.soilManager;
+            const calls = { saveLogs: 0, filterAndRenderLogs: 0, firebaseSaveRecords: 0, firebaseSaveBatch: 0 };
+            window.__importSpy = calls;
+            for (const name of Object.keys(calls)) {
+                const orig = mgr[name];
+                if (typeof orig !== 'function') continue;
+                mgr[name] = function (...args) { calls[name]++; return orig.apply(this, args); };
+            }
+        });
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const calls = await page.evaluate(() => window.__importSpy);
+        expect(calls.saveLogs).toBe(1);
+        expect(calls.filterAndRenderLogs).toBe(1);
+        expect(calls.firebaseSaveRecords).toBe(0);
+        expect(calls.firebaseSaveBatch).toBe(1);
+
+        const persisted = await readPersisted(page);
+        expect(persisted).toHaveLength(201);
+    });
+
+    test('Firestore 배치가 false로 끝나면 실패로 알린다 (reject가 아니어도)', async ({ page }) => {
+        const modal = await openWithPastedData(page, [PASTE_HEADER, ...PASTE_ROWS].join('\n'));
+        await modal.locator('[data-act="automap"]').click();
+
+        await page.evaluate(() => {
+            const spy = { batchCalls: 0, docs: 0, failures: 0 };
+            window.__cloudSpy = spy;
+            // batchSave는 실패를 reject가 아니라 false resolve로도 알린다
+            window.firestoreDb = {
+                ...(window.firestoreDb || {}),
+                isEnabled: () => true,
+                batchSave: async (_type, _year, docs) => { spy.batchCalls++; spy.docs = docs.length; return false; },
+            };
+            const mgr = window.soilManager;
+            mgr._handleCloudSyncFailure = () => { spy.failures++; };
+        });
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        await expect.poll(() => page.evaluate(() => window.__cloudSpy.failures)).toBe(1);
+        const spy = await page.evaluate(() => window.__cloudSpy);
+        expect(spy.batchCalls).toBe(1);
+        expect(spy.docs).toBe(2);
+    });
+});

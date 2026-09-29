@@ -11,7 +11,7 @@
  *   4) 옵션            — 접수번호 자동부여 / 중복 시(건너뛰기·덮어쓰기)
  *   5) 미리보기        — 생성될 행 표 + 신규/중복/오류 배지 + 건수 요약
  *
- * 저장은 `window.soilManager.addImportedRecord(record)`로 위임한다.
+ * 저장은 `window.soilManager.addImportedRecords(records)`로 한 번에 위임한다.
  *
  * 메인과의 의도적 차이:
  * - 계산 로직(파싱·자동매핑·중복판정)은 Phase A/B-1/B-2에서 순수 모듈로 분리했고
@@ -77,7 +77,8 @@ interface SoilManagerLike {
     getNextNumberForClass?(year: number | string, landClass1: string): number;
     /** 성토 다음 접수번호 — 'F3' 형태의 문자열을 돌려준다 */
     generateNextFillReceptionNumber?(landClass1?: string): string;
-    addImportedRecord?(record: PreviewRecord): unknown;
+    /** 같은 접수번호+경지구분이면 덮어쓰고 아니면 추가. 저장·재렌더는 배치당 1회 */
+    addImportedRecords?(records: PreviewRecord[]): { inserted: number; updated: number; failed: number };
 }
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -391,12 +392,8 @@ function buildModal(): HTMLElement {
         <span class="sri-muted">중복 접수번호가 있을 때:</span>
         <div class="sri-opt-sub">
           <label class="sri-radio"><input type="radio" name="sriDup" value="skip" checked> 건너뛰기</label>
-          <!--
-            메인은 이 라벨이 '그래도 추가(덮어쓰기)'였으나 실제로는 덮어쓰지 않는다.
-            매니저 addImportedRecord는 기존 레코드를 찾지 않고 sampleLogs.push만 하므로
-            같은 접수번호가 두 줄이 된다. 라벨이 거짓을 말하지 않게 문구를 고쳤다.
-          -->
-          <label class="sri-radio"><input type="radio" name="sriDup" value="overwrite"> 그래도 추가 <span class="sri-muted">(같은 접수번호가 중복 등록됨)</span></label>
+          <!-- 매니저 addImportedRecords가 같은 접수번호+경지구분 레코드를 찾아 갱신한다 (빈 칸은 기존 값 유지) -->
+          <label class="sri-radio"><input type="radio" name="sriDup" value="overwrite"> 덮어쓰기</label>
         </div>
       </div>
     </section>
@@ -1054,34 +1051,38 @@ export class SoilResultImporter {
         const p = this._state.preview;
         if (!p) return;
         const mgr = getManager();
-        if (!mgr || typeof mgr.addImportedRecord !== 'function') {
+        if (!mgr || typeof mgr.addImportedRecords !== 'function') {
             toast('접수 매니저가 준비되지 않았습니다. 잠시 후 다시 시도하세요.', 'error');
             return;
         }
 
-        // 루프는 행마다 저장+재렌더를 하므로 수백 행이면 수 초간 동기 실행된다.
-        // 그 사이 들어온 두 번째 클릭이 큐에 남으면 전량이 두 번 등록되므로 먼저 잠근다.
+        // 두 번째 클릭이 큐에 남으면 전량이 한 번 더 반영되므로 먼저 잠근다.
         const importBtn = this._els?.importBtn ?? null;
         if (importBtn) importBtn.disabled = true;
 
-        let applied = 0;
-        let failed = 0;
+        const recs: PreviewRecord[] = [];
         for (const it of p.items) {
             if (it.status === 'err') continue;
             if (it.status === 'dup' && it.skip) continue;
-            try {
-                const rec: PreviewRecord = { ...it.rec };
-                // 자동부여 행은 receptionNumber를 비워 매니저가 채번하게 한다
-                if (it.auto) delete rec.receptionNumber;
-                mgr.addImportedRecord(rec);
-                applied++;
-            } catch (err) {
-                failed++;
-                logErr('가져오기 레코드 저장 실패:', err, it.rec);
-            }
+            const rec: PreviewRecord = { ...it.rec };
+            // 자동부여 행은 receptionNumber를 비워 매니저가 채번하게 한다
+            if (it.auto) delete rec.receptionNumber;
+            recs.push(rec);
         }
 
-        const parts = [`✅ ${applied}건 가져오기 완료`];
+        let res: { inserted: number; updated: number; failed: number };
+        try {
+            res = mgr.addImportedRecords(recs);
+        } catch (err) {
+            logErr('가져오기 저장 실패:', err);
+            toast('가져오기 저장에 실패했습니다. 다시 시도하세요.', 'error');
+            if (importBtn) importBtn.disabled = false;
+            return;
+        }
+        const { inserted, updated, failed } = res;
+
+        const parts = [`✅ ${inserted + updated}건 가져오기 완료`];
+        if (updated > 0) parts.push(`덮어씀 ${updated}건`);
         if (p.stats.dup > 0) parts.push(`중복 ${p.stats.dup}건`);
         if (p.stats.err > 0) parts.push(`오류 ${p.stats.err}건`);
         if (failed > 0) parts.push(`실패 ${failed}건`);
