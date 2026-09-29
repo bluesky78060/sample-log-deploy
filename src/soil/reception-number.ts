@@ -6,8 +6,8 @@
  *  - 일반 시료와 성토(subCategory='성토', 'F' 접두) 시료는 서로 다른 번호 체계를 쓴다.
  *  - 접수번호의 본번은 '12-3'처럼 '-' 뒤 가지번호를 가질 수 있어 split('-')[0]로 본번만 본다.
  *
- * SoilSampleManager의 generateNextReceptionNumber / generateNextFillReceptionNumber 가
- * 모두 이 함수에 위임한다(알고리즘 단일화).
+ * SoilSampleManager의 채번 메서드는 모두 computeNextNumber에, 가져오기 미리보기의
+ * 중복 판정은 receptionBaseKey에 위임한다(분류 규칙 단일화).
  */
 
 /** 채번 계산에 필요한 최소 로그 형태 */
@@ -24,7 +24,41 @@ export interface ComputeNextNumberOptions {
     defaultClass?: string;
 }
 
+/** 경지구분 1차 기본값 — 이 파일 밖에서 이 문자열을 다시 적지 않는다 */
 export const DEFAULT_LAND_CLASS = '농가의뢰';
+
+/** 경지구분 1차 값 목록 (폼·목록 탭·가져오기 모달이 공유) */
+export const LAND_CLASS1_OPTIONS = [
+    '개량제', '전략', '직불', '자체', '기타', '친환경',
+    '유기농', '무농약', 'GAP', DEFAULT_LAND_CLASS, '대표필지', '공익직불제',
+] as const;
+
+/** receptionBaseKey가 읽는 필드 — 저장소 원본은 숫자·null도 섞여 있다 */
+export interface ReceptionKeySource {
+    receptionNumber?: string | number | null;
+    subCategory?: string | null;
+    landClass1?: string | null;
+}
+
+/**
+ * 채번(computeNextNumber)과 가져오기 중복 판정(collectExistingNumbers)이 공유하는 분류 규칙.
+ * 대상 풀이면 비교 키(본번, 성토는 F를 뗀 숫자부)를, 아니면 null을 돌려준다.
+ * targetClass는 호출부가 확정해 넘긴다 — 빈 값을 기본값으로 폴백하는지가 두 호출부에서 다르다.
+ */
+export function receptionBaseKey(
+    log: ReceptionKeySource | null | undefined,
+    fill: boolean,
+    targetClass: string,
+    defaultClass: string = DEFAULT_LAND_CLASS,
+): string | null {
+    if (!log || !log.receptionNumber) return null;
+    if ((log.landClass1 || defaultClass) !== targetClass) return null;
+    if (fill !== (log.subCategory === '성토')) return null;
+
+    const base = String(log.receptionNumber).split('-')[0].trim();
+    if (!fill && base.startsWith('F')) return null;
+    return fill ? base.replace('F', '') : base;
+}
 
 /**
  * 주어진 로그 배열에서 targetClass 범위의 다음 접수번호(정수)를 계산.
@@ -46,19 +80,9 @@ export function computeNextNumber(
     let maxNumber = 0;
     const list = Array.isArray(logs) ? logs : [];
     for (const log of list) {
-        if (!log || !log.receptionNumber) continue;
-        // 성토/일반 체계 분리
-        const isFill = log.subCategory === '성토';
-        if (fill !== isFill) continue;
-        // 같은 경지구분 1차 범위만
-        if ((log.landClass1 || def) !== target) continue;
-
-        const baseNumber = String(log.receptionNumber).split('-')[0];
-        // 일반 체계에서는 'F' 접두(성토 흔적) 번호를 제외
-        if (!fill && baseNumber.startsWith('F')) continue;
-
-        const numStr = fill ? baseNumber.replace('F', '') : baseNumber;
-        const num = parseInt(numStr, 10);
+        const key = receptionBaseKey(log, fill, target, def);
+        if (key === null) continue;
+        const num = parseInt(key, 10);
         if (!isNaN(num) && num > maxNumber) maxNumber = num;
     }
     return maxNumber + 1;

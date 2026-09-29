@@ -79,6 +79,22 @@ describe('computeNextNumber — 성토(F) 번호 체계 분리', () => {
         expect(next(logs, '농가의뢰', { fill: true })).toBe(4)
     })
 
+    it('성토 채번은 더 큰 일반 번호를 끌어오지 않는다', () => {
+        const logs = [
+            { receptionNumber: '10', landClass1: '농가의뢰' },
+            { receptionNumber: 'F3', subCategory: '성토', landClass1: '농가의뢰' }
+        ]
+        expect(next(logs, '농가의뢰', { fill: true })).toBe(4)
+    })
+
+    it('일반 채번은 F 접두가 없는 성토 레코드도 제외', () => {
+        const logs = [
+            { receptionNumber: '1', landClass1: '농가의뢰' },
+            { receptionNumber: '20', subCategory: '성토', landClass1: '농가의뢰' }
+        ]
+        expect(next(logs, '농가의뢰')).toBe(2)
+    })
+
     it('성토 채번도 경지구분별 독립', () => {
         const logs = [
             { receptionNumber: 'F1', subCategory: '성토', landClass1: '농가의뢰' },

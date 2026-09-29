@@ -10,6 +10,7 @@
  */
 
 import { LAND_CLASS1_DEFAULT, type ColumnMapping } from './soil-import-mapping';
+import { receptionBaseKey } from './reception-number';
 
 /** 기존 접수 레코드에서 이 계산에 필요한 최소 형태 */
 export interface ExistingLogLike {
@@ -87,10 +88,7 @@ export interface ComputePreviewOptions {
     nextNumber?: number | null;
     /** 기존 접수번호 집합 — 성토 시퀀스 (collectExistingNumbers(logs, class, {fill:true})) */
     existingFill?: ReadonlySet<string>;
-    /**
-     * 성토 자동부여 시작 번호(정수, F 접두 없이). 매니저의
-     * `generateNextFillReceptionNumber()`가 만드는 값과 같아야 한다.
-     */
+    /** 성토 자동부여 시작 번호(정수, F 접두 없이). 매니저의 `getNextFillNumberForClass()` 결과를 넘긴다. */
     nextFillNumber?: number | null;
 }
 
@@ -101,13 +99,9 @@ export interface CollectExistingOptions {
 
 /**
  * 기존 레코드에서 "같은 경지구분1차 + 같은 시퀀스(일반/성토)" 범위의 접수번호 집합을 만든다.
- *
- * 이 함수의 분류 규칙은 매니저 `reception-number.ts`의 `computeNextNumber`와
- * **한 줄씩 같아야 한다** — 어긋나면 미리보기가 보여준 번호와 실제 저장 번호가 달라진다:
- * - 성토(`subCategory === '성토'`)는 F 접두의 별 시퀀스이고, 두 시퀀스는 서로를 제외한다
- * - 일반 시퀀스에서는 `F` 접두 번호를 제외한다
- * - 성토 시퀀스에서는 `F`를 떼고 숫자만 비교한다
- * - 서브넘버(`5-1`)는 본번(`5`)으로 접어 넣는다
+ * 분류 규칙은 채번(computeNextNumber)과 같은 receptionBaseKey를 쓴다 — 어긋나면 미리보기가
+ * 보여준 번호와 실제 저장 번호가 달라진다.
+ * landClass1은 폴백 없이 그대로 비교한다(빈 값이면 빈 집합).
  */
 export function collectExistingNumbers(
     logs: readonly ExistingLogLike[] | null | undefined,
@@ -117,14 +111,8 @@ export function collectExistingNumbers(
     const fill = !!opts?.fill;
     const set = new Set<string>();
     for (const log of logs ?? []) {
-        if (!log || !log.receptionNumber) continue;
-        if ((log.landClass1 || LAND_CLASS1_DEFAULT) !== landClass1) continue;
-        // 성토/일반 체계 분리 (computeNextNumber와 동일 조건)
-        if (fill !== (log.subCategory === '성토')) continue;
-
-        const base = String(log.receptionNumber).split('-')[0].trim();
-        if (!fill && base.startsWith('F')) continue;
-        set.add(fill ? base.replace('F', '') : base);
+        const key = receptionBaseKey(log, fill, landClass1, LAND_CLASS1_DEFAULT);
+        if (key !== null) set.add(key);
     }
     return set;
 }

@@ -5,7 +5,7 @@
 
 import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow, ParsedParcelAddress, RegionSelectionModalData, SoilStatistics } from '../types/sample-types';
 import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleManager';
-import { computeNextNumber } from './reception-number';
+import { computeNextNumber, receptionBaseKey, DEFAULT_LAND_CLASS as LAND_CLASS1_DEFAULT, LAND_CLASS1_OPTIONS } from './reception-number';
 import {
     resolveParcelCategory as resolveParcelCategoryPure,
     resolveParcelPurpose as resolveParcelPurposePure,
@@ -53,6 +53,8 @@ interface ImportedRecordsResult {
     inserted: number;
     updated: number;
     failed: number;
+    /** 같은 본번 레코드가 여럿이라 어느 것을 덮을지 정할 수 없어 건너뛴 행 */
+    ambiguous: number;
     /** 이번 배치에서 추가되거나 갱신된 레코드 */
     logs: SoilLog[];
 }
@@ -84,15 +86,6 @@ const AUTO_SAVE_FILE = 'soil-autosave.json';
 // 경지구분 1차 (landClass1)
 // ========================================
 
-/**
- * 경지구분 1차 값 목록 (단일 소스 — 폼/탭 option은 이 배열로 JS 동적 생성).
- * '공익직불제'는 옵션 값으로만 존재하며 전용 UI/로직은 없음(일반 경지구분처럼 동작).
- */
-const LAND_CLASS1_OPTIONS: readonly string[] = ['개량제', '전략', '직불', '자체', '기타', '친환경', '유기농', '무농약', 'GAP', '농가의뢰', '대표필지', '공익직불제'];
-
-/** 기본 경지구분 1차 */
-const LAND_CLASS1_DEFAULT = '농가의뢰';
-
 /** 공익직불제 기준년도(이행점검명) 선택지 (임시값, 추후 교체 가능) */
 const GONGIK_BASE_YEAR_OPTIONS: readonly string[] = ['2024토양화학성분 기준', '2025토양화학성분 기준', '2026토양화학성분 기준', '2027토양화학성분 기준'];
 
@@ -101,7 +94,7 @@ const GONGIK_BASE_YEAR_OPTIONS: readonly string[] = ['2024토양화학성분 기
  * 매핑 외 값은 category-other 폴백.
  */
 const LAND_CLASS1_STATS_MAPPING: Record<string, { label: string; class: string }> = {
-    '농가의뢰': { label: '🧑‍🌾 농가의뢰', class: 'purpose-general' },
+    [LAND_CLASS1_DEFAULT]: { label: '🧑‍🌾 농가의뢰', class: 'purpose-general' },
     '공익직불제': { label: '🏛️ 공익직불제', class: 'purpose-gap' },
     '대표필지': { label: '📍 대표필지', class: 'category-facility' },
     '개량제': { label: '🧪 개량제', class: 'category-fill' },
@@ -916,13 +909,21 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         return computeNextNumber(logs, targetClass);
     }
 
+    /** getNextNumberForClass의 성토(F) 시퀀스판. 'F' 접두 없이 정수를 돌려주고 로그는 찍지 않는다. */
+    getNextFillNumberForClass(year?: number | string, landClass1?: string): number {
+        const targetClass = landClass1 || LAND_CLASS1_DEFAULT;
+        const targetYear = year || this.selectedYear;
+        const logs = (String(targetYear) === String(this.selectedYear)) ? this.sampleLogs : [];
+        return computeNextNumber(logs, targetClass, { fill: true });
+    }
+
     /**
      * 가져온 레코드를 현재 연도 저장소에 반영한다 (SoilResultImporter 위임 대상).
      * 같은 접수번호 + 같은 경지구분 레코드가 있으면 덮어쓰고, 없으면 추가한다.
      * 저장·클라우드 동기화·재렌더는 배치 끝에 한 번씩만 한다 — 행마다 하면 수백 행에서 수 초 멈춘다.
      */
     addImportedRecords(records: ImportedSoilRecord[]): ImportedRecordsResult {
-        const result: ImportedRecordsResult = { inserted: 0, updated: 0, failed: 0, logs: [] };
+        const result: ImportedRecordsResult = { inserted: 0, updated: 0, failed: 0, ambiguous: 0, logs: [] };
         const nowISO = new Date().toISOString();
 
         for (const record of Array.isArray(records) ? records : []) {
@@ -930,11 +931,11 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 const src = record || {};
                 const landClass1 = src.landClass1 || LAND_CLASS1_DEFAULT;
                 const receptionNumber = this._resolveImportedNumber(src, landClass1);
-                const existing = this.sampleLogs.find(l =>
-                    String(l.receptionNumber ?? '').trim() === receptionNumber
-                    && (l.landClass1 || LAND_CLASS1_DEFAULT) === landClass1);
+                const existing = this._findImportTarget(receptionNumber, src.subCategory === '성토', landClass1);
 
-                if (existing) {
+                if (existing === 'ambiguous') {
+                    result.ambiguous++;
+                } else if (existing) {
                     this._applyImportedValues(existing, src, nowISO);
                     result.updated++;
                     if (!result.logs.includes(existing)) result.logs.push(existing);
@@ -955,8 +956,24 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             this.firebaseSaveBatch(result.logs);
             this.filterAndRenderLogs();
         }
-        this.log('가져오기 반영:', result.inserted, '건 추가,', result.updated, '건 덮어씀,', result.failed, '건 실패');
+        this.log('가져오기 반영:', result.inserted, '건 추가,', result.updated, '건 덮어씀,',
+            result.ambiguous, '건 모호,', result.failed, '건 실패');
         return result;
+    }
+
+    /**
+     * 덮어쓸 기존 레코드. 앱 전체(폼 중복 검사·채번·완료 연동)가 본번을 접수의 정체성으로 쓰므로
+     * 미리보기 중복 판정과 같은 receptionBaseKey로 찾는다: 번호 전체가 같은 레코드 우선,
+     * 없으면 같은 본번이 한 건일 때 그것. 같은 본번이 여럿('5-1'·'5-2'에 '5')이면 고르지 않는다.
+     */
+    private _findImportTarget(receptionNumber: string, isFill: boolean, landClass1: string): SoilLog | 'ambiguous' | undefined {
+        const key = receptionBaseKey({ receptionNumber, subCategory: isFill ? '성토' : '', landClass1 }, isFill, landClass1);
+        if (key === null) return undefined;
+        const same = this.sampleLogs.filter(l => receptionBaseKey(l, isFill, landClass1) === key);
+        const exact = same.find(l => String(l.receptionNumber ?? '').trim() === receptionNumber);
+        if (exact) return exact;
+        if (same.length === 0) return undefined;
+        return same.length === 1 ? same[0] : 'ambiguous';
     }
 
     /** 지정 접수번호 우선, 없으면 경지구분 1차별 독립 번호 자동 부여 */

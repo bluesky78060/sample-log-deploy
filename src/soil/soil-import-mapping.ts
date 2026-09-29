@@ -33,12 +33,8 @@ interface NormKeyword {
 /** 헤더 배열 → { 필드키: 컬럼인덱스 } */
 export type ColumnMapping = Record<string, number>;
 
-export const LAND_CLASS1_OPTIONS = [
-    '개량제', '전략', '직불', '자체', '기타', '친환경',
-    '유기농', '무농약', 'GAP', '농가의뢰', '대표필지', '공익직불제',
-] as const;
-
-export const LAND_CLASS1_DEFAULT = '농가의뢰';
+// 정의는 reception-number.ts 한 곳. 모달·테스트가 이 이름으로 가져가므로 재수출만 한다.
+export { LAND_CLASS1_OPTIONS, DEFAULT_LAND_CLASS as LAND_CLASS1_DEFAULT } from './reception-number';
 
 /**
  * 매핑 대상 필드 (순서 = 매핑 UI 표시 순서 = 동점 시 우선순위).

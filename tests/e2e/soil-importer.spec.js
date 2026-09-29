@@ -507,3 +507,64 @@ test.describe('토양 가져오기 — 덮어쓰기(upsert)와 배치 저장 (SA
         expect(spy.docs).toBe(2);
     });
 });
+
+test.describe('토양 가져오기 — 덮어쓰기 매칭은 미리보기와 같은 본번 기준 (SAMPL-2-28)', () => {
+    const seed = (id, receptionNumber, name) => ({
+        id, receptionNumber, name, landClass1: '농가의뢰', subCategory: '논', purpose: '일반재배',
+        createdAt: '2020-01-01T00:00:00.000Z', updatedAt: '2020-01-01T00:00:00.000Z', groupId: `g-${id}`,
+        parcels: [{ id: `p-${id}`, lotAddress: `옛주소-${id}`, isMountain: false, subLots: [],
+            crops: [{ name: '벼', area: '100' }], category: '논', purpose: '일반재배', note: '' }],
+    });
+
+    async function seedAndOpen(page, logs, rows) {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await page.evaluate((data) => {
+            localStorage.clear();
+            localStorage.setItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`, JSON.stringify(data));
+        }, logs);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction((n) => (window.soilManager?.sampleLogs || []).length === n, logs.length);
+        await page.evaluate(() => {
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
+        });
+
+        const modal = await openWithPastedData(page, ['접수번호\t성명\t지번주소', ...rows].join('\n'));
+        await modal.locator('[data-el="autoNumber"]').uncheck();
+        await modal.locator('input[name="sriDup"][value="overwrite"]').check();
+        await modal.locator('[data-act="automap"]').click();
+        return modal;
+    }
+
+    test("'5-1'만 있을 때 '5'를 덮어쓰면 새로 추가하지 않고 '5-1'을 갱신한다", async ({ page }) => {
+        const modal = await seedAndOpen(page, [seed('sub-5-1', '5-1', '옛이름')], ['5\t새이름\t봉화읍 내성리 5']);
+        // 미리보기는 본번이 같아 중복으로 본다
+        await expect(modal.locator('.sri-pill.dup')).toContainText('중복 1');
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const logs = await readPersistedRaw(page);
+        expect(logs).toHaveLength(1);
+        expect(logs[0].id).toBe('sub-5-1');
+        expect(logs[0].receptionNumber).toBe('5-1');
+        expect(logs[0].name).toBe('새이름');
+    });
+
+    test('같은 본번이 여러 건이면 어느 것도 덮지 않고 건너뛴 건수를 알린다', async ({ page }) => {
+        const modal = await seedAndOpen(page,
+            [seed('sub-8-1', '8-1', '첫째'), seed('sub-8-2', '8-2', '둘째')],
+            ['8\t새이름\t봉화읍 내성리 8']);
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const toasts = await page.evaluate(() => window.__toasts);
+        expect(toasts.join(' | ')).toContain('같은 본번이 여러 건이라 건너뜀 1건');
+
+        const logs = await readPersistedRaw(page);
+        expect(logs.map((l) => `${l.receptionNumber}:${l.name}`).sort()).toEqual(['8-1:첫째', '8-2:둘째']);
+    });
+});

@@ -75,10 +75,10 @@ interface SoilManagerLike {
     sampleLogs?: ExistingLogLike[];
     selectedYear?: number | string;
     getNextNumberForClass?(year: number | string, landClass1: string): number;
-    /** 성토 다음 접수번호 — 'F3' 형태의 문자열을 돌려준다 */
-    generateNextFillReceptionNumber?(landClass1?: string): string;
+    /** 성토 다음 접수번호(정수, F 접두 없음) */
+    getNextFillNumberForClass?(year: number | string, landClass1: string): number;
     /** 같은 접수번호+경지구분이면 덮어쓰고 아니면 추가. 저장·재렌더는 배치당 1회 */
-    addImportedRecords?(records: PreviewRecord[]): { inserted: number; updated: number; failed: number };
+    addImportedRecords?(records: PreviewRecord[]): { inserted: number; updated: number; failed: number; ambiguous: number };
 }
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -392,7 +392,7 @@ function buildModal(): HTMLElement {
         <span class="sri-muted">중복 접수번호가 있을 때:</span>
         <div class="sri-opt-sub">
           <label class="sri-radio"><input type="radio" name="sriDup" value="skip" checked> 건너뛰기</label>
-          <!-- 매니저 addImportedRecords가 같은 접수번호+경지구분 레코드를 찾아 갱신한다 (빈 칸은 기존 값 유지) -->
+          <!-- 매니저 addImportedRecords가 미리보기와 같은 본번 기준으로 기존 레코드를 찾아 갱신한다 (빈 칸은 기존 값 유지) -->
           <label class="sri-radio"><input type="radio" name="sriDup" value="overwrite"> 덮어쓰기</label>
         </div>
       </div>
@@ -916,9 +916,8 @@ export class SoilResultImporter {
         const nextNumber = typeof mgr?.getNextNumberForClass === 'function'
             ? mgr.getNextNumberForClass(currentYear(mgr), landClass1)
             : null;
-        // 매니저는 'F3' 문자열을 주므로 숫자만 뽑아 커서로 쓴다
-        const nextFillNumber = typeof mgr?.generateNextFillReceptionNumber === 'function'
-            ? Number.parseInt(mgr.generateNextFillReceptionNumber(landClass1).replace('F', ''), 10)
+        const nextFillNumber = typeof mgr?.getNextFillNumberForClass === 'function'
+            ? mgr.getNextFillNumberForClass(currentYear(mgr), landClass1)
             : null;
 
         this._state.preview = computePreview({
@@ -1070,7 +1069,7 @@ export class SoilResultImporter {
             recs.push(rec);
         }
 
-        let res: { inserted: number; updated: number; failed: number };
+        let res: { inserted: number; updated: number; failed: number; ambiguous: number };
         try {
             res = mgr.addImportedRecords(recs);
         } catch (err) {
@@ -1079,14 +1078,15 @@ export class SoilResultImporter {
             if (importBtn) importBtn.disabled = false;
             return;
         }
-        const { inserted, updated, failed } = res;
+        const { inserted, updated, failed, ambiguous } = res;
 
         const parts = [`✅ ${inserted + updated}건 가져오기 완료`];
         if (updated > 0) parts.push(`덮어씀 ${updated}건`);
+        if (ambiguous > 0) parts.push(`같은 본번이 여러 건이라 건너뜀 ${ambiguous}건`);
         if (p.stats.dup > 0) parts.push(`중복 ${p.stats.dup}건`);
         if (p.stats.err > 0) parts.push(`오류 ${p.stats.err}건`);
         if (failed > 0) parts.push(`실패 ${failed}건`);
-        toast(parts.join(' · '), failed > 0 ? 'warning' : 'success');
+        toast(parts.join(' · '), failed > 0 || ambiguous > 0 ? 'warning' : 'success');
         this.close();
     }
 
