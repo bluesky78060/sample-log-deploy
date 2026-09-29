@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { receptionBaseKey, computeNextNumber, DEFAULT_LAND_CLASS } from '../../src/soil/reception-number'
+import { receptionBaseKey, computeNextNumber, DEFAULT_LAND_CLASS, matchImportRow, isFillImportRow, importedSubCategory } from '../../src/soil/reception-number'
 import { collectExistingNumbers } from '../../src/soil/soil-import-preview'
 
 // SAMPL-2-28: 채번과 가져오기 중복 판정이 같은 분류 규칙을 쓰는지 본다
@@ -48,4 +48,38 @@ describe('computeNextNumber ↔ collectExistingNumbers 일치', () => {
             })
         }
     }
+})
+
+// SAMPL-1-152 수정 라운드: 미리보기와 매니저가 같이 쓰는 가져오기 매칭
+describe('matchImportRow', () => {
+    const L = DEFAULT_LAND_CLASS
+    const logs = [
+        { receptionNumber: '5', landClass1: L },
+        { receptionNumber: '8-1', landClass1: L },
+        { receptionNumber: '8-2', landClass1: L },
+        { receptionNumber: 'F3', landClass1: L, subCategory: '성토' },
+        { receptionNumber: '7', landClass1: '공익직불제' },
+    ]
+
+    it('전체 번호 일치 → match, 같은 본번 여럿 → ambiguous, 없으면 none', () => {
+        expect(matchImportRow(logs, '5', '', L)).toEqual({ kind: 'match', target: logs[0] })
+        expect(matchImportRow(logs, '8-2', '', L)).toEqual({ kind: 'match', target: logs[2] })
+        expect(matchImportRow(logs, '8', '', L).kind).toBe('ambiguous')
+        expect(matchImportRow(logs, '7', '', L).kind).toBe('none')
+    })
+
+    it("본번만 있을 때 'N-M' 행은 하위 필지 행이다", () => {
+        expect(matchImportRow(logs, '5-1', '', L).kind).toBe('subrow')
+    })
+
+    it('구분이 비어도 F 번호면 성토 풀에서 찾는다', () => {
+        expect(matchImportRow(logs, 'F3', '', L)).toEqual({ kind: 'match', target: logs[3] })
+        expect(isFillImportRow('F3', '')).toBe(true)
+        expect(importedSubCategory('F9', '')).toBe('성토')
+        expect(importedSubCategory('9', '')).toBe('')
+    })
+
+    it("구분 '성토'인 일반 번호 행은 일반 레코드와 만나지 않는다", () => {
+        expect(matchImportRow(logs, '5', '성토', L).kind).toBe('none')
+    })
 })

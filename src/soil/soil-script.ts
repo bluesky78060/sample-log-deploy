@@ -5,7 +5,10 @@
 
 import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow, ParsedParcelAddress, RegionSelectionModalData, SoilStatistics } from '../types/sample-types';
 import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleManager';
-import { computeNextNumber, receptionBaseKey, DEFAULT_LAND_CLASS as LAND_CLASS1_DEFAULT, LAND_CLASS1_OPTIONS } from './reception-number';
+import {
+    computeNextNumber, DEFAULT_LAND_CLASS as LAND_CLASS1_DEFAULT, LAND_CLASS1_OPTIONS,
+    matchImportRow, importedSubCategory, type ImportMatch,
+} from './reception-number';
 import {
     resolveParcelCategory as resolveParcelCategoryPure,
     resolveParcelPurpose as resolveParcelPurposePure,
@@ -51,12 +54,26 @@ interface ImportedSoilRecord {
 
 interface ImportedRecordsResult {
     inserted: number;
+    /** 기존 레코드를 덮어쓴 건수 (같은 레코드는 한 번만) */
     updated: number;
-    failed: number;
+    /** 이 배치에서 이미 추가·갱신한 레코드를 뒤 행이 다시 덮은 건수 */
+    batchUpdated: number;
+    /** 건너뛰기 정책이라 기존 레코드를 건드리지 않은 행 */
+    skipped: number;
     /** 같은 본번 레코드가 여럿이라 어느 것을 덮을지 정할 수 없어 건너뛴 행 */
     ambiguous: number;
+    /** 'N-M' 하위 필지 행이라 건너뛴 행 */
+    subRows: number;
+    failed: number;
+    /** 로컬 저장 실패 — 메모리는 가져오기 전으로 되돌렸고 클라우드에는 보내지 않았다 */
+    saveError?: unknown;
     /** 이번 배치에서 추가되거나 갱신된 레코드 */
     logs: SoilLog[];
+}
+
+interface ImportedRecordsOptions {
+    /** 기존 레코드와 매칭된 행을 덮을지(overwrite) 그대로 둘지(skip). 기본 skip */
+    onDuplicate?: 'skip' | 'overwrite';
 }
 
 /**
@@ -68,6 +85,12 @@ const IMPORT_OVERWRITE_FIELDS = [
     'subCategory', 'purpose', 'receptionMethod', 'note', 'businessRegNo', 'gongikOrder',
     'gongikBaseYear', 'basePnu',
 ] as const;
+
+/** 내보내기는 산 필지를 '주소 (산)'으로 쓴다. 되가져올 때 떼지 않으면 '(산)'이 주소에 붙어 쌓인다 */
+function splitMountainSuffix(raw: string): { lotAddress: string; isMountain: boolean } {
+    const m = /^(.*?)\s*\(산\)\s*$/.exec(raw);
+    return m ? { lotAddress: m[1].trim(), isMountain: true } : { lotAddress: raw.trim(), isMountain: false };
+}
 
 // ========================================
 // 상수 및 설정
@@ -920,29 +943,47 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     /**
      * 가져온 레코드를 현재 연도 저장소에 반영한다 (SoilResultImporter 위임 대상).
-     * 같은 접수번호 + 같은 경지구분 레코드가 있으면 덮어쓰고, 없으면 추가한다.
+     * 기존 레코드 매칭은 미리보기와 같은 matchImportRow로 한다. 매칭되면 onDuplicate에 따라 덮거나 두고,
+     * 모호·하위 필지 행은 정책과 무관하게 건너뛴다.
      * 저장·클라우드 동기화·재렌더는 배치 끝에 한 번씩만 한다 — 행마다 하면 수백 행에서 수 초 멈춘다.
      */
-    addImportedRecords(records: ImportedSoilRecord[]): ImportedRecordsResult {
-        const result: ImportedRecordsResult = { inserted: 0, updated: 0, failed: 0, ambiguous: 0, logs: [] };
+    async addImportedRecords(records: ImportedSoilRecord[], opts: ImportedRecordsOptions = {}): Promise<ImportedRecordsResult> {
+        const result: ImportedRecordsResult = {
+            inserted: 0, updated: 0, batchUpdated: 0, skipped: 0, ambiguous: 0, subRows: 0, failed: 0, logs: [],
+        };
+        const overwrite = opts.onDuplicate === 'overwrite';
         const nowISO = new Date().toISOString();
+        // 저장 실패 시 되돌릴 원본. 배열·객체를 교체하지 않고 제자리 복원한다(외부 참조 보존 — saveLogs 참고)
+        const originals = new Map<SoilLog, string>();
+        const insertedLogs = new Set<SoilLog>();
 
         for (const record of Array.isArray(records) ? records : []) {
             try {
                 const src = record || {};
                 const landClass1 = src.landClass1 || LAND_CLASS1_DEFAULT;
-                const receptionNumber = this._resolveImportedNumber(src, landClass1);
-                const existing = this._findImportTarget(receptionNumber, src.subCategory === '성토', landClass1);
+                const given = src.receptionNumber != null ? String(src.receptionNumber).trim() : '';
+                const match: ImportMatch<SoilLog> = given
+                    ? matchImportRow(this.sampleLogs, given, src.subCategory, landClass1)
+                    : { kind: 'none' };
 
-                if (existing === 'ambiguous') {
+                if (match.kind === 'ambiguous') {
                     result.ambiguous++;
-                } else if (existing) {
-                    this._applyImportedValues(existing, src, nowISO);
-                    result.updated++;
-                    if (!result.logs.includes(existing)) result.logs.push(existing);
+                } else if (match.kind === 'subrow') {
+                    result.subRows++;
+                } else if (match.kind === 'match') {
+                    const target = match.target;
+                    if (!overwrite) { result.skipped++; continue; }
+                    const touched = insertedLogs.has(target) || originals.has(target);
+                    if (!touched) originals.set(target, JSON.stringify(target));
+                    this._applyImportedValues(target, src, nowISO);
+                    if (touched) result.batchUpdated++;
+                    else result.updated++;
+                    if (!result.logs.includes(target)) result.logs.push(target);
                 } else {
+                    const receptionNumber = given || this._resolveImportedNumber(src, landClass1);
                     const newLog = this._buildImportedLog(src, receptionNumber, landClass1, nowISO);
                     this.sampleLogs.push(newLog);
+                    insertedLogs.add(newLog);
                     result.inserted++;
                     result.logs.push(newLog);
                 }
@@ -953,35 +994,35 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         }
 
         if (result.logs.length > 0) {
-            this.saveLogs();
+            try {
+                await this.saveLogs();
+            } catch (err) {
+                // setItem은 실패하면 저장소를 바꾸지 않는다 → 메모리만 되돌리면 셋이 다시 맞는다
+                this._restoreImportSnapshot(originals, insertedLogs);
+                (window.logger?.error || console.error)('가져오기 로컬 저장 실패 — 되돌림:', err);
+                result.saveError = err;
+                return result;
+            }
             this.firebaseSaveBatch(result.logs);
             this.filterAndRenderLogs();
         }
-        this.log('가져오기 반영:', result.inserted, '건 추가,', result.updated, '건 덮어씀,',
-            result.ambiguous, '건 모호,', result.failed, '건 실패');
+        this.log('가져오기 반영:', result);
         return result;
     }
 
-    /**
-     * 덮어쓸 기존 레코드. 앱 전체(폼 중복 검사·채번·완료 연동)가 본번을 접수의 정체성으로 쓰므로
-     * 미리보기 중복 판정과 같은 receptionBaseKey로 찾는다: 번호 전체가 같은 레코드 우선,
-     * 없으면 같은 본번이 한 건일 때 그것. 같은 본번이 여럿('5-1'·'5-2'에 '5')이면 고르지 않는다.
-     */
-    private _findImportTarget(receptionNumber: string, isFill: boolean, landClass1: string): SoilLog | 'ambiguous' | undefined {
-        const key = receptionBaseKey({ receptionNumber, subCategory: isFill ? '성토' : '', landClass1 }, isFill, landClass1);
-        if (key === null) return undefined;
-        const same = this.sampleLogs.filter(l => receptionBaseKey(l, isFill, landClass1) === key);
-        const exact = same.find(l => String(l.receptionNumber ?? '').trim() === receptionNumber);
-        if (exact) return exact;
-        if (same.length === 0) return undefined;
-        return same.length === 1 ? same[0] : 'ambiguous';
+    private _restoreImportSnapshot(originals: Map<SoilLog, string>, insertedLogs: Set<SoilLog>): void {
+        for (let i = this.sampleLogs.length - 1; i >= 0; i--) {
+            if (insertedLogs.has(this.sampleLogs[i])) this.sampleLogs.splice(i, 1);
+        }
+        originals.forEach((json, target) => {
+            const t = target as unknown as Record<string, unknown>;
+            for (const k of Object.keys(t)) delete t[k];
+            Object.assign(t, JSON.parse(json));
+        });
     }
 
-    /** 지정 접수번호 우선, 없으면 경지구분 1차별 독립 번호 자동 부여 */
+    /** 접수번호가 없는 행에 경지구분 1차별 독립 번호 자동 부여 */
     private _resolveImportedNumber(src: ImportedSoilRecord, landClass1: string): string {
-        if (src.receptionNumber != null && String(src.receptionNumber).trim() !== '') {
-            return String(src.receptionNumber).trim();
-        }
         // 성토(subCategory='성토')는 F 접두의 **별 시퀀스**를 쓴다. 이 분기가 없으면
         // computeNextNumber가 일반 체계(fill=false)로 계산하면서 방금 저장한 성토 레코드를
         // 제외하므로 카운터가 전진하지 않고 성토 행 전부가 '1'로 저장된다 (SAMPL-1-124 적대적 검증).
@@ -991,7 +1032,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     }
 
     private _buildImportedLog(src: ImportedSoilRecord, receptionNumber: string, landClass1: string, nowISO: string): SoilLog {
-        const lotAddress = src.lotAddress || '';
+        const { lotAddress, isMountain } = splitMountainSuffix(src.lotAddress || '');
+        const subCategory = importedSubCategory(receptionNumber, src.subCategory || '');
         const cropsDisplay = src.cropsDisplay || '-';
         const area = (parseFloat(String(src.area ?? '')) || 0).toString();
 
@@ -1005,7 +1047,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             addressPostcode: src.addressPostcode || '',
             addressRoad: src.addressRoad || '',
             addressDetail: src.addressDetail || '',
-            subCategory: src.subCategory || '-',
+            subCategory: subCategory || '-',
             purpose: src.purpose || '',
             landClass1,
             receptionMethod: src.receptionMethod || '-',
@@ -1024,12 +1066,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             parcels: [{
                 id: crypto.randomUUID(),
                 lotAddress,
-                isMountain: false,
+                isMountain,
                 subLots: [],
                 crops: (cropsDisplay && cropsDisplay !== '-')
                     ? [{ name: cropsDisplay, area: (parseFloat(area) || 0).toString() }]
                     : [],
-                category: src.subCategory || '',
+                category: subCategory,
                 purpose: src.purpose || '',
                 note: src.note || ''
             }],
@@ -1041,14 +1083,17 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     /**
      * 기존 레코드에 가져온 값을 덮어쓴다. id·createdAt·groupId는 그대로 두고 updatedAt만 새로 찍는다.
-     * 빈 칸은 건너뛴다 — 미리보기 레코드는 매핑하지 않은 열도 ''로 채우므로, 빈 값까지 쓰면
-     * 가져오기와 무관한 연락처·완료 여부가 지워진다.
+     * 빈 칸과 '-'는 건너뛴다 — 매핑하지 않은 열은 ''로, 앱 내보내기는 빈 칸을 '-'로 채우므로
+     * 그 값을 쓰면 가져오기와 무관한 연락처·비고가 지워지거나 '-'가 된다.
      */
     private _applyImportedValues(target: SoilLog, src: ImportedSoilRecord, nowISO: string): void {
         const t = target as unknown as Record<string, unknown>;
-        const has = (v: unknown): boolean => v != null && String(v).trim() !== '';
+        const has = (v: unknown): boolean => v != null && String(v).trim() !== '' && String(v).trim() !== '-';
+        // 성토 여부가 바뀌면 F 시퀀스와 일반 시퀀스 사이를 옮겨 채번이 어긋난다 — 구분은 같은 쪽 안에서만 바꾼다
+        const keepSubCategory = has(src.subCategory) && (src.subCategory === '성토') !== (t.subCategory === '성토');
 
         for (const key of IMPORT_OVERWRITE_FIELDS) {
+            if (key === 'subCategory' && keepSubCategory) continue;
             if (has(src[key])) t[key] = src[key];
         }
 
@@ -1058,18 +1103,35 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             t.parcels = parcels;
         }
         const parcel = parcels[0];
-        if (has(src.lotAddress)) { t.lotAddress = src.lotAddress; parcel.lotAddress = src.lotAddress; }
-        if (has(src.subCategory)) parcel.category = src.subCategory;
+        if (has(src.lotAddress)) {
+            const { lotAddress, isMountain } = splitMountainSuffix(String(src.lotAddress));
+            // 표기 없이 같은 주소가 오면 산 여부는 원래 값을 둔다(다른 도구가 '(산)'을 떨궜을 수 있다)
+            parcel.isMountain = isMountain || (lotAddress === parcel.lotAddress && parcel.isMountain === true);
+            t.lotAddress = lotAddress;
+            parcel.lotAddress = lotAddress;
+        }
+        if (has(src.subCategory) && !keepSubCategory) parcel.category = src.subCategory;
         if (has(src.purpose)) parcel.purpose = src.purpose;
         if (has(src.note)) parcel.note = src.note;
-        if (has(src.cropsDisplay) || has(src.area)) {
-            const area = has(src.area) ? (parseFloat(String(src.area)) || 0).toString() : String(t.area ?? '0');
-            const cropsDisplay = has(src.cropsDisplay) ? String(src.cropsDisplay) : String(t.cropsDisplay ?? '-');
-            t.area = area;
-            t.cropsDisplay = cropsDisplay;
-            parcel.crops = cropsDisplay !== '-' ? [{ name: cropsDisplay, area }] : [];
-        }
+        this._applyImportedCrops(t, parcel, src, has);
         t.updatedAt = nowISO;
+    }
+
+    /**
+     * 작물은 한 행에 '고추, 콩' / 합계 면적으로만 온다. 기존이 여러 작물이거나 평 단위면 이 값으로
+     * 개별 면적·단위를 되살릴 수 없으므로 건드리지 않는다(내보내기 면적은 평과 ㎡를 그냥 더한 값이다).
+     */
+    private _applyImportedCrops(t: Record<string, unknown>, parcel: Record<string, unknown>, src: ImportedSoilRecord, has: (v: unknown) => boolean): void {
+        if (!has(src.cropsDisplay) && !has(src.area)) return;
+        const crops = Array.isArray(parcel.crops) ? (parcel.crops as Array<Record<string, unknown>>) : [];
+        if (crops.length >= 2 || crops.some(c => has(c.unit))) return;
+
+        const prev = crops[0];
+        const name = has(src.cropsDisplay) ? String(src.cropsDisplay).trim() : String(prev?.name ?? t.cropsDisplay ?? '-');
+        const area = has(src.area) ? (parseFloat(String(src.area)) || 0).toString() : String(prev?.area ?? t.area ?? '0');
+        t.area = area;
+        t.cropsDisplay = name;
+        parcel.crops = name !== '-' ? [{ ...(prev ?? {}), name, area }] : [];
     }
 
     // ========================================

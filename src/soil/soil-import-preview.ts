@@ -10,7 +10,7 @@
  */
 
 import { LAND_CLASS1_DEFAULT, type ColumnMapping } from './soil-import-mapping';
-import { receptionBaseKey } from './reception-number';
+import { receptionBaseKey, isFillImportRow, matchImportRow, importedSubCategory } from './reception-number';
 
 /** 기존 접수 레코드에서 이 계산에 필요한 최소 형태 */
 export interface ExistingLogLike {
@@ -47,7 +47,7 @@ export interface PreviewItem {
     auto?: boolean;
     /** 중복이고 건너뛰기 정책이라 등록되지 않는 행 */
     skip?: boolean;
-    /** 오류 사유 */
+    /** 오류 사유, 또는 정책과 무관하게 건너뛰는 중복의 사유 */
     reason?: string;
 }
 
@@ -81,6 +81,11 @@ export interface ComputePreviewOptions {
     dupPolicy?: DupPolicy;
     /** 기존 접수번호 집합 — 일반 시퀀스 (collectExistingNumbers 결과) */
     existing?: ReadonlySet<string>;
+    /**
+     * 기존 레코드 원본. 넘기면 중복 판정을 매니저와 같은 matchImportRow로 한다(모달은 항상 넘긴다).
+     * 없으면 existing/existingFill 집합에서 본번만 가진 레코드를 만들어 쓴다 — 가지번호 정보가 없다.
+     */
+    existingLogs?: readonly ExistingLogLike[];
     /**
      * 자동부여 시작 번호. 매니저의 `getNextNumberForClass()` 결과를 넘긴다.
      * 넘기지 않으면 `existing`의 최대값 + 1로 계산한다(매니저 미준비 시 폴백).
@@ -143,6 +148,13 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
     const dupPolicy: DupPolicy = opts.dupPolicy ?? 'skip';
     const existing = opts.existing ?? new Set<string>();
     const existingFill = opts.existingFill ?? new Set<string>();
+    // 기존 레코드 + 이 배치가 추가할 레코드. 매니저도 배치 안에서 방금 추가한 레코드와 매칭하므로 같이 쌓는다.
+    const known: ExistingLogLike[] = opts.existingLogs
+        ? [...opts.existingLogs]
+        : [
+            ...[...existing].map((n) => ({ receptionNumber: n, landClass1 })),
+            ...[...existingFill].map((n) => ({ receptionNumber: `F${n}`, subCategory: '성토', landClass1 })),
+        ];
 
     const mappedKeys = Object.keys(mapping);
     const hasIdentity = mapping.name != null || mapping.lotAddress != null || mapping.receptionNumber != null;
@@ -212,7 +224,7 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
         // 성토는 F 접두의 별 시퀀스다. 이 분기가 없으면 성토 행에 일반 번호가 찍히고,
         // 저장된 성토 레코드는 일반 풀에서 제외돼 카운터가 전진하지 않아 전 행이 같은
         // 번호로 저장된다 (SAMPL-1-124 적대적 검증에서 1,1,1 재현).
-        const isFill = rec.subCategory === '성토';
+        const isFill = isFillImportRow(recNo, rec.subCategory);
         const pool = isFill ? existingFill : existing;
         const seenPool = isFill ? seenFillInBatch : seenInBatch;
 
@@ -224,14 +236,20 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
             recNo = isFill ? `F${candidate}` : String(candidate);
             if (isFill) nextFill = candidate + 1;
             else nextNum = candidate + 1;
+            known.push({ receptionNumber: recNo, subCategory: importedSubCategory(recNo, rec.subCategory), landClass1 });
             stats.new++;
             items.push({ status: 'new', display: recNo, rec: { ...rec }, auto: true });
         } else {
             const base = recNo.split('-')[0].trim();
             // 성토 시퀀스는 F를 떼고 숫자만 비교한다 (computeNextNumber와 동일)
             const key = isFill ? base.replace('F', '') : base;
-            const isDup = pool.has(key) || seenPool.has(key);
-            const willBeSaved = !(isDup && dupPolicy === 'skip');
+            const match = matchImportRow(known, recNo, rec.subCategory, landClass1);
+            const isDup = match.kind !== 'none';
+            // 모호·하위 필지 행은 덮을 대상을 고를 수 없어 정책과 무관하게 건너뛴다 (매니저와 같다)
+            const forcedReason = match.kind === 'ambiguous' ? '같은 본번이 여러 건'
+                : match.kind === 'subrow' ? '하위 필지 행' : undefined;
+            const skip = forcedReason !== undefined || dupPolicy === 'skip';
+            const willBeSaved = !(isDup && skip);
             seenPool.add(key);
 
             // 수동 번호가 실제로 저장되면 매니저의 max+1 채번이 그 번호를 넘어간다.
@@ -250,10 +268,12 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
                 items.push({
                     status: 'dup',
                     display: recNo,
-                    skip: dupPolicy === 'skip',
+                    skip,
+                    ...(forcedReason ? { reason: forcedReason } : {}),
                     rec: { ...rec, receptionNumber: recNo },
                 });
             } else {
+                known.push({ receptionNumber: recNo, subCategory: importedSubCategory(recNo, rec.subCategory), landClass1 });
                 stats.new++;
                 items.push({ status: 'new', display: recNo, rec: { ...rec, receptionNumber: recNo } });
             }

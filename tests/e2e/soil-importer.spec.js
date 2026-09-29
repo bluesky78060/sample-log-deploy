@@ -422,8 +422,16 @@ test.describe('토양 가져오기 — 덮어쓰기(upsert)와 배치 저장 (SA
         await modal.locator('input[name="sriDup"][value="overwrite"]').check();
         await modal.locator('[data-act="automap"]').click();
         await expect(modal.locator('select[data-field-key="receptionNumber"]')).not.toHaveValue('-1');
+        await page.evaluate(() => {
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
+        });
         await modal.locator('[data-act="import"]').click();
         await expect(modal).toBeHidden();
+        // 배치 안의 두 번째 9는 '덮어씀'이 아니라 따로 센다
+        expect(await page.evaluate(() => window.__toasts.find((m) => m.startsWith('✅')))).toBe(
+            '✅ 2건 가져오기 완료 · 덮어씀 1건 · 파일 안 반복 번호를 뒤 행으로 갱신 1건');
 
         const logs = await readPersistedRaw(page);
         expect(logs).toHaveLength(3); // keep-7, other-7, 9 한 건
@@ -487,7 +495,7 @@ test.describe('토양 가져오기 — 덮어쓰기(upsert)와 배치 저장 (SA
         await modal.locator('[data-act="automap"]').click();
 
         await page.evaluate(() => {
-            const spy = { batchCalls: 0, docs: 0, failures: 0 };
+            const spy = { batchCalls: 0, docs: 0 };
             window.__cloudSpy = spy;
             // batchSave는 실패를 reject가 아니라 false resolve로도 알린다
             window.firestoreDb = {
@@ -495,13 +503,14 @@ test.describe('토양 가져오기 — 덮어쓰기(upsert)와 배치 저장 (SA
                 isEnabled: () => true,
                 batchSave: async (_type, _year, docs) => { spy.batchCalls++; spy.docs = docs.length; return false; },
             };
-            const mgr = window.soilManager;
-            mgr._handleCloudSyncFailure = () => { spy.failures++; };
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
         });
         await modal.locator('[data-act="import"]').click();
         await expect(modal).toBeHidden();
 
-        await expect.poll(() => page.evaluate(() => window.__cloudSpy.failures)).toBe(1);
+        await expect.poll(() => page.evaluate(() => window.__toasts.filter((m) => m.includes('클라우드 동기화 실패')).length)).toBe(1);
         const spy = await page.evaluate(() => window.__cloudSpy);
         expect(spy.batchCalls).toBe(1);
         expect(spy.docs).toBe(2);
@@ -557,7 +566,10 @@ test.describe('토양 가져오기 — 덮어쓰기 매칭은 미리보기와 �
     test('같은 본번이 여러 건이면 어느 것도 덮지 않고 건너뛴 건수를 알린다', async ({ page }) => {
         const modal = await seedAndOpen(page,
             [seed('sub-8-1', '8-1', '첫째'), seed('sub-8-2', '8-2', '둘째')],
-            ['8\t새이름\t봉화읍 내성리 8']);
+            // 모호한 행만 있으면 미리보기가 등록 0건으로 보고 버튼을 잠그므로 신규 행을 하나 섞는다
+            ['8\t새이름\t봉화읍 내성리 8', '9\t신규\t봉화읍 내성리 9']);
+        // 미리보기가 저장 전에 모호함을 보여준다 (SAMPL-1-152 수정 라운드 — 같은 매칭 함수)
+        await expect(modal.locator('.sri-pv-table tbody tr').first()).toContainText('같은 본번이 여러 건');
         await modal.locator('[data-act="import"]').click();
         await expect(modal).toBeHidden();
 
@@ -565,6 +577,138 @@ test.describe('토양 가져오기 — 덮어쓰기 매칭은 미리보기와 �
         expect(toasts.join(' | ')).toContain('같은 본번이 여러 건이라 건너뜀 1건');
 
         const logs = await readPersistedRaw(page);
-        expect(logs.map((l) => `${l.receptionNumber}:${l.name}`).sort()).toEqual(['8-1:첫째', '8-2:둘째']);
+        expect(logs.map((l) => `${l.receptionNumber}:${l.name}`).sort()).toEqual(['8-1:첫째', '8-2:둘째', '9:신규']);
+    });
+});
+
+test.describe('토양 가져오기 — 수정 라운드 (SAMPL-1-152 리뷰 R1·R2·R3)', () => {
+    const OLD = '2020-01-01T00:00:00.000Z';
+
+    async function seed(page, logs) {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await page.evaluate((data) => {
+            localStorage.clear();
+            localStorage.setItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`, JSON.stringify(data));
+        }, logs);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction((n) => (window.soilManager?.sampleLogs || []).length === n, logs.length);
+        await page.evaluate(() => {
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
+        });
+    }
+
+    async function openManual(page, text, policy) {
+        const modal = await openWithPastedData(page, text);
+        await modal.locator('[data-el="autoNumber"]').uncheck();
+        await modal.locator(`input[name="sriDup"][value="${policy}"]`).check();
+        await modal.locator('[data-act="automap"]').click();
+        return modal;
+    }
+
+    const toasts = (page) => page.evaluate(() => window.__toasts);
+
+    test('R1: 앱 내보내기를 덮어쓰기로 되가져와도 여러 작물·하위 필지·비고·산 표시가 망가지지 않는다', async ({ page }) => {
+        const crops = [{ name: '고추', area: '100', unit: 'pyeong' }, { name: '콩', area: '200' }];
+        const subLots = [{ lotAddress: '내성리 5-1', crops: [{ name: '벼', area: '50' }] }];
+        await seed(page, [{
+            id: 'k5', receptionNumber: '5', name: '원래', landClass1: '농가의뢰', subCategory: '논', note: '',
+            createdAt: OLD, updatedAt: OLD, lotAddress: '내성리 5',
+            parcels: [{ id: 'p5', lotAddress: '내성리 5', isMountain: true, subLots, crops, category: '논', purpose: '', note: '' }],
+        }]);
+        // exportToExcel이 쓰는 모양: 산 필지는 '(산)', 빈 비고는 '-', 하위 필지는 'N-M' 행, 작물은 ', '로 이은 합계
+        const modal = await openManual(page, [
+            '접수번호\t필지 주소\t작물\t면적(m²)\t비고',
+            '5\t내성리 5 (산)\t고추, 콩\t300\t-',
+            '5-1\t내성리 5-1\t벼\t50\t-',
+        ].join('\n'), 'overwrite');
+        await expect(modal.locator('.sri-pv-table tbody tr').nth(1)).toContainText('하위 필지 행');
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        expect((await toasts(page)).find((m) => m.startsWith('✅'))).toBe(
+            '✅ 1건 가져오기 완료 · 덮어씀 1건 · 하위 필지 행 건너뜀 1건');
+        const logs = await readPersistedRaw(page);
+        expect(logs).toHaveLength(1);
+        const p = logs[0].parcels[0];
+        expect(p.crops).toEqual(crops);
+        expect(p.subLots).toEqual(subLots);
+        expect(p.lotAddress).toBe('내성리 5');
+        expect(p.isMountain).toBe(true);
+        expect(logs[0].note).toBe('');
+    });
+
+    test('R2: 건너뛰기에서는 구분 열이 없는 F 번호 행도 기존 성토 레코드를 덮거나 새로 만들지 않는다', async ({ page }) => {
+        await seed(page, [{
+            id: 'f3', receptionNumber: 'F3', name: '원래', landClass1: '농가의뢰', subCategory: '성토',
+            createdAt: OLD, updatedAt: OLD, lotAddress: '원주소',
+            parcels: [{ id: 'pf3', lotAddress: '원주소', isMountain: false, subLots: [], crops: [], category: '성토', purpose: '', note: '' }],
+        }]);
+        // 신규 F4를 섞어 저장까지 가게 한다 — 중복 행도 매니저로 넘어가 정책대로 처리되는지 본다
+        const modal = await openManual(page, ['접수번호\t성명\t지번주소', 'F3\t덮은이름\t다른주소', 'F4\t신규\t주소4'].join('\n'), 'skip');
+        await expect(modal.locator('.sri-pill.dup')).toContainText('중복 1');
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        expect((await toasts(page)).find((m) => m.startsWith('✅'))).toBe('✅ 1건 가져오기 완료 · 중복 건너뜀 1건');
+        const logs = await readPersistedRaw(page);
+        expect(logs.map((l) => `${l.receptionNumber}:${l.name}:${l.lotAddress ?? ''}:${l.subCategory}`)).toEqual(
+            ['F3:원래:원주소:성토', 'F4:신규:주소4:성토']);
+    });
+
+    test('덮어쓰기가 성토 레코드의 구분을 일반으로 바꾸지 않는다', async ({ page }) => {
+        await seed(page, [{
+            id: 'f3', receptionNumber: 'F3', name: '원래', landClass1: '농가의뢰', subCategory: '성토',
+            createdAt: OLD, updatedAt: OLD,
+            parcels: [{ id: 'pf3', lotAddress: '원주소', isMountain: false, subLots: [], crops: [], category: '성토', purpose: '', note: '' }],
+        }]);
+        const modal = await openManual(page, ['접수번호\t성명\t지번주소\t구분', 'F3\t새이름\t원주소\t논'].join('\n'), 'overwrite');
+        await modal.locator('[data-act="import"]').click();
+        await expect(modal).toBeHidden();
+
+        const [log] = await readPersistedRaw(page);
+        expect(log.name).toBe('새이름');
+        expect(log.subCategory).toBe('성토');
+        expect(log.parcels[0].category).toBe('성토');
+    });
+
+    test('R3: 로컬 저장이 실패하면 가져오기를 되돌리고 오류로 알리며 클라우드에 보내지 않는다', async ({ page }) => {
+        await seed(page, [{
+            id: 'k7', receptionNumber: '7', name: '옛이름', landClass1: '농가의뢰', subCategory: '논',
+            createdAt: OLD, updatedAt: OLD,
+            parcels: [{ id: 'p7', lotAddress: '옛주소', isMountain: false, subLots: [], crops: [], category: '논', purpose: '', note: '' }],
+        }]);
+        const modal = await openManual(page, ['접수번호\t성명\t지번주소', '7\t새이름\t새주소', '8\t신규\t주소8'].join('\n'), 'overwrite');
+        await page.evaluate(() => {
+            window.__rejections = [];
+            window.addEventListener('unhandledrejection', (e) => window.__rejections.push(String(e.reason)));
+            window.__batchCalls = 0;
+            const mgr = window.soilManager;
+            const origBatch = mgr.firebaseSaveBatch;
+            mgr.firebaseSaveBatch = function (...a) { window.__batchCalls++; return origBatch.apply(this, a); };
+            const origSet = Storage.prototype.setItem;
+            Storage.prototype.setItem = function (k, v) {
+                if (String(k).startsWith('test_soilSampleLogs_')) {
+                    const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e;
+                }
+                return origSet.call(this, k, v);
+            };
+        });
+        await modal.locator('[data-act="import"]').click();
+
+        await expect.poll(() => toasts(page).then((t) => t.join(' | '))).toContain('로컬 저장에 실패해 가져오기를 취소했습니다');
+        const state = await page.evaluate(() => ({
+            mem: window.soilManager.sampleLogs.map((l) => `${l.receptionNumber}:${l.name}`),
+            ok: window.__toasts.filter((m) => m.startsWith('✅')).length,
+            batch: window.__batchCalls,
+            rej: window.__rejections,
+        }));
+        expect(state).toEqual({ mem: ['7:옛이름'], ok: 0, batch: 0, rej: [] });
+        await expect(modal).toBeVisible();
+        await expect(modal.locator('[data-act="import"]')).toBeEnabled();
     });
 });

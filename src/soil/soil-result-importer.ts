@@ -11,7 +11,7 @@
  *   4) 옵션            — 접수번호 자동부여 / 중복 시(건너뛰기·덮어쓰기)
  *   5) 미리보기        — 생성될 행 표 + 신규/중복/오류 배지 + 건수 요약
  *
- * 저장은 `window.soilManager.addImportedRecords(records)`로 한 번에 위임한다.
+ * 저장은 `window.soilManager.addImportedRecords(records, { onDuplicate })`로 한 번에 위임한다.
  *
  * 메인과의 의도적 차이:
  * - 계산 로직(파싱·자동매핑·중복판정)은 Phase A/B-1/B-2에서 순수 모듈로 분리했고
@@ -77,8 +77,19 @@ interface SoilManagerLike {
     getNextNumberForClass?(year: number | string, landClass1: string): number;
     /** 성토 다음 접수번호(정수, F 접두 없음) */
     getNextFillNumberForClass?(year: number | string, landClass1: string): number;
-    /** 같은 접수번호+경지구분이면 덮어쓰고 아니면 추가. 저장·재렌더는 배치당 1회 */
-    addImportedRecords?(records: PreviewRecord[]): { inserted: number; updated: number; failed: number; ambiguous: number };
+    /** 미리보기와 같은 matchImportRow로 매칭해 정책대로 덮거나 두고, 없으면 추가. 저장·재렌더는 배치당 1회 */
+    addImportedRecords?(records: PreviewRecord[], opts: { onDuplicate: DupPolicy }): Promise<ImportResult>;
+}
+
+interface ImportResult {
+    inserted: number;
+    updated: number;
+    batchUpdated: number;
+    skipped: number;
+    ambiguous: number;
+    subRows: number;
+    failed: number;
+    saveError?: unknown;
 }
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -554,7 +565,7 @@ export class SoilResultImporter {
             if (!actEl || !m.contains(actEl)) return;
             const act = actEl.getAttribute('data-act');
             if (act === 'close') this.close();
-            else if (act === 'import') this._commit();
+            else if (act === 'import') void this._commit();
             else if (act === 'automap') this._autoMap(false);
             else if (act === 'dlErrorCsv') this._downloadErrorCsv();
             else if (act === 'pick') { e.stopPropagation(); els.fileInput?.click(); }
@@ -927,6 +938,7 @@ export class SoilResultImporter {
             autoNumber: this._state.autoNumber,
             dupPolicy: this._state.dupPolicy,
             existing,
+            existingLogs: logs,
             nextNumber,
             existingFill,
             nextFillNumber: Number.isNaN(nextFillNumber) ? null : nextFillNumber,
@@ -1018,7 +1030,7 @@ export class SoilResultImporter {
         const statusCell = document.createElement('td');
         statusCell.appendChild(span(
             `sri-status ${it.status}`,
-            STATUS_LABEL[it.status] + (it.skip ? ' · 건너뜀' : ''),
+            STATUS_LABEL[it.status] + (it.skip ? ` · 건너뜀${it.status === 'dup' && it.reason ? `(${it.reason})` : ''}` : ''),
         ));
         tr.appendChild(statusCell);
 
@@ -1046,7 +1058,7 @@ export class SoilResultImporter {
     // ----------------------------------------------------------
     // 저장 커밋
     // ----------------------------------------------------------
-    private _commit(): void {
+    private async _commit(): Promise<void> {
         const p = this._state.preview;
         if (!p) return;
         const mgr = getManager();
@@ -1059,31 +1071,40 @@ export class SoilResultImporter {
         const importBtn = this._els?.importBtn ?? null;
         if (importBtn) importBtn.disabled = true;
 
+        // 중복 행도 넘긴다 — 덮을지 둘지는 매니저가 같은 매칭 함수와 정책으로 정한다(토스트 건수도 실제 결과로)
         const recs: PreviewRecord[] = [];
         for (const it of p.items) {
             if (it.status === 'err') continue;
-            if (it.status === 'dup' && it.skip) continue;
             const rec: PreviewRecord = { ...it.rec };
             // 자동부여 행은 receptionNumber를 비워 매니저가 채번하게 한다
             if (it.auto) delete rec.receptionNumber;
             recs.push(rec);
         }
 
-        let res: { inserted: number; updated: number; failed: number; ambiguous: number };
+        const policy = this._state.dupPolicy;
+        let res: ImportResult;
         try {
-            res = mgr.addImportedRecords(recs);
+            res = await mgr.addImportedRecords(recs, { onDuplicate: policy });
         } catch (err) {
             logErr('가져오기 저장 실패:', err);
             toast('가져오기 저장에 실패했습니다. 다시 시도하세요.', 'error');
             if (importBtn) importBtn.disabled = false;
             return;
         }
-        const { inserted, updated, failed, ambiguous } = res;
+        if (res.saveError) {
+            logErr('가져오기 로컬 저장 실패:', res.saveError);
+            toast('로컬 저장에 실패해 가져오기를 취소했습니다(저장 공간 부족일 수 있습니다). 바뀐 내용은 없습니다.', 'error');
+            if (importBtn) importBtn.disabled = false;
+            return;
+        }
+        const { inserted, updated, batchUpdated, skipped, ambiguous, subRows, failed } = res;
 
         const parts = [`✅ ${inserted + updated}건 가져오기 완료`];
-        if (updated > 0) parts.push(`덮어씀 ${updated}건`);
+        if (policy === 'overwrite' && updated > 0) parts.push(`덮어씀 ${updated}건`);
+        if (policy === 'skip' && skipped > 0) parts.push(`중복 건너뜀 ${skipped}건`);
+        if (batchUpdated > 0) parts.push(`파일 안 반복 번호를 뒤 행으로 갱신 ${batchUpdated}건`);
         if (ambiguous > 0) parts.push(`같은 본번이 여러 건이라 건너뜀 ${ambiguous}건`);
-        if (p.stats.dup > 0) parts.push(`중복 ${p.stats.dup}건`);
+        if (subRows > 0) parts.push(`하위 필지 행 건너뜀 ${subRows}건`);
         if (p.stats.err > 0) parts.push(`오류 ${p.stats.err}건`);
         if (failed > 0) parts.push(`실패 ${failed}건`);
         toast(parts.join(' · '), failed > 0 || ambiguous > 0 ? 'warning' : 'success');

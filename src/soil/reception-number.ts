@@ -87,3 +87,52 @@ export function computeNextNumber(
     }
     return maxNumber + 1;
 }
+
+/**
+ * 가져오는 행이 성토(F) 시퀀스인가. 앱 내보내기는 구분 열 없이 'F3'만 남기기도 하므로
+ * 구분이 비어도 F 번호면 성토로 본다 — 아니면 F3 행이 일반 풀에서 걸러져 기존 성토 F3과 만나지 못한다.
+ */
+export function isFillImportRow(receptionNumber: string | null | undefined, subCategory: string | null | undefined): boolean {
+    return subCategory === '성토' || String(receptionNumber ?? '').trim().startsWith('F');
+}
+
+/**
+ * 새로 저장될 레코드의 구분. 구분이 빈 F 번호 행은 성토로 저장한다 — '-'로 저장하면
+ * 어느 풀에도 속하지 않아 다음 가져오기·채번이 그 번호를 보지 못한다. 미리보기와 매니저가 같이 쓴다.
+ */
+export function importedSubCategory(receptionNumber: string | undefined, subCategory: string): string {
+    if (subCategory) return subCategory;
+    return isFillImportRow(receptionNumber, subCategory) ? '성토' : '';
+}
+
+export type ImportMatch<T> =
+    | { kind: 'none' }
+    | { kind: 'match'; target: T }
+    /** 같은 본번이 여럿이라 어느 것을 덮을지 고를 수 없다 */
+    | { kind: 'ambiguous' }
+    /** 'N-M' 행인데 N-M 레코드는 없고 본번 N만 있다 — 내보내기의 하위 필지 행이다 */
+    | { kind: 'subrow' };
+
+/**
+ * 가져오기 한 행이 덮어쓸 기존 레코드. 미리보기와 매니저가 이 함수 하나로 판정한다 —
+ * 둘이 다르면 미리보기가 '신규'라 한 행이 저장 때 기존 레코드를 덮는다.
+ * 순서: 접수번호 전체 일치 → 없음 → 하위 필지 행 → 같은 본번 한 건 → 여러 건.
+ */
+export function matchImportRow<T extends ReceptionKeySource>(
+    logs: ReadonlyArray<T>,
+    receptionNumber: string,
+    subCategory: string | null | undefined,
+    landClass1: string,
+): ImportMatch<T> {
+    const rn = String(receptionNumber ?? '').trim();
+    const fill = isFillImportRow(rn, subCategory);
+    const key = receptionBaseKey({ receptionNumber: rn, subCategory: fill ? '성토' : '', landClass1 }, fill, landClass1);
+    if (key === null) return { kind: 'none' };
+
+    const same = logs.filter(l => receptionBaseKey(l, fill, landClass1) === key);
+    const exact = same.find(l => String(l.receptionNumber ?? '').trim() === rn);
+    if (exact) return { kind: 'match', target: exact };
+    if (same.length === 0) return { kind: 'none' };
+    if (rn.split('-')[0].trim() !== rn) return { kind: 'subrow' };
+    return same.length === 1 ? { kind: 'match', target: same[0] } : { kind: 'ambiguous' };
+}
