@@ -209,6 +209,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             receptionTo: '',
             lot: '',
             purpose: '',
+            // populateLandClass1Options가 탭을 농가의뢰로 표시하므로 필터도 같은 값으로 시작해야 한다
+            landClass1: LAND_CLASS1_DEFAULT,
             completed: 'incomplete'
         };
         this.isFullView = false;
@@ -3834,9 +3836,12 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                         const newCompletedStatus = !log.isComplete;
                         const receptionNumber = log.receptionNumber || '';
                         const baseNumber = receptionNumber.split('-').slice(0, 2).join('-');
+                        // 접수번호는 경지구분별 독립 시퀀스라 같은 번호가 다른 경지구분에도 있다
+                        const landClass = log.landClass1 || LAND_CLASS1_DEFAULT;
                         const relatedLogs = this.sampleLogs.filter(l => {
                             const logBaseNumber = (l.receptionNumber || '').split('-').slice(0, 2).join('-');
-                            return logBaseNumber === baseNumber && baseNumber !== '';
+                            return logBaseNumber === baseNumber && baseNumber !== ''
+                                && (l.landClass1 || LAND_CLASS1_DEFAULT) === landClass;
                         });
                         relatedLogs.forEach(relatedLog => {
                             relatedLog.isComplete = newCompletedStatus;
@@ -4146,11 +4151,15 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 if (selectedIds.length === 0) { alert('완료 처리할 항목을 선택해주세요.'); return; }
 
                 // 연관 접수번호(같은 base 번호) 포함한 실제 처리 대상 사전 계산
-                // 성토(F접두사)와 일반 시료는 분리하여 그룹핑
+                // 성토(F접두사)와 일반 시료, 그리고 경지구분(독립 시퀀스)별로 분리하여 그룹핑
                 const selectedGroups = selectedIds.map(id => {
                     const log = this.sampleLogs.find(l => String(l.id) === id);
                     const rec = log?.receptionNumber || '';
-                    return { base: rec.replace(/^F/, '').split('-')[0], isFill: rec.startsWith('F') };
+                    return {
+                        base: rec.replace(/^F/, '').split('-')[0],
+                        isFill: rec.startsWith('F'),
+                        landClass: log?.landClass1 || LAND_CLASS1_DEFAULT,
+                    };
                 }).filter(g => g.base);
                 const targetIds = new Set(
                     this.sampleLogs
@@ -4159,7 +4168,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                             const rec = log.receptionNumber || '';
                             const base = rec.replace(/^F/, '').split('-')[0];
                             const isFill = rec.startsWith('F');
-                            return base && selectedGroups.some(g => g.base === base && g.isFill === isFill);
+                            const landClass = log.landClass1 || LAND_CLASS1_DEFAULT;
+                            return base && selectedGroups.some(g =>
+                                g.base === base && g.isFill === isFill && g.landClass === landClass);
                         })
                         .map(log => String(log.id))
                 );

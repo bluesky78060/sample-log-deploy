@@ -1,0 +1,86 @@
+// @ts-check
+const { test, expect } = require('@playwright/test');
+
+/**
+ * 경지구분 1차(landClass1) 도입 후의 경계 — SAMPL-2-27
+ *
+ * 접수번호는 경지구분별 독립 시퀀스라 같은 번호 '5'가 농가의뢰와 공익직불제에 따로 존재한다.
+ * 완료 연동은 접수번호로 묶으므로, 경지구분을 보지 않으면 남의 시료까지 완료된다.
+ */
+
+function seedLog(id, landClass1) {
+    return {
+        id, receptionNumber: '5', date: '2026-03-02', name: `농가-${id}`, phoneNumber: '010-0000-0000',
+        address: '봉화읍', subCategory: '논', purpose: '일반재배', landClass1, isComplete: false,
+        groupId: `g-${id}`, parcelIndex: 1, totalParcels: 1,
+        parcels: [{ id: `p-${id}`, lotAddress: '내성리 1', isMountain: false, subLots: [],
+            crops: [{ name: '벼', area: '100' }], category: '논', purpose: '일반재배', note: '' }],
+    };
+}
+
+async function seedAndReload(page, logs) {
+    await page.evaluate((data) => {
+        localStorage.clear();
+        localStorage.setItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`, JSON.stringify(data));
+    }, logs);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+}
+
+async function readCompleted(page) {
+    return page.evaluate(() => {
+        const raw = localStorage.getItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`);
+        return Object.fromEntries((raw ? JSON.parse(raw) : []).map((l) => [l.id, !!l.isComplete]));
+    });
+}
+
+async function showAllLandClasses(page) {
+    await page.click('.nav-btn[data-view="list"]');
+    await page.selectOption('#landClass1Tab', '');
+}
+
+test.describe('경지구분 1차 — 같은 접수번호가 다른 경지구분에 있을 때', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await seedAndReload(page, [seedLog('a', '농가의뢰'), seedLog('b', '공익직불제')]);
+    });
+
+    test('완료 버튼은 다른 경지구분의 같은 번호를 완료하지 않는다', async ({ page }) => {
+        await showAllLandClasses(page);
+        await page.click('tr[data-id="a"] .btn-complete');
+
+        await expect.poll(async () => (await readCompleted(page)).a).toBe(true);
+        expect((await readCompleted(page)).b).toBe(false);
+    });
+
+    test('일괄 완료는 다른 경지구분의 같은 번호를 끌어오지 않는다', async ({ page }) => {
+        await showAllLandClasses(page);
+        page.on('dialog', (d) => d.accept());
+        await page.check('tr[data-id="a"] .row-checkbox');
+        await page.evaluate(() => document.getElementById('btnBulkComplete')?.click());
+
+        await expect.poll(async () => (await readCompleted(page)).a).toBe(true);
+        expect((await readCompleted(page)).b).toBe(false);
+    });
+});
+
+test.describe('경지구분 1차 목록 탭', () => {
+    test('첫 화면의 탭 표시와 실제 필터가 일치한다', async ({ page }) => {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await seedAndReload(page, [seedLog('a', '농가의뢰'), seedLog('b', '공익직불제')]);
+
+        const tabValue = await page.inputValue('#landClass1Tab');
+        const filterValue = await page.evaluate(() => window.soilManager.currentSearchFilter.landClass1 || '');
+        expect(filterValue).toBe(tabValue);
+
+        // 탭이 '농가의뢰'로 보이면 공익직불제 행은 목록에 없어야 한다
+        await page.click('.nav-btn[data-view="list"]');
+        await expect(page.locator('tr[data-id="a"]').first()).toBeVisible();
+        await expect(page.locator('tr[data-id="b"]')).toHaveCount(0);
+    });
+});
