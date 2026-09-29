@@ -107,3 +107,8 @@ E2E는 다른 worktree와 포트가 겹치지 않도록 임시 설정(포트 892
 - 같은 접수번호 전체가 같은 레코드가 이미 여러 건이면(과거 중복 가져오기 흔적) 처음 찾은 한 건만 갱신한다.
 - E2E 1차 실패 8건은 부하로 인한 타임아웃으로 판단했고, 2차 재실행에서 전부 통과했다. 원인을 따로 재현해 보지는 않았다.
 - 독립 리뷰는 코디네이터 몫이다(자기 승인 아님).
+
+## AI PM submit_test
+
+`smart_workflow(SAMPL-2-28, submit_test)` run 1 — build·type·integration pass, unit은 사실대로 `fail`로 적고
+output에 "기존 33건 외 신규 실패 0"을 명시했다. 서버가 overall=fail로 판정해 티켓이 **`fixing`으로 전환됐다.**
