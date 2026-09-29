@@ -107,3 +107,9 @@ E2E는 종전처럼 임시 설정(포트 8927, `reuseExistingServer: false`, 스
 - 성토 판정을 `subCategory==='성토' || F 접두`로 넓게 잡았다. 성토 표기 없는 `F` 번호와 성토 표기된 `F` 번호는 서로 형제로 남는다(의도). 실데이터에 그런 조합이 있는지는 재 보지 않았다.
 - 메인 프로젝트(`sample-log-electron`)의 같은 결함(리뷰 원문 「메인 프로젝트 판정」)은 범위 밖이라 건드리지 않았다.
 - 이 수정본은 아직 아무도 리뷰하지 않았다. 재리뷰는 코디네이터 몫이다.
+
+## AI PM submit_test (수정 라운드)
+
+`complete_fix`로 fixing → testing 전환 후 `submit_test` run 2 — build·type·integration pass, unit은 기존 암호화 실패 33건을
+사실대로 `fail`로 보고했다(신규 실패 0). 서버가 overall=fail로 판정해 티켓은 다시 **`fixing`**이다.
+run 1과 같은 이유이며 unit을 pass로 바꿔 재제출하지 않았다. 상태 처리는 코디네이터 판단에 맡긴다.
