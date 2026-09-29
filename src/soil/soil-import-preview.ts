@@ -10,7 +10,7 @@
  */
 
 import { LAND_CLASS1_DEFAULT, type ColumnMapping } from './soil-import-mapping';
-import { receptionBaseKey, isFillImportRow, matchImportRow, importedSubCategory } from './reception-number';
+import { receptionBaseKey, isFillImportRow, importRowConflict, matchImportRow, importedSubCategory } from './reception-number';
 
 /** 기존 접수 레코드에서 이 계산에 필요한 최소 형태 */
 export interface ExistingLogLike {
@@ -49,6 +49,8 @@ export interface PreviewItem {
     skip?: boolean;
     /** 오류 사유, 또는 정책과 무관하게 건너뛰는 중복의 사유 */
     reason?: string;
+    /** 하위필지 행이라 오류로 건너뛴 행 (결과 토스트가 따로 센다) */
+    subRow?: boolean;
 }
 
 export interface PreviewStats {
@@ -240,14 +242,21 @@ export function computePreview(opts: ComputePreviewOptions): PreviewResult | nul
             stats.new++;
             items.push({ status: 'new', display: recNo, rec: { ...rec }, auto: true });
         } else {
-            const base = recNo.split('-')[0].trim();
-            // 성토 시퀀스는 F를 떼고 숫자만 비교한다 (computeNextNumber와 동일)
-            const key = isFill ? base.replace('F', '') : base;
-            const match = matchImportRow(known, recNo, rec.subCategory, landClass1);
-            const isDup = match.kind !== 'none';
-            // 모호·하위 필지 행은 덮을 대상을 고를 수 없어 정책과 무관하게 건너뛴다 (매니저와 같다)
-            const forcedReason = match.kind === 'ambiguous' ? '같은 본번이 여러 건'
-                : match.kind === 'subrow' ? '하위 필지 행' : undefined;
+            const conflict = importRowConflict(recNo, rec.subCategory);
+            const match = conflict ? null : matchImportRow(known, recNo, landClass1);
+            if (conflict || match?.kind === 'subrow') {
+                const reason = conflict
+                    ?? `본번 ${(match as { parent: string }).parent}이 있어 하위필지 행으로 봅니다 — 하위필지는 가져오기로 갱신하지 않습니다`;
+                stats.err++;
+                items.push({ status: 'err', reason, display: recNo, rec: { ...rec, receptionNumber: recNo },
+                    ...(conflict ? {} : { subRow: true }) });
+                continue;
+            }
+            // 성토 시퀀스는 F를 뗀 본번으로 커서를 맞춘다 (computeNextNumber와 같은 헬퍼)
+            const key = receptionBaseKey({ receptionNumber: recNo, landClass1 }, isFill, landClass1) ?? '';
+            const isDup = match!.kind !== 'none';
+            // 모호한 행은 덮을 대상을 고를 수 없어 정책과 무관하게 건너뛴다 (매니저와 같다)
+            const forcedReason = match!.kind === 'ambiguous' ? '같은 본번이 여러 건' : undefined;
             const skip = forcedReason !== undefined || dupPolicy === 'skip';
             const willBeSaved = !(isDup && skip);
             seenPool.add(key);

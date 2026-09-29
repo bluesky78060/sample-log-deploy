@@ -128,3 +128,34 @@ test.describe('경지구분 1차 — 연속 등록', () => {
         await expect(page.locator('#logTableBody')).toContainText('연속둘째');
     });
 });
+
+test.describe('성토 채번 — F 번호 레코드의 구분이 성토가 아닐 때 (SAMPL-2-28 수정 라운드)', () => {
+    test('필지 구분을 논으로 둔 성토 등록 뒤에도 다음 성토 번호가 F2로 이어진다', async ({ page }) => {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await seedAndReload(page, []);
+
+        async function registerFill(name, parcelCategory) {
+            await page.selectOption('#subCategory', '성토');
+            const rn = await page.inputValue('#receptionNumber');
+            await page.fill('#name', name);
+            await page.fill('#phoneNumber', '010-1234-5678');
+            await page.selectOption('#purpose', '일반재배');
+            await page.locator('.lot-address-input').first().fill('내성리 1');
+            if (parcelCategory) await page.locator('.parcel-category-select').first().selectOption(parcelCategory);
+            await page.click('#navSubmitBtn');
+            await expect(page.locator('#closeResultBtn')).toBeEnabled({ timeout: 20000 });
+            await page.click('#closeResultBtn');
+            await page.click('.nav-btn[data-view="form"]');
+            return rn;
+        }
+
+        // 폼은 필지 카드의 구분을 저장하므로 F1 레코드의 구분이 '논'이 된다
+        expect(await registerFill('성토1', '논')).toBe('F1');
+        expect(await registerFill('성토2', null)).toBe('F2');
+        const stored = await page.evaluate(() =>
+            JSON.parse(localStorage.getItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`) || '[]').map((l) => `${l.receptionNumber}:${l.name}`));
+        expect(stored).toEqual(['F1:성토1', 'F2:성토2']);
+    });
+});

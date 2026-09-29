@@ -403,7 +403,7 @@ function buildModal(): HTMLElement {
         <span class="sri-muted">중복 접수번호가 있을 때:</span>
         <div class="sri-opt-sub">
           <label class="sri-radio"><input type="radio" name="sriDup" value="skip" checked> 건너뛰기</label>
-          <!-- 매니저 addImportedRecords가 미리보기와 같은 본번 기준으로 기존 레코드를 찾아 갱신한다 (빈 칸은 기존 값 유지) -->
+          <!-- 미리보기와 매니저가 같은 matchImportRow로 대상을 찾는다 (빈 칸·'-'는 기존 값 유지) -->
           <label class="sri-radio"><input type="radio" name="sriDup" value="overwrite"> 덮어쓰기</label>
         </div>
       </div>
@@ -941,7 +941,7 @@ export class SoilResultImporter {
             existingLogs: logs,
             nextNumber,
             existingFill,
-            nextFillNumber: Number.isNaN(nextFillNumber) ? null : nextFillNumber,
+            nextFillNumber,
         });
     }
 
@@ -1032,6 +1032,8 @@ export class SoilResultImporter {
             `sri-status ${it.status}`,
             STATUS_LABEL[it.status] + (it.skip ? ` · 건너뜀${it.status === 'dup' && it.reason ? `(${it.reason})` : ''}` : ''),
         ));
+        // 오류 사유는 CSV에만 있으면 왜 빠지는지 저장 전에 알 수 없다
+        if (it.status === 'err' && it.reason) statusCell.appendChild(span('sri-muted', ` ${it.reason}`));
         tr.appendChild(statusCell);
 
         const cells: Array<[string, string?]> = [
@@ -1097,15 +1099,18 @@ export class SoilResultImporter {
             if (importBtn) importBtn.disabled = false;
             return;
         }
-        const { inserted, updated, batchUpdated, skipped, ambiguous, subRows, failed } = res;
+        const { inserted, updated, batchUpdated, skipped, ambiguous, failed } = res;
+        const previewSubRows = p.items.filter((it) => it.subRow).length;
+        const subRows = res.subRows + previewSubRows;
+        const otherErrors = p.stats.err - previewSubRows;
 
         const parts = [`✅ ${inserted + updated}건 가져오기 완료`];
         if (policy === 'overwrite' && updated > 0) parts.push(`덮어씀 ${updated}건`);
         if (policy === 'skip' && skipped > 0) parts.push(`중복 건너뜀 ${skipped}건`);
         if (batchUpdated > 0) parts.push(`파일 안 반복 번호를 뒤 행으로 갱신 ${batchUpdated}건`);
         if (ambiguous > 0) parts.push(`같은 본번이 여러 건이라 건너뜀 ${ambiguous}건`);
-        if (subRows > 0) parts.push(`하위 필지 행 건너뜀 ${subRows}건`);
-        if (p.stats.err > 0) parts.push(`오류 ${p.stats.err}건`);
+        if (subRows > 0) parts.push(`하위필지 행 건너뜀 ${subRows}건`);
+        if (otherErrors > 0) parts.push(`오류 ${otherErrors}건`);
         if (failed > 0) parts.push(`실패 ${failed}건`);
         toast(parts.join(' · '), failed > 0 || ambiguous > 0 ? 'warning' : 'success');
         this.close();

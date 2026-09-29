@@ -113,11 +113,14 @@ describe('computePreview — 중복 판정 (수동 접수번호)', () => {
         expect(r.willImport).toBe(1);
     });
 
-    it('서브넘버는 기본번호로 중복 판정 (5-1은 5와 충돌)', () => {
+    // SAMPL-1-152·2-28 수정 라운드(코디네이터 결정 1): 본번 5가 있으면 5-1은 하위필지 행 — 5로 접지 않고 오류
+    it('본번이 있으면 서브넘버 행은 하위필지 행 오류 (5-1은 5로 접지 않는다)', () => {
         const r = computePreview({
             rows: [['5-1', '홍길동', '주소']], mapping: MAP, existing,
         })!;
-        expect(r.items[0].status).toBe('dup');
+        expect(r.items[0].status).toBe('err');
+        expect(r.items[0].subRow).toBe(true);
+        expect(r.items[0].reason).toContain('하위필지');
         expect(r.items[0].display).toBe('5-1'); // 표시는 원문 유지
         expect(r.items[0].rec.receptionNumber).toBe('5-1');
     });

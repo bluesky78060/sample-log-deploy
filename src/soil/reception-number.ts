@@ -41,6 +41,15 @@ export interface ReceptionKeySource {
 }
 
 /**
+ * 성토(F) 시퀀스 레코드인가. 구분이 '성토'가 아니어도 번호가 F면 성토 풀이다 — 폼 등록은 필지 카드의
+ * 구분을 저장하므로 F1 레코드가 '논'으로 남을 수 있고, 그걸 어느 풀에도 넣지 않으면 성토 채번이 F1을
+ * 다시 내놓아 중복 검사에 막힌다. 흙토람 형제 판정도 이 함수를 쓴다.
+ */
+export function isFillLog(log: { receptionNumber?: string | number | null; subCategory?: string | null }): boolean {
+    return log.subCategory === '성토' || String(log.receptionNumber ?? '').trim().startsWith('F');
+}
+
+/**
  * 채번(computeNextNumber)과 가져오기 중복 판정(collectExistingNumbers)이 공유하는 분류 규칙.
  * 대상 풀이면 비교 키(본번, 성토는 F를 뗀 숫자부)를, 아니면 null을 돌려준다.
  * targetClass는 호출부가 확정해 넘긴다 — 빈 값을 기본값으로 폴백하는지가 두 호출부에서 다르다.
@@ -53,10 +62,9 @@ export function receptionBaseKey(
 ): string | null {
     if (!log || !log.receptionNumber) return null;
     if ((log.landClass1 || defaultClass) !== targetClass) return null;
-    if (fill !== (log.subCategory === '성토')) return null;
+    if (fill !== isFillLog(log)) return null;
 
     const base = String(log.receptionNumber).split('-')[0].trim();
-    if (!fill && base.startsWith('F')) return null;
     return fill ? base.replace('F', '') : base;
 }
 
@@ -89,16 +97,26 @@ export function computeNextNumber(
 }
 
 /**
- * 가져오는 행이 성토(F) 시퀀스인가. 앱 내보내기는 구분 열 없이 'F3'만 남기기도 하므로
- * 구분이 비어도 F 번호면 성토로 본다 — 아니면 F3 행이 일반 풀에서 걸러져 기존 성토 F3과 만나지 못한다.
+ * 가져오는 행이 성토(F) 시퀀스인가. 번호가 있으면 F 접두로만 정하고(구분과 어긋나는 행은
+ * importRowConflict가 오류로 거른다), 번호가 없는 자동부여 행만 구분을 본다.
  */
 export function isFillImportRow(receptionNumber: string | null | undefined, subCategory: string | null | undefined): boolean {
-    return subCategory === '성토' || String(receptionNumber ?? '').trim().startsWith('F');
+    const rn = String(receptionNumber ?? '').trim();
+    return rn ? rn.startsWith('F') : subCategory === '성토';
+}
+
+/** 수동 번호와 구분이 어긋나는 행의 오류 사유. 어느 한쪽을 믿고 저장하면 번호 풀 밖 레코드가 생긴다 */
+export function importRowConflict(receptionNumber: string | null | undefined, subCategory: string | null | undefined): string | null {
+    const rn = String(receptionNumber ?? '').trim();
+    if (!rn) return null;
+    const fill = rn.startsWith('F');
+    if (fill && subCategory && subCategory !== '성토') return 'F 번호인데 구분이 성토가 아닙니다';
+    if (!fill && subCategory === '성토') return '구분이 성토인데 번호에 F가 없습니다';
+    return null;
 }
 
 /**
- * 새로 저장될 레코드의 구분. 구분이 빈 F 번호 행은 성토로 저장한다 — '-'로 저장하면
- * 어느 풀에도 속하지 않아 다음 가져오기·채번이 그 번호를 보지 못한다. 미리보기와 매니저가 같이 쓴다.
+ * 새로 저장될 레코드의 구분. 구분이 빈 F 번호 행은 성토로 저장한다. 미리보기와 매니저가 같이 쓴다.
  */
 export function importedSubCategory(receptionNumber: string | undefined, subCategory: string): string {
     if (subCategory) return subCategory;
@@ -108,31 +126,39 @@ export function importedSubCategory(receptionNumber: string | undefined, subCate
 export type ImportMatch<T> =
     | { kind: 'none' }
     | { kind: 'match'; target: T }
-    /** 같은 본번이 여럿이라 어느 것을 덮을지 고를 수 없다 */
+    /** 같은 본번의 가지번호 레코드가 여럿이라 어느 것을 덮을지 고를 수 없다 */
     | { kind: 'ambiguous' }
-    /** 'N-M' 행인데 N-M 레코드는 없고 본번 N만 있다 — 내보내기의 하위 필지 행이다 */
-    | { kind: 'subrow' };
+    /** 'N-M' 행인데 N-M 레코드는 없고 번호가 정확히 N인 레코드가 있다 — 그 레코드의 하위필지 행으로 본다 */
+    | { kind: 'subrow'; parent: string };
 
 /**
- * 가져오기 한 행이 덮어쓸 기존 레코드. 미리보기와 매니저가 이 함수 하나로 판정한다 —
- * 둘이 다르면 미리보기가 '신규'라 한 행이 저장 때 기존 레코드를 덮는다.
- * 순서: 접수번호 전체 일치 → 없음 → 하위 필지 행 → 같은 본번 한 건 → 여러 건.
+ * 가져오기 한 행이 덮어쓸 기존 레코드. 미리보기와 매니저가 이 함수 하나로 판정한다.
+ * 1) 같은 경지구분에서 번호가 정확히 같은 레코드(풀 무관, 첫 건)
+ * 2) 'N-M' 행: 같은 풀에 정확히 N인 레코드가 있으면 subrow, 없으면 none(새 가지번호 레코드)
+ * 3) 'N' 행: 같은 풀의 가지번호 레코드 N-K가 한 건이면 그것, 여럿이면 ambiguous
+ * 부모로 접는 것은 3)의 방향뿐이다 — 'N-M'을 N에 접으면 본필지가 하위필지 값으로 덮인다.
  */
 export function matchImportRow<T extends ReceptionKeySource>(
     logs: ReadonlyArray<T>,
     receptionNumber: string,
-    subCategory: string | null | undefined,
     landClass1: string,
 ): ImportMatch<T> {
     const rn = String(receptionNumber ?? '').trim();
-    const fill = isFillImportRow(rn, subCategory);
-    const key = receptionBaseKey({ receptionNumber: rn, subCategory: fill ? '성토' : '', landClass1 }, fill, landClass1);
-    if (key === null) return { kind: 'none' };
-
-    const same = logs.filter(l => receptionBaseKey(l, fill, landClass1) === key);
-    const exact = same.find(l => String(l.receptionNumber ?? '').trim() === rn);
+    if (!rn) return { kind: 'none' };
+    const exact = logs.find(l => (l.landClass1 || DEFAULT_LAND_CLASS) === landClass1
+        && String(l.receptionNumber ?? '').trim() === rn);
     if (exact) return { kind: 'match', target: exact };
-    if (same.length === 0) return { kind: 'none' };
-    if (rn.split('-')[0].trim() !== rn) return { kind: 'subrow' };
-    return same.length === 1 ? { kind: 'match', target: same[0] } : { kind: 'ambiguous' };
+
+    const fill = rn.startsWith('F');
+    const key = receptionBaseKey({ receptionNumber: rn, landClass1 }, fill, landClass1);
+    if (key === null) return { kind: 'none' };
+    const pool = logs.filter(l => receptionBaseKey(l, fill, landClass1) === key);
+
+    const base = rn.split('-')[0].trim();
+    if (base !== rn) {
+        const hasParent = pool.some(l => String(l.receptionNumber ?? '').trim() === base);
+        return hasParent ? { kind: 'subrow', parent: base } : { kind: 'none' };
+    }
+    if (pool.length === 0) return { kind: 'none' };
+    return pool.length === 1 ? { kind: 'match', target: pool[0] } : { kind: 'ambiguous' };
 }

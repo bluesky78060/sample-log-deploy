@@ -4,7 +4,7 @@
  * 흙토람 서식(.xlsx)으로 내보내는 페이지 스크립트
  */
 
-import { DEFAULT_LAND_CLASS } from '../soil/reception-number';
+import { DEFAULT_LAND_CLASS, isFillLog } from '../soil/reception-number';
 
 // ========================================
 // 타입 정의
@@ -1032,10 +1032,7 @@ class HeuktoramManager {
     if (!editedRow) return;
 
     const baseOf = (log: SoilLog): string => String(log.receptionNumber ?? '').replace(/-\d+$/, '');
-    const poolOf = (log: SoilLog): string => {
-      const isFill = log.subCategory === '성토' || baseOf(log).startsWith('F');
-      return `${log.landClass1 || DEFAULT_LAND_CLASS}|${isFill}`;
-    };
+    const poolOf = (log: SoilLog): string => `${log.landClass1 || DEFAULT_LAND_CLASS}|${isFillLog(log)}`;
     const editedBase = baseOf(editedRow.log);
     const editedPool = poolOf(editedRow.log);
     const siblingRows = this.flatRows.filter(r => {

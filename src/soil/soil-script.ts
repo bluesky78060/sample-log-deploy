@@ -7,7 +7,7 @@ import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow
 import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleManager';
 import {
     computeNextNumber, DEFAULT_LAND_CLASS as LAND_CLASS1_DEFAULT, LAND_CLASS1_OPTIONS,
-    matchImportRow, importedSubCategory, type ImportMatch,
+    matchImportRow, importedSubCategory, importRowConflict, type ImportMatch,
 } from './reception-number';
 import {
     resolveParcelCategory as resolveParcelCategoryPure,
@@ -943,8 +943,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
 
     /**
      * 가져온 레코드를 현재 연도 저장소에 반영한다 (SoilResultImporter 위임 대상).
-     * 기존 레코드 매칭은 미리보기와 같은 matchImportRow로 한다. 매칭되면 onDuplicate에 따라 덮거나 두고,
-     * 모호·하위 필지 행은 정책과 무관하게 건너뛴다.
+     * 기존 레코드 매칭은 미리보기와 같은 matchImportRow로 한다(규칙은 그 함수 주석). 매칭되면 onDuplicate에
+     * 따라 덮거나 두고, 모호·하위필지 행은 정책과 무관하게 건너뛴다. 번호와 구분이 어긋나는 행은 실패로 센다.
      * 저장·클라우드 동기화·재렌더는 배치 끝에 한 번씩만 한다 — 행마다 하면 수백 행에서 수 초 멈춘다.
      */
     async addImportedRecords(records: ImportedSoilRecord[], opts: ImportedRecordsOptions = {}): Promise<ImportedRecordsResult> {
@@ -962,9 +962,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 const src = record || {};
                 const landClass1 = src.landClass1 || LAND_CLASS1_DEFAULT;
                 const given = src.receptionNumber != null ? String(src.receptionNumber).trim() : '';
-                const match: ImportMatch<SoilLog> = given
-                    ? matchImportRow(this.sampleLogs, given, src.subCategory, landClass1)
-                    : { kind: 'none' };
+                const conflict = importRowConflict(given, src.subCategory);
+                if (conflict) throw new Error(conflict);
+                const match: ImportMatch<SoilLog> = matchImportRow(this.sampleLogs, given, landClass1);
 
                 if (match.kind === 'ambiguous') {
                     result.ambiguous++;

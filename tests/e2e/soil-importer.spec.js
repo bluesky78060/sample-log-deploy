@@ -626,12 +626,12 @@ test.describe('토양 가져오기 — 수정 라운드 (SAMPL-1-152 리뷰 R1·
             '5\t내성리 5 (산)\t고추, 콩\t300\t-',
             '5-1\t내성리 5-1\t벼\t50\t-',
         ].join('\n'), 'overwrite');
-        await expect(modal.locator('.sri-pv-table tbody tr').nth(1)).toContainText('하위 필지 행');
+        await expect(modal.locator('.sri-pv-table tbody tr').nth(1)).toContainText('오류');
         await modal.locator('[data-act="import"]').click();
         await expect(modal).toBeHidden();
 
         expect((await toasts(page)).find((m) => m.startsWith('✅'))).toBe(
-            '✅ 1건 가져오기 완료 · 덮어씀 1건 · 하위 필지 행 건너뜀 1건');
+            '✅ 1건 가져오기 완료 · 덮어씀 1건 · 하위필지 행 건너뜀 1건');
         const logs = await readPersistedRaw(page);
         expect(logs).toHaveLength(1);
         const p = logs[0].parcels[0];
@@ -660,20 +660,22 @@ test.describe('토양 가져오기 — 수정 라운드 (SAMPL-1-152 리뷰 R1·
             ['F3:원래:원주소:성토', 'F4:신규:주소4:성토']);
     });
 
-    test('덮어쓰기가 성토 레코드의 구분을 일반으로 바꾸지 않는다', async ({ page }) => {
+    test('덮어쓰기가 F 없는 옛 성토 레코드의 구분을 일반으로 바꾸지 않는다', async ({ page }) => {
         await seed(page, [{
-            id: 'f3', receptionNumber: 'F3', name: '원래', landClass1: '농가의뢰', subCategory: '성토',
+            id: 'old7', receptionNumber: '7', name: '원래', landClass1: '농가의뢰', subCategory: '성토',
             createdAt: OLD, updatedAt: OLD,
-            parcels: [{ id: 'pf3', lotAddress: '원주소', isMountain: false, subLots: [], crops: [], category: '성토', purpose: '', note: '' }],
+            parcels: [{ id: 'p7', lotAddress: '원주소', isMountain: false, subLots: [], crops: [], category: '성토', purpose: '', note: '' }],
         }]);
-        const modal = await openManual(page, ['접수번호\t성명\t지번주소\t구분', 'F3\t새이름\t원주소\t논'].join('\n'), 'overwrite');
+        // 정확한 번호 탐색이 풀보다 먼저라 일반 행 '7'이 이 레코드와 만난다
+        const modal = await openManual(page, ['접수번호\t성명\t지번주소\t구분', '7\t새이름\t원주소\t논'].join('\n'), 'overwrite');
         await modal.locator('[data-act="import"]').click();
         await expect(modal).toBeHidden();
 
-        const [log] = await readPersistedRaw(page);
-        expect(log.name).toBe('새이름');
-        expect(log.subCategory).toBe('성토');
-        expect(log.parcels[0].category).toBe('성토');
+        const logs = await readPersistedRaw(page);
+        expect(logs).toHaveLength(1);
+        expect(logs[0].name).toBe('새이름');
+        expect(logs[0].subCategory).toBe('성토');
+        expect(logs[0].parcels[0].category).toBe('성토');
     });
 
     test('R3: 로컬 저장이 실패하면 가져오기를 되돌리고 오류로 알리며 클라우드에 보내지 않는다', async ({ page }) => {
@@ -710,5 +712,114 @@ test.describe('토양 가져오기 — 수정 라운드 (SAMPL-1-152 리뷰 R1·
         expect(state).toEqual({ mem: ['7:옛이름'], ok: 0, batch: 0, rej: [] });
         await expect(modal).toBeVisible();
         await expect(modal.locator('[data-act="import"]')).toBeEnabled();
+    });
+});
+
+test.describe('토양 가져오기 — 매칭 규칙 양방향 (SAMPL-2-28 리뷰 A1~A4 · 코디네이터 결정 1~5)', () => {
+    const OLD = '2020-01-01T00:00:00.000Z';
+    const rec = (o) => ({ landClass1: '농가의뢰', subCategory: '논', purpose: '일반재배', createdAt: OLD, updatedAt: OLD, groupId: `g-${o.id}`, ...o });
+    const parcel = (id, lot, crops = [], subLots = [], category = '논') => ({ id, lotAddress: lot, isMountain: false, category, purpose: '', note: '', crops, subLots });
+
+    async function run(page, logs, text, policy, { expectImport = true } = {}) {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await page.evaluate((data) => {
+            localStorage.clear();
+            localStorage.setItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`, JSON.stringify(data));
+        }, logs);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction((n) => (window.soilManager?.sampleLogs || []).length === n, logs.length);
+        await page.evaluate(() => {
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
+        });
+        const modal = await openWithPastedData(page, text);
+        await modal.locator('[data-el="autoNumber"]').uncheck();
+        await modal.locator(`input[name="sriDup"][value="${policy}"]`).check();
+        await modal.locator('[data-act="automap"]').click();
+        const pills = (await modal.locator('.sri-pill').allTextContents()).join(' ');
+        const rows = await modal.locator('.sri-pv-table tbody tr').allTextContents();
+        const importBtn = modal.locator('[data-act="import"]');
+        if (expectImport) {
+            await importBtn.click();
+            await expect(modal).toBeHidden();
+        } else {
+            await expect(importBtn).toBeDisabled();
+        }
+        const toast = await page.evaluate(() => window.__toasts.find((m) => m.startsWith('✅')) ?? null);
+        const saved = await readPersistedRaw(page);
+        return { pills, rows, toast, saved };
+    }
+
+    test('A1: 하위필지 2개 레코드를 내보낸 모양(5·5-1·5-2)으로 덮어써도 본필지가 하위필지 값으로 바뀌지 않는다', async ({ page }) => {
+        const subLots = [{ lotAddress: '내성리 5-1', crops: [{ name: '벼', area: '50' }] }, { lotAddress: '내성리 5-2', crops: [{ name: '콩', area: '30' }] }];
+        const r = await run(page,
+            [rec({ id: 'k5', receptionNumber: '5', name: '원래', lotAddress: '내성리 5', parcels: [parcel('p5', '내성리 5', [{ name: '고추', area: '100' }], subLots)] })],
+            ['접수번호\t성명\t지번주소\t작물\t면적', '5\t원래\t내성리 5\t고추\t100', '5-1\t원래\t내성리 5-1\t벼\t50', '5-2\t원래\t내성리 5-2\t콩\t30'].join('\n'),
+            'overwrite');
+        expect(r.pills).toContain('오류 2');
+        expect(r.toast).toBe('✅ 1건 가져오기 완료 · 덮어씀 1건 · 하위필지 행 건너뜀 2건');
+        expect(r.saved).toHaveLength(1);
+        const p = r.saved[0].parcels[0];
+        expect(p.lotAddress).toBe('내성리 5');
+        expect(p.crops.map((c) => `${c.name}/${c.area}`)).toEqual(['고추/100']);
+        expect(p.subLots).toEqual(subLots);
+    });
+
+    test('A1b: 하위필지 행만 들어오면 저장하지 않고 미리보기가 사유를 보여준다', async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 'k5', receptionNumber: '5', name: '원래', lotAddress: '내성리 5', parcels: [parcel('p5', '내성리 5', [{ name: '고추', area: '100' }])] })],
+            ['접수번호\t성명\t지번주소\t작물\t면적', '5-1\t원래\t내성리 5-1\t벼\t50'].join('\n'),
+            'overwrite', { expectImport: false });
+        expect(r.rows[0]).toContain('하위필지는 가져오기로 갱신하지 않습니다');
+        expect(r.saved.map((l) => `${l.receptionNumber}:${l.parcels[0].lotAddress}`)).toEqual(['5:내성리 5']);
+    });
+
+    test('A2: 본번 레코드가 없으면 가지번호 행은 각각 새 레코드다 (7-1 갑 · 7-2 을)', async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 'x1', receptionNumber: '1', name: '무관', parcels: [] })],
+            ['접수번호\t성명\t지번주소', '7-1\t갑\t주소1', '7-2\t을\t주소2'].join('\n'), 'overwrite');
+        expect(r.toast).toBe('✅ 2건 가져오기 완료');
+        expect(r.saved.map((l) => `${l.receptionNumber}:${l.name}`).sort()).toEqual(['1:무관', '7-1:갑', '7-2:을']);
+    });
+
+    test("경계: 같은 배치에서 앞서 추가된 '7'이 있으면 '7-1'은 하위필지 행이다", async ({ page }) => {
+        const r = await run(page, [],
+            ['접수번호\t성명\t지번주소', '7\t본\t주소7', '7-1\t가지\t주소71'].join('\n'), 'overwrite');
+        expect(r.rows[1]).toContain('본번 7이 있어 하위필지 행으로 봅니다');
+        expect(r.toast).toBe('✅ 1건 가져오기 완료 · 하위필지 행 건너뜀 1건');
+        expect(r.saved.map((l) => `${l.receptionNumber}:${l.name}`)).toEqual(['7:본']);
+    });
+
+    test("경계: 'N-K'만 있고 'N'이 없으면 'N-K'는 그 레코드를 갱신하고 'N-M'은 새로 추가한다", async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 's81', receptionNumber: '8-1', name: '옛', parcels: [parcel('p81', '옛주소')] })],
+            ['접수번호\t성명\t지번주소', '8-1\t갱신\t주소81', '8-2\t추가\t주소82'].join('\n'), 'overwrite');
+        expect(r.toast).toBe('✅ 2건 가져오기 완료 · 덮어씀 1건');
+        expect(r.saved.map((l) => `${l.id === 's81' ? 'old' : 'new'}:${l.receptionNumber}:${l.name}`).sort())
+            .toEqual(['new:8-2:추가', 'old:8-1:갱신']);
+    });
+
+    test('A3: 구분 열 없이 F5를 덮어쓰면 기존 성토 F5를 갱신하고 새로 만들지 않는다', async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 'f5', receptionNumber: 'F5', name: '원래', subCategory: '성토', parcels: [parcel('pf5', '원주소', [], [], '성토')] })],
+            ['접수번호\t성명\t지번주소', 'F5\t새이름\t새주소'].join('\n'), 'overwrite');
+        expect(r.pills).toContain('중복 1');
+        expect(r.saved.map((l) => `${l.id}:${l.receptionNumber}:${l.name}:${l.subCategory}`)).toEqual(['f5:F5:새이름:성토']);
+    });
+
+    test('A4 양방향: 구분 성토인데 F 없는 행, F인데 구분이 성토가 아닌 행은 오류로 저장하지 않는다', async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 'g7', receptionNumber: '7', name: '원래', parcels: [parcel('pg7', '원주소')] }),
+             rec({ id: 'f5', receptionNumber: 'F5', name: '성토원래', subCategory: '성토', parcels: [parcel('pf5', '원주소', [], [], '성토')] })],
+            ['접수번호\t성명\t지번주소\t구분', '7\t새이름\t새주소\t성토', 'F5\t새이름\t새주소\t논', '9\t정상\t주소9\t논'].join('\n'), 'skip');
+        expect(r.rows[0]).toContain('구분이 성토인데 번호에 F가 없습니다');
+        expect(r.rows[1]).toContain('F 번호인데 구분이 성토가 아닙니다');
+        expect(r.toast).toBe('✅ 1건 가져오기 완료 · 오류 2건');
+        expect(r.saved.map((l) => `${l.receptionNumber}:${l.name}:${l.subCategory}`).sort())
+            .toEqual(['7:원래:논', '9:정상:논', 'F5:성토원래:성토']);
     });
 });

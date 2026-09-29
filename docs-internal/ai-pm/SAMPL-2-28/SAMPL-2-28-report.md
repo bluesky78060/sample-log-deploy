@@ -112,3 +112,70 @@ E2E는 다른 worktree와 포트가 겹치지 않도록 임시 설정(포트 892
 
 `smart_workflow(SAMPL-2-28, submit_test)` run 1 — build·type·integration pass, unit은 사실대로 `fail`로 적고
 output에 "기존 33건 외 신규 실패 0"을 명시했다. 서버가 overall=fail로 판정해 티켓이 **`fixing`으로 전환됐다.**
+
+---
+
+# 수정 라운드 (독립 리뷰 1라운드 + 코디네이터 추가 지시)
+
+리뷰 원문: 코디네이터 스크래치패드 `review-2-28-r1.md`(🟠 1 / 🟡 2 / 🔵 3). 재현 스펙 `zz-review228.spec.js`(A1·A1b·A2·A3·A4·R1·R2)의 시나리오를 단정이 있는 E2E로 옮겼다.
+같은 함수를 고치는 SAMPL-1-152 수정 라운드와 함께 진행했다(코디네이터 지시 — 커밋·보고서는 티켓별). 추가 범위로 SAMPL-2-27 재리뷰가 찾은 성토 채번 막힘(P1)을 넣었다.
+
+## 코디네이터 설계 결정과 구현
+
+| 결정 | 구현 (`src/soil/reception-number.ts`) |
+| --- | --- |
+| 1) `N-M` 행이고 같은 번호 레코드가 없으면 부모로 접지 않는다 | `matchImportRow`: 같은 경지구분·같은 풀에 번호가 정확히 `N`인 레코드(이 배치에서 앞서 추가된 것 포함)가 있으면 `subrow` → 미리보기 **오류**(사유 `본번 N이 있어 하위필지 행으로 봅니다 — 하위필지는 가져오기로 갱신하지 않습니다`), 결과 토스트 `하위필지 행 건너뜀 N건`. `N`이 없으면 새 레코드(질의 후 (c)안으로 확정) |
+| 2) 들어온 쪽 `N` → 기존 단건 `N-K`만 접는다 | `N` 행은 같은 풀의 가지번호 레코드가 한 건이면 그것, 여럿이면 `ambiguous` |
+| 3) 풀은 번호의 F 접두로, exact 먼저, 어긋나는 행은 오류 | exact 탐색은 같은 경지구분에서 풀 필터보다 먼저. 풀은 `rn.startsWith('F')`. `importRowConflict`: F인데 구분이 성토가 아님 / 구분이 성토인데 F 없음 → 오류 |
+| 4) 미리보기와 매니저가 같은 순수 함수 | 둘 다 `matchImportRow`·`importRowConflict`만 쓴다. 미리보기는 배치가 추가할 레코드를 쌓아 매니저의 배치 내 매칭까지 같게 한다. 들어온 쪽 키도 `receptionBaseKey`(SUGGESTION-1) |
+| 5) 정책을 매니저에 전달, skip이면 불변 | `addImportedRecords(records, { onDuplicate })` (SAMPL-1-152 커밋 b2d0a7f에서 도입) |
+| 추가: P1 성토 채번 막힘 | `isFillLog(log)` = 구분 `성토` **또는 F 번호**. `receptionBaseKey`가 이것으로 풀을 가른다. 흙토람 `syncToSiblings`도 같은 함수를 쓴다 |
+
+그 밖에: MINOR-2 주석 3곳(매니저 docstring·모달 타입 주석·모달 HTML 주석)을 현재 규칙으로, SUGGESTION-2 `Number.isNaN(nextFillNumber)` 가드 삭제. SUGGESTION-3(흙토람 서식 셀의 `'농가의뢰'` 리터럴)은 범위 밖으로 두었다.
+
+### 기존 기대를 바꾼 테스트
+
+- `tests/unit/soil-import-preview.test.ts` 「서브넘버는 기본번호로 중복 판정 (5-1은 5와 충돌)」 → 「본번이 있으면 서브넘버 행은 하위필지 행 오류」. 결정 1이 이 동작을 뒤집었다.
+- `tests/e2e/soil-importer.spec.js` 「같은 본번이 여러 건이면…」: 신규 행을 섞고 미리보기 사유 단정을 추가(SAMPL-1-152 수정 라운드에서 변경, 원래 단정 유지).
+
+## 재현 먼저 (수정 전 코드에서 새 테스트 실패 확인)
+
+새 E2E를 먼저 쓰고, `src`만 직전 커밋(7659b80 = SAMPL-1-152 수정 라운드 b2d0a7f 상태)으로 되돌려 빌드한 뒤 `soil-importer`·`soil-landclass`를 돌렸다: **9 failed / 26 passed.**
+실패: A1, A1b, A2, 경계(배치 내 `7`→`7-1`), 경계(`N-K`만 있을 때), A4 양방향, P1 성토 채번, 그리고 이번에 기대를 바꾼 R1(문구)·옛 성토 `7` 구분 보존.
+A3·R2는 직전 커밋에서 이미 통과했다(SAMPL-1-152 수정 라운드가 F 번호 행을 성토 풀로 본 덕). 실패 메시지는 테스트별로 다 열어 보지 않았고 통과/실패만 확인했다.
+리뷰어 스펙의 d943451 관찰(A1 본필지가 `내성리 5-2`로, A2 갑 행 소실, A3 F5 2건, A4 F 없는 성토 7)은 리뷰 원문 표를 따른다 — 이 커밋 기준으로 따로 다시 돌리지 않았다.
+
+## 실행한 명령과 결과 (수정 라운드)
+
+E2E는 임시 설정(포트 8927, `reuseExistingServer: false`, 스크래치패드 — 커밋 안 함)으로 돌렸다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `npm run build` | exit 0 |
+| `npm run typecheck:gate` | 714 / baseline 714, exit 0 |
+| `npx vitest run` | 33 failed / 402 passed (435). 실패는 `encryption-manager` 23 · `secure-storage` 8 · `crypto-utils` 1 · `path-security` 1 — 기준선과 같다, **신규 실패 0** |
+| `soil-importer` + `soil-landclass` + `heuktoram-siblings` | 39 passed |
+| `npx playwright test` 전체 (224건, `--workers=3`) | 219 passed / 5 failed — 실패 5건(`edit-test:5`, `form-submission:135`, `soil-form:54`, `soil-form:58`, `theme-toggle:5`)은 기존 기준선과 같다 |
+
+## 변이 검증 (결정 1~5 + P1, 그리고 SAMPL-1-152 병합 수정 재확인)
+
+수정본을 tar로 보관하고 한 곳씩 되돌려 빌드한 뒤 세 스펙(39건)을 돌렸다. 끝나고 복원해 5개 파일을 `cmp`로 확인하고 다시 빌드했다.
+
+| 변이 | 되돌린 곳 | 실패한 테스트 (나머지 통과) |
+| --- | --- | --- |
+| D1 | `N-M` 행의 subrow 판정 제거(부모로 접음) | R1, A1, A1b, A2, 경계 2건 — 6 failed / 33 passed |
+| D2 | `N` 행을 단건 `N-K`로 접지 않음 | 「'5-1'만 있을 때…」, 「같은 본번이 여러 건이면…」 |
+| D3a | exact 탐색을 풀 안으로 제한 | 옛 성토 `7` 구분 보존 |
+| D3b | 번호·구분 불일치 검사 제거 | A4 양방향 |
+| D3c | `isFillLog`가 F 접두를 보지 않음 | P1 성토 채번 |
+| D4 | 미리보기가 공유 함수 대신 옛 집합 판정 | 「같은 본번이 여러 건이면…」, R1, A1, A1b, 경계(배치 내 `7`) — 5 failed |
+| D5 | 매니저가 `onDuplicate` 무시 | R2 |
+| M2a~d, M3 | SAMPL-1-152 병합·저장 실패 처리 | 각각 R1 / R1 / R1 / 옛 성토 `7` / R3만 |
+
+## 남은 위험 (수정 라운드)
+
+- **동작 변화**: 번호와 구분이 어긋나는 행(`F5`+논, `7`+성토)은 이제 오류로 저장되지 않는다. 전에는 저장됐다(풀 밖 레코드).
+- **동작 변화**: 본번 `N`이 있는 `N-M` 행은 덮어쓰기에서도 저장되지 않는다. 내보내기에서 하위필지를 고쳐 되가져와도 반영되지 않는다(결정 1 — 하위필지 배정은 가져오기로 하지 않는다).
+- `isFillLog` 변경으로 **F 번호인데 구분이 성토가 아닌 기존 레코드**(P1로 생긴 것)가 이제 성토 풀에 든다. 채번·중복 판정·흙토람 형제 판정 모두 성토 쪽으로 본다. 그 레코드의 구분 값 자체는 고치지 않았다(데이터 이동 없음). 폼이 필지 카드 구분을 저장하는 원인(`soil-script.ts` 신규 등록의 `subCategory: parcel.category || …`)도 그대로다.
+- 번호가 정확히 같은 레코드가 여러 건이면(과거 중복 가져오기 흔적) 여전히 첫 건만 갱신한다(SAMPL-1-152 m-3, 범위 밖).
+- 이 수정본은 아직 아무도 리뷰하지 않았다.
