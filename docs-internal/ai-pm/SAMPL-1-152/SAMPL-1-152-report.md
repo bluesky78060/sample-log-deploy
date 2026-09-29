@@ -151,3 +151,8 @@ E2E는 종전처럼 임시 설정(포트 8927, `reuseExistingServer: false`, 스
 - 저장 실패 복원은 덮은 레코드를 JSON 사본으로 되돌린다. `undefined` 값·함수 같은 JSON이 못 담는 속성은 복원 후 사라진다(현재 레코드에는 없다고 보지만 재 보지는 않았다).
 - 클라우드 실패 알림은 여전히 성공 토스트 뒤에 따로 뜬다.
 - 이 수정본은 아직 아무도 리뷰하지 않았다. 재리뷰는 코디네이터 몫이다.
+
+## AI PM submit_test (수정 라운드)
+
+`complete_fix`로 fixing → testing 전환 후 `submit_test` run 2 — build·type·integration pass, unit은 기존 암호화 실패 33건을
+사실대로 `fail`로 적었다(신규 실패 0). 서버가 overall=fail로 판정해 티켓은 다시 **`fixing`**이다. 상태 처리는 코디네이터 판단에 맡긴다.
