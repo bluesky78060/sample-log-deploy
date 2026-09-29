@@ -51,3 +51,9 @@
 - 🟡 5건은 보류했다(리뷰 문서 참고). 그중 m-1(`getNextNumberForClass` 타 연도)은 지금은 도달 경로가 없지만 호출자가 생기면 중복 번호가 된다.
 - 이관 항목(SAMPL-1-152: upsert 부재·행마다 저장, SAMPL-2-28: 상수 중복·규칙 중복·`getNextFillNumberForClass` 부재)은 건드리지 않았다.
 - 이 리뷰는 단일 레인이다. 다른 계열 모델의 독립 리뷰는 코디네이터 몫이다.
+
+## AI PM submit_test
+
+`smart_workflow(SAMPL-2-27, submit_test)` run 1 — build·type·integration pass, unit은 기존 암호화 실패 33건 때문에
+사실대로 `fail`로 보고했다. 서버가 overall=fail로 판정해 티켓이 **`fixing`으로 전환됐다.** 신규 실패는 0건이다.
+unit을 pass로 바꿔 재제출하지 않았다(기록이 거짓이 된다). 상태 처리는 코디네이터 판단에 맡긴다.
