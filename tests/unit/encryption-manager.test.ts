@@ -170,28 +170,12 @@ describe('encryption-manager.ts', () => {
     };
 
     describe('Module Constants', () => {
-        it('should have correct PBKDF2 iterations for recovery key', async () => {
-            // This tests that security constants are properly defined
-            // The actual value is verified by importing the module
-            const module = await import('../../src/shared/encryption-manager');
-            expect(module).toBeDefined();
-        });
+        it.todo('should have correct PBKDF2 iterations for recovery key — RECOVERY_PBKDF2_ITERATIONS(600000)가 복구 키 파생(deriveRecoveryAesKey)에 실제로 쓰이는지 — 모듈 export 가 없어 import 만으로는 볼 수 없다');
     });
 
     describe('Helper Functions', () => {
         describe('timingSafeEqual (indirectly tested)', () => {
-            it('should prevent timing attacks on string comparison', () => {
-                // This function is internal, but we can test behavior
-                // by ensuring password verification doesn't leak timing info
-                const pw1 = 'password123!';
-                const pw2 = 'password123!';
-                const pw3 = 'different123!';
-
-                // Both comparisons should take similar time
-                // (In practice, this is hard to test without performance profiling)
-                expect(pw1).toBe(pw2);
-                expect(pw1).not.toBe(pw3);
-            });
+            it.todo('should prevent timing attacks on string comparison — timingSafeEqual: 길이가 다르거나 한 글자만 달라도 false, 같으면 true (verifyPassword 의 세션 비밀번호 비교 경로로 구동)');
         });
 
         describe('getCollectionPrefix', () => {
@@ -346,15 +330,7 @@ describe('encryption-manager.ts', () => {
             (window as any).firebaseConfig.isEnabled = vi.fn(() => true);
         });
 
-        it('should acquire lock when available', async () => {
-            mockFirebaseDoc.exists = false;
-
-            vi.resetModules();
-
-            await import('../../src/shared/encryption-manager');
-            // Lock acquisition happens internally
-            expect(mockFirebaseDb.runTransaction).toBeDefined();
-        });
+        it.todo('should acquire lock when available — acquireLock: 잠금 문서가 없으면 transaction.set 에 lockedBy=_lockId 를 쓰고 진행 — recoverPassword 는 이후 복구 키 입력 모달에서 멈춰 모달 처리가 필요');
 
         it('should fail to acquire lock when held by another process', async () => {
             mockFirebaseDoc.exists = true;
@@ -363,44 +339,21 @@ describe('encryption-manager.ts', () => {
                 lockedAt: new Date().toISOString()
             });
 
-            vi.resetModules();
+            const manager = await loadManager();
+            const result = await manager.recoverPassword();
 
-            await import('../../src/shared/encryption-manager');
-            expect(mockFirebaseDb.runTransaction).toBeDefined();
+            expect(result).toEqual({ success: false, error: 'Another password operation in progress' });
+            expect(mockFirebaseDb.runTransaction).toHaveBeenCalledTimes(1);
+            expect(mockFirebaseDb.collection).toHaveBeenCalledWith('_system');
         });
 
-        it('should acquire expired lock', async () => {
-            const fiveMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
-            mockFirebaseDoc.exists = true;
-            mockFirebaseDoc.data = () => ({
-                lockedBy: 'expired-process',
-                lockedAt: fiveMinutesAgo.toISOString()
-            });
-
-            vi.resetModules();
-
-            await import('../../src/shared/encryption-manager');
-            expect(mockFirebaseDb.runTransaction).toBeDefined();
-        });
+        it.todo('should acquire expired lock — acquireLock: lockedAt 이 LOCK_TIMEOUT_MS(5분) 넘게 지난 잠금은 빼앗는다 — available 과 같은 모달 문제');
     });
 
     describe('Encryption Manager State', () => {
-        it('should start in uninitialized state', async () => {
-            vi.resetModules();
+        it.todo('should start in uninitialized state — import 직후 isReady()=false, getKey()=null, getKeySource()=null');
 
-            const module = await import('../../src/shared/encryption-manager');
-
-            // Module loads but manager needs explicit init
-            expect(module).toBeDefined();
-        });
-
-        it('should track initialization status', async () => {
-            vi.resetModules();
-
-            await import('../../src/shared/encryption-manager');
-            // isReady() and getKey() methods exist on window.encryptionManager
-            expect((window as any).encryptionManager).toBeDefined();
-        });
+        it.todo('should track initialization status — init/initSilent 성공 후 isReady()=true 로 바뀌는지 (세션 비밀번호·키·salt·검증 데이터 목 필요)');
     });
 
     describe('Error Handling', () => {
@@ -430,6 +383,7 @@ describe('encryption-manager.ts', () => {
         });
 
         // SAMPL-2-39: 최상위 _lockId 가 import 시점에 crypto.randomUUID 를 읽어 전역 crypto 가 없으면 TypeError
+        // it.fails 는 어떤 이유로든 실패하면 통과한다 — 이 자리의 다른 회귀도 가릴 수 있다
         it.fails('should handle missing crypto API gracefully', async () => {
             vi.stubGlobal('crypto', undefined);
             try {
@@ -445,11 +399,7 @@ describe('encryption-manager.ts', () => {
     });
 
     describe('Recovery Blob', () => {
-        it('should have recovery key length of 24 characters', async () => {
-            // Recovery key format is typically base32 or similar
-            const mockRecoveryKey = 'ABCD-EFGH-IJKL-MNOP-QRST';
-            expect(mockRecoveryKey.replace(/-/g, '').length).toBeGreaterThanOrEqual(20);
-        });
+        it.todo('should have recovery key length of 24 characters — generateRecoveryKey() 결과가 RECOVERY_KEY_LENGTH(24)자이고 허용 문자만 쓰는지 — 내부 함수라 regenerateRecoveryKey 모달 경로로만 닿는다');
 
         it('should encrypt recovery blob with user password', async () => {
             const { CryptoUtils } = await import('../../src/shared/crypto-utils');
@@ -474,19 +424,9 @@ describe('encryption-manager.ts', () => {
     });
 
     describe('Session Management', () => {
-        it('should store session password in localStorage (encrypted)', async () => {
-            mockLocalStorage['encryption_sessionPw'] = 'encrypted-session-pw';
+        it.todo('should store session password in localStorage (encrypted) — storeSessionPassword 의 저장 위치·형식 — 소스는 sessionStorage 에 평문으로 둔다(보고서 §8). 기대 동작부터 정해야 한다');
 
-            expect(localStorage.getItem('encryption_sessionPw')).toBeTruthy();
-        });
-
-        it('should clear session password on logout', () => {
-            mockLocalStorage['encryption_sessionPw'] = 'session-data';
-
-            localStorage.removeItem('encryption_sessionPw');
-
-            expect(mockLocalStorage['encryption_sessionPw']).toBeUndefined();
-        });
+        it.todo('should clear session password on logout — destroy() 후 sessionStorage 의 encryption_sessionPw 가 지워지는지');
     });
 
     describe('Key Source Tracking', () => {
@@ -515,14 +455,7 @@ describe('encryption-manager.ts', () => {
             expect(manager.getKeySource()).toBe('local');
         });
 
-        it('should track key source as generated', async () => {
-            // No key in Firebase or localStorage
-            vi.resetModules();
-
-            await import('../../src/shared/encryption-manager');
-            // New key would be generated
-            expect(true).toBe(true);
-        });
+        it.todo('should track key source as generated — 키가 어디에도 없을 때 generateAndStoreKeyFile 후 getKeySource() 가 generated (init 의 첫 설정 모달 경로)');
     });
 
     describe('Integration with CryptoUtils', () => {
@@ -560,27 +493,9 @@ describe('encryption-manager.ts', () => {
     });
 
     describe('Edge Cases', () => {
-        it('should handle concurrent initialization attempts', async () => {
-            vi.resetModules();
+        it.todo('should handle concurrent initialization attempts — init() 동시 호출 3회가 같은 _initPromise 를 공유해 _doInitEncryption 이 한 번만 도는지');
 
-            // Simulate concurrent init calls (in practice, handled by _initInProgress flag)
-            const imports = await Promise.all([
-                import('../../src/shared/encryption-manager'),
-                import('../../src/shared/encryption-manager'),
-                import('../../src/shared/encryption-manager')
-            ]);
-
-            expect(imports).toHaveLength(3);
-            imports.forEach(mod => expect(mod).toBeDefined());
-        });
-
-        it('should handle missing window.encryptionManager gracefully', () => {
-            delete (window as any).encryptionManager;
-
-            // Should not throw when checking isReady
-            const isReady = (window as any).encryptionManager?.isReady();
-            expect(isReady).toBeUndefined();
-        });
+        it.todo('should handle missing window.encryptionManager gracefully — window.encryptionManager 가 없을 때 호출하는 쪽(페이지 스크립트)이 죽지 않는지 — 대상이 이 모듈이 아니다');
 
         it('should handle null password input', async () => {
             const { CryptoUtils } = await import('../../src/shared/crypto-utils');
@@ -601,53 +516,15 @@ describe('encryption-manager.ts', () => {
     });
 
     describe('Security Considerations', () => {
-        it('should not store passwords in plain text', () => {
-            // Verify localStorage doesn't contain plain passwords
-            Object.keys(mockLocalStorage).forEach(key => {
-                const value = mockLocalStorage[key];
-                expect(value).not.toContain('password');
-                expect(value).not.toContain('비밀번호');
-            });
-        });
+        it.todo('should not store passwords in plain text — init 흐름을 돈 뒤 localStorage·sessionStorage 에 비밀번호 평문이 없는지 (현재 세션 비밀번호는 sessionStorage 평문)');
 
         it('should use sufficient PBKDF2 iterations (600,000)', async () => {
             const { PBKDF2_ITERATIONS } = await import('../../src/shared/crypto-utils');
             expect(PBKDF2_ITERATIONS).toBeGreaterThanOrEqual(600000);
         });
 
-        it('should use random IV for each encryption', async () => {
-            const { CryptoUtils } = await import('../../src/shared/crypto-utils');
+        it.todo('should use random IV for each encryption — crypto-utils.test.ts "Real AES-GCM" 블록의 "uses a fresh IV for each encryption" 이 대신 검증한다');
 
-            const keyResult = await CryptoUtils.createMasterKey(
-                'TestPass123!',
-                CryptoUtils.generateKeyFileContent()
-            );
-
-            const enc1 = await CryptoUtils.encrypt('same data', keyResult.key);
-            const enc2 = await CryptoUtils.encrypt('same data', keyResult.key);
-
-            // IVs should be different
-            expect(enc1?.iv).toBeTruthy();
-            expect(enc2?.iv).toBeTruthy();
-            // With deterministic mock, they'll be the same, but in real crypto they differ
-        });
-
-        it('should use AAD to prevent ciphertext substitution', async () => {
-            const { CryptoUtils } = await import('../../src/shared/crypto-utils');
-
-            const keyResult = await CryptoUtils.createMasterKey(
-                'TestPass123!',
-                CryptoUtils.generateKeyFileContent()
-            );
-
-            // Encrypt with AAD
-            const encrypted = await CryptoUtils.encrypt(
-                'sensitive data',
-                keyResult.key,
-                'fieldName'
-            );
-
-            expect(encrypted).toBeTruthy();
-        });
+        it.todo('should use AAD to prevent ciphertext substitution — crypto-utils.test.ts "Real AES-GCM" 블록의 AAD·필드 치환 테스트가 대신 검증한다');
     });
 });

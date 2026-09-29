@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
 
 // Mock localStorage
 const mockLocalStorage: Record<string, string> = {};
@@ -326,6 +327,29 @@ describe('secure-storage.ts', () => {
             expect(retrieved2).toEqual({ value: 'test2' });
         });
 
+        // XOR 목은 키를 무시해 회전 없이도 위 왕복이 통과한다. 실제 AES-GCM 으로 키·암호문 교체를 본다.
+        it('should replace the stored key and re-encrypt data with it (real AES-GCM)', async () => {
+            vi.stubGlobal('crypto', webcrypto);
+            const { SecureStorage } = await import('../../src/shared/secure-storage');
+            const storage = new SecureStorage();
+            await storage.setItem('data1', { value: 'test1' });
+
+            const oldKey = mockLocalStorage['samplelog_secure_key'];
+            const oldCiphertext = mockLocalStorage['secure_data1'];
+
+            expect(await storage.rotateKey()).toBe(true);
+
+            expect(mockLocalStorage['samplelog_secure_key']).toBeTruthy();
+            expect(mockLocalStorage['samplelog_secure_key']).not.toBe(oldKey);
+            expect(mockLocalStorage['secure_data1']).not.toBe(oldCiphertext);
+
+            // 저장된 새 키로 만든 인스턴스가 읽을 수 있어야 하고, 옛 암호문은 새 키로 풀리지 않아야 한다
+            const reopened = new SecureStorage();
+            expect(await reopened.getItem('data1')).toEqual({ value: 'test1' });
+            mockLocalStorage['secure_data1'] = oldCiphertext;
+            expect(await reopened.getItem('data1')).toBeNull();
+        });
+
         it('should handle key rotation failure gracefully', async () => {
             const { SecureStorage } = await import('../../src/shared/secure-storage');
             const storage = new SecureStorage();
@@ -462,7 +486,8 @@ describe('secure-storage.ts', () => {
             expect(retrieved).toEqual({ value: 'special' });
         });
 
-        // SAMPL-2-38: encryptWithCrypto 의 String.fromCharCode.apply 가 ~130KB 에서 RangeError → setItem false
+        // SAMPL-2-38: encryptWithCrypto 의 String.fromCharCode.apply 가 이 머신(node 22)에서 약 109KB 넘으면 RangeError(스택 크기에 따라 다름) → setItem false
+        // it.fails 는 어떤 이유로든 실패하면 통과한다 — 이 자리의 다른 회귀도 가릴 수 있다
         it.fails('should handle very large data', async () => {
             const { SecureStorage } = await import('../../src/shared/secure-storage');
             const storage = new SecureStorage();

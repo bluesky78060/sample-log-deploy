@@ -11,10 +11,13 @@
 | 시점 | Test Files | Tests |
 | --- | --- | --- |
 | 수정 전 기준선 (`npx vitest run`) | 4 failed / 15 passed (19) | **33 failed / 385 passed (418)** |
-| 수정 후 (`npx vitest run`, 2회 연속) | 19 passed (19) | **0 failed / 423 passed (423)** |
+| 1라운드 후 (3baed4e, `npx vitest run`, 2회 연속) | 19 passed (19) | 0 failed / 423 passed (423) |
+| **2라운드 후 (`npx vitest run`, 2회 연속)** | 19 passed (19) | **0 failed / 415 passed / 15 todo (430)** |
 
-- 수정 후 423 = 기존 418 + 새로 넣은 실제 AES-GCM 테스트 5건.
-- 423 안에 `it.fails` 3건이 들어 있다(아래 3절). 코디네이터 결정(A)에 따라 0 fail 로 본다.
+- 1라운드 423 = 기존 418 + 새로 넣은 실제 AES-GCM 테스트 5건.
+- 2라운드 430 = 423 + 새 테스트 7건(키 파생 5, v2.0 레거시 1, 실제 AES-GCM rotateKey 1).
+  그중 껍데기 15건을 `it.todo` 로 바꿔 통과 수에서 뺐다(9절). 그래서 통과는 415.
+- 통과 수 안에 `it.fails` 3건이 들어 있다(5절). 코디네이터 결정(A)에 따라 0 fail 로 본다.
 
 ## 2. 기준선 실패 33건의 원인 분류
 
@@ -79,7 +82,7 @@ GCM 태그 검증 자체는 WebCrypto 안에 있어 소스 변이로 끌 수 없
 
 | 테스트 | 후속 티켓 | 원인 | 재현 |
 | --- | --- | --- | --- |
-| secure-storage `should handle very large data` | SAMPL-2-38 | `encryptWithCrypto` 의 `String.fromCharCode.apply(null, combined)` 가 약 130KB에서 `RangeError: Maximum call stack size exceeded` → `setItem` false | 1,000건×약 130자 객체를 `setItem`. 로그 `[SecureStorage] 저장 실패: RangeError…`. 현재 사용처는 `firebase-config-migration.ts`(작은 설정)뿐이라 실제 영향은 낮다 |
+| secure-storage `should handle very large data` | SAMPL-2-38 | `encryptWithCrypto` 의 `String.fromCharCode.apply(null, combined)` 가 이 머신(node 22.23.2)에서 약 109KB(측정 109,847바이트, 스택 크기에 따라 다름 · CI 미측정)를 넘으면 `RangeError: Maximum call stack size exceeded` → `setItem` false | 1,000건×약 130자 객체(JSON 140,793바이트, IV 를 붙인 `combined` 140,805바이트 — 목 암호화라 태그 없음)를 `setItem`. 로그 `[SecureStorage] 저장 실패: RangeError…`. 현재 사용처는 `firebase-config-migration.ts`(작은 설정)뿐이라 실제 영향은 낮다 |
 | encryption-manager `should handle missing crypto API gracefully` | SAMPL-2-39 | 최상위 `_lockId` 가 import 시점에 `crypto.randomUUID` 를 읽는다. 전역 `crypto` 가 없으면 import 자체가 `TypeError` | `vi.stubGlobal('crypto', undefined)` 후 import. 브라우저·Electron 에는 전역 crypto 가 늘 있어 엣지 케이스 |
 | path-security `should handle invalid URL encoding gracefully` | SAMPL-2-40 | `%ZZ%YY` 는 `/%[0-9a-fA-F]{2}/` 에 안 걸려 디코딩 검사를 건너뛰고 `safe:true` | `PathSecurity.checkDangerousPatterns('%ZZ%YY')`. 유효한 `%XX` 가 섞이면 `decodeURIComponent` 가 던져 이미 거부된다 |
 
@@ -94,29 +97,25 @@ GCM 태그 검증 자체는 WebCrypto 안에 있어 소스 변이로 끌 수 없
 
 ## 6. 여전히 아무것도 검증하지 않는 테스트 (통과하지만 껍데기)
 
-이번 티켓 범위(실패 테스트 되살리기) 밖이라 고치지 않았다. 목록만 남긴다.
+2라운드에서 encryption-manager 껍데기 15건은 `it.todo` 로 바꿨고(9-4절), Distributed Lock `held by another process` 는
+실제 테스트로 바꿨다. 아래는 **아직 초록으로 통과 수에 들어 있는** 껍데기다.
 
-- encryption-manager
-  - `Distributed Lock` 3건: `expect(mockFirebaseDb.runTransaction).toBeDefined()` 만 본다. `acquireLock` 은 불리지 않는다
-    (`recoverPassword()` 로 구동하면 테스트 가능. 잠금이 잡혀 있으면 `'Another password operation in progress'` 로 즉시 반환)
-  - `timingSafeEqual` 1건, `Recovery Blob > recovery key length` 1건: 테스트 안의 리터럴끼리만 비교
-  - `Session Management` 2건: 목 localStorage 를 직접 읽고 쓴다. 소스는 세션 비밀번호를 **sessionStorage 에 평문으로** 둔다.
-    테스트 이름("localStorage (encrypted)")이 소스와 다르다
-  - `Key Source Tracking > generated`: `expect(true).toBe(true)`
-  - `Module Constants`, `Encryption Manager State > uninitialized`, `Edge Cases > concurrent initialization`: 모듈이 정의됐는지만 본다
-  - `Security Considerations > should not store passwords in plain text`: `beforeEach` 가 비운 목 저장소를 훑어 항상 통과
-  - `Security Considerations > random IV / AAD`: 결과가 truthy 인지만 본다(실제 검증은 3-4절 블록으로 대체됨)
-- crypto-utils: `different keys on each call`, `different salts`(목이 결정적이라 truthy 만), `v2.0 backward compatibility`(`typeof string` 만)
+- crypto-utils: `different keys on each call`, `different salts`(목이 결정적이라 truthy 만),
+  `v2.0 backward compatibility`(`typeof string` 만 — 실제 복원 검증은 실제 AES-GCM 블록의 v2.0 레거시 테스트가 한다)
 - secure-storage: `undefined data storage` 는 `toBeDefined()` 라 `null` 도 통과
+- secure-storage `should rotate encryption key`(XOR 목): 목이 키를 무시해 회전이 없어도 통과한다.
+  회전 자체는 새 실제 AES-GCM 테스트가 검증한다(9-3절). 기존 테스트는 지우지 않았다
 
 ## 7. 실행한 명령과 결과
 
 | 명령 | 결과 |
 | --- | --- |
 | `npx vitest run` (기준선) | 33 failed / 385 passed (418), 4 files failed |
-| `npx vitest run` (수정 후, 2회) | 423 passed (423), 19 files passed, exit 0 |
-| `npm run build` | exit 0, `✓ built in 8.30s` (청크 크기 경고만). 빌드가 다시 쓴 `docs/*.html`·`src/shared/tailwind-output.css` 해시 변경은 산출물이라 `git checkout` 으로 되돌림 |
-| `npm run typecheck:gate` | exit 0, `현재 타입에러: 714 / baseline: 714`, 통과 |
+| `npx vitest run` (1라운드 후, 2회) | 423 passed (423), 19 files passed, exit 0 |
+| `npx vitest run` (**2라운드 후, 2회**) | **415 passed / 15 todo (430)**, 19 files passed, exit 0 (두 번 모두) |
+| `npm run build` (2라운드) | exit 0, `✓ built in 11.52s` (청크 크기 경고만). 빌드가 다시 쓴 `docs/*.html` 12개·`src/shared/tailwind-output.css` 는 산출물이라 `git checkout` 으로 되돌림 |
+| `npm run typecheck:gate` (2라운드) | exit 0, `현재 타입에러: 714 / baseline: 714`, 통과 |
+| `git diff --quiet src` (변이 후·빌드 후) | 빈 출력(exit 0) |
 
 ## 8. 남은 위험
 
@@ -125,3 +124,52 @@ GCM 태그 검증 자체는 WebCrypto 안에 있어 소스 변이로 끌 수 없
 - 범위 밖 관찰: `src/shared/encryption-manager.ts` 의 `changePassword()` 는 스텁이다(`'Not implemented in abbreviated version'` 반환).
   `src/` 에서 호출하는 곳은 찾지 못했다(`globals.d.ts` 의 타입 선언뿐). 따라서 사용자 영향은 확인하지 않았다.
 - `secure-storage` `rotateKey()` 는 복호화에 실패한 항목을 `null` 로 백업한 뒤 새 키로 `null` 을 다시 저장한다. 원래 암호문은 사라진다. 코드를 읽어 확인했을 뿐 재현 테스트는 만들지 않았다.
+- Distributed Lock 변이(L1·L2)는 단언이 아니라 **5초 타임아웃**으로 실패한다. 잠금을 통과한 `recoverPassword` 가 뒤의 복구 흐름(모달)에서 멈추는 것으로 보인다 — 어디서 멈추는지는 추적하지 않았다. 잡히긴 하지만 실패 메시지가 원인을 말해 주지 않는다.
+- `it.todo` 15건은 검증이 **없다**는 표시일 뿐이다. `init`·복구·세션 비밀번호 저장 흐름은 여전히 단위 테스트가 없다.
+
+## 9. 2라운드 — 독립 리뷰 지적 반영
+
+리뷰 원문: codex 레인 🟠 MAJOR 1, code-reviewer 레인 🟡 3 · 🔵 2.
+
+### 9-1. 키 파생 (codex 🟠 MAJOR) — crypto-utils 실제 AES-GCM 블록
+- 같은 password·key-file·salt 로 두 번 만든 키는 서로 복호화한다.
+- password / key-file / salt 를 **하나씩** 바꿔 만든 키로는 복호화가 거부된다(`it.each` 3건).
+- `webcrypto.subtle.deriveKey` 를 spy 해 `{ name:'PBKDF2', iterations:600000, hash:'SHA-256', salt }` 로 불렸는지 단언하고,
+  소스와 독립적으로 `PBKDF2-SHA256(password + base64(SHA-256(keyFile)), salt, 600000)` 을 `deriveBits` 로 계산해
+  `exportKey('raw')` 결과와 바이트 단위로 비교한다.
+
+### 9-2. v2.0 레거시 복호화 (🟡 MINOR 3)
+AAD 없이 `encrypt` 한 `{ v:'2.0' }` 레코드가 `decryptRecord` 로 원문 복원되고 `_enc` 가 빠지는지 단언.
+
+### 9-3. rotateKey (🟡 MINOR 1) — secure-storage
+실제 `webcrypto` 로 구동: 회전 후 `samplelog_secure_key` 가 바뀌고, `secure_data1` 암호문이 바뀌고,
+새로 만든 인스턴스(저장된 새 키를 읽음)가 복원하며, 옛 암호문을 되돌려 넣으면 새 키로는 `null` 인지 단언.
+
+### 9-4. 껍데기 정리 (🟡 MINOR 2) — encryption-manager
+- `Distributed Lock > held by another process`: 잠금 문서가 5분 이내면 `recoverPassword()` 가
+  `{ success:false, error:'Another password operation in progress' }` 를 돌려주고, `runTransaction` 1회, `collection('_system')` 을 단언.
+- 나머지 15건을 `it.todo` 로 바꿨다. 설명 문자열에 무엇을 검증해야 하는지 남겼다:
+  Module Constants 1, timingSafeEqual 1, Distributed Lock available·expired 2, Encryption Manager State 2,
+  Recovery key length 1, Session Management 2, Key Source generated 1, Edge Cases 2, Security Considerations 3(plaintext·random IV·AAD).
+
+### 9-5. 문서·주석
+- 5절의 "약 130KB" → 측정값(109,847바이트, node 22.23.2, `String.fromCharCode.apply` 이분 탐색)으로 정정. 테스트 주석도 같이 정정.
+- `it.fails` 3건(secure-storage·encryption-manager·path-security)에 "어떤 이유로든 실패하면 통과 — 다른 회귀도 가릴 수 있다" 한 줄 추가.
+  현재 동작 고정 테스트로 바꾸는 것(🔵 1)은 코디네이터 결정대로 하지 않았다(SAMPL-2-38/39/40 에서 소스와 함께 처리).
+
+### 9-6. 변이 검증 (2라운드)
+각 변이를 소스에 주입 → 해당 테스트 파일을 `npx vitest run <파일> --reporter=verbose` 로 실행 → `git checkout` 원복.
+마지막에 `git diff --stat src` 빈 출력 확인. **8건 모두 잡힘.**
+
+| # | 변이 (src/shared/…) | 결과 | 실패한 테스트 |
+| --- | --- | --- | --- |
+| K1 | crypto-utils `createCompositeInput` 이 `password` 만 반환 | **잡음** (2 failed / 59 passed) | different key file cannot decrypt, independently computed PBKDF2 key |
+| K2 | `deriveKey` 에 고정 salt(`new Uint8Array(16).buffer`) | **잡음** (2 failed / 59 passed) | different salt cannot decrypt, independently computed PBKDF2 key |
+| K3 | PBKDF2 `iterations: 1` | **잡음** (1 failed / 60 passed) | independently computed PBKDF2 key |
+| X2 | `decryptRecord` 의 `useAAD = true` (crypto-utils.ts:394) | **잡음** (1 failed / 60 passed) | legacy v2.0 record encrypted without AAD |
+| X5 | secure-storage `rotateKey` 재암호화 루프 제거 | **잡음** (1 failed / 30 passed) | replace the stored key and re-encrypt (real AES-GCM) |
+| X6 | secure-storage `rotateKey` 새 키 생성·저장 제거 | **잡음** (1 failed / 30 passed) | 같음 |
+| L1 | encryption-manager `acquireLock` 이 유효한 잠금에도 `true` | **잡음** (1 failed / 22 passed / 15 todo) — 5초 타임아웃 | held by another process |
+| L2 | `recoverPassword` 의 `if (!lockAcquired)` 조기 반환 제거 | **잡음** (같음) — 5초 타임아웃 | held by another process |
+
+1라운드 리뷰가 보고한 X2·X5·X6 은 그때 전체 실행에서 423 passed(못 잡음)였다.

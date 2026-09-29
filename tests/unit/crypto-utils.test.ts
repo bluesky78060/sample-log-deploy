@@ -671,5 +671,67 @@ describe('crypto-utils.ts', () => {
             expect(decrypted.name).toBe('[복호화 실패]');
             expect(decrypted.phone).toBe('010-1234-5678');
         });
+
+        it('decrypts a legacy v2.0 record encrypted without AAD', async () => {
+            const legacy = {
+                id: 'legacy-1',
+                _enc: { v: '2.0', name: await encrypt('레거시데이터', realKey) }
+            };
+
+            const decrypted = await decryptRecord(legacy, realKey);
+            expect(decrypted.name).toBe('레거시데이터');
+            expect(decrypted).not.toHaveProperty('_enc');
+        });
+
+        describe('key derivation (PBKDF2)', () => {
+            const password = 'testPassword123!';
+            const keyFile = 'a2V5LWZpbGUtY29udGVudC1mb3ItdGVzdHM=';
+            const salt = new Uint8Array(16).fill(7).buffer;
+
+            const roundTrip = async (encKey: CryptoKey, decKey: CryptoKey) => {
+                const encrypted = await encrypt('derivation check', encKey);
+                return decrypt(encrypted!.iv, encrypted!.ct, decKey);
+            };
+
+            it('derives the same key from the same password, key file and salt', async () => {
+                const a = (await createMasterKey(password, keyFile, salt)).key;
+                const b = (await createMasterKey(password, keyFile, salt)).key;
+
+                expect(await roundTrip(a, b)).toBe('derivation check');
+            });
+
+            it.each([
+                ['password', 'otherPassword123!', keyFile, salt],
+                ['key file', password, 'b3RoZXIta2V5LWZpbGUtY29udGVudA==', salt],
+                ['salt', password, keyFile, new Uint8Array(16).fill(8).buffer]
+            ])('a key with a different %s cannot decrypt', async (_label, pw, kf, s) => {
+                const base = (await createMasterKey(password, keyFile, salt)).key;
+                const other = (await createMasterKey(pw as string, kf as string, s as ArrayBuffer)).key;
+
+                await expect(roundTrip(base, other)).rejects.toThrow();
+            });
+
+            // 기대값을 소스와 독립적으로 계산한다: PBKDF2-SHA256(password + base64(SHA-256(keyFile)), salt, 600000)
+            it('matches an independently computed PBKDF2 key and passes the iteration count', async () => {
+                const deriveSpy = vi.spyOn(webcrypto.subtle, 'deriveKey');
+                const { key } = await createMasterKey(password, keyFile, salt, true);
+
+                expect(deriveSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ name: 'PBKDF2', iterations: 600000, hash: 'SHA-256', salt }),
+                    expect.anything(), expect.anything(), true, ['encrypt', 'decrypt']
+                );
+                deriveSpy.mockRestore();
+
+                const enc = new TextEncoder();
+                const keyFileHash = Buffer.from(await webcrypto.subtle.digest('SHA-256', enc.encode(keyFile))).toString('base64');
+                const material = await webcrypto.subtle.importKey('raw', enc.encode(password + keyFileHash), 'PBKDF2', false, ['deriveBits']);
+                const expected = await webcrypto.subtle.deriveBits(
+                    { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, material, 256
+                );
+
+                const actual = await webcrypto.subtle.exportKey('raw', key);
+                expect(Buffer.from(actual).toString('hex')).toBe(Buffer.from(expected).toString('hex'));
+            });
+        });
     });
 });

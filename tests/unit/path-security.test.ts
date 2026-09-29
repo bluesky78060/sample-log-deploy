@@ -351,6 +351,7 @@ describe('path-security.ts', () => {
         });
 
         // SAMPL-2-40: '%ZZ' 는 /%[0-9a-fA-F]{2}/ 에 안 걸려 디코딩 검사를 건너뛰고 safe:true 가 된다
+        // it.fails 는 어떤 이유로든 실패하면 통과한다 — 이 자리의 다른 회귀도 가릴 수 있다
         it.fails('should handle invalid URL encoding gracefully', () => {
             const result = PathSecurity.checkDangerousPatterns('%ZZ%YY');
             expect(result.safe).toBe(false);
