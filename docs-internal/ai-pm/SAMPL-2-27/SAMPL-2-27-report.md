@@ -57,3 +57,53 @@
 `smart_workflow(SAMPL-2-27, submit_test)` run 1 — build·type·integration pass, unit은 기존 암호화 실패 33건 때문에
 사실대로 `fail`로 보고했다. 서버가 overall=fail로 판정해 티켓이 **`fixing`으로 전환됐다.** 신규 실패는 0건이다.
 unit을 pass로 바꿔 재제출하지 않았다(기록이 거짓이 된다). 상태 처리는 코디네이터 판단에 맡긴다.
+
+---
+
+# 수정 라운드 (독립 리뷰 1라운드의 🟠 MAJOR 2건)
+
+리뷰 원문: 코디네이터 스크래치패드 `review-2-27-r1.md` (43f13e7·0ebdd7f 대상, 🟠 2 / 🟡 2 / 🔵 1).
+범위 밖으로 둔 것: MINOR-1(건수 표시), MINOR-2(엑셀 경지구분 열), SUGGESTION-1, m-5(수정 모드 번호 변경) — 코디네이터가 후속 티켓으로 뺐다.
+SAMPL-2-28의 공유 상수(`DEFAULT_LAND_CLASS`)를 그대로 쓴다.
+
+## 바꾼 것
+
+| 파일 | 변경 |
+| --- | --- |
+| `src/heuktoram/heuktoram-script.ts` | MAJOR-1: `syncToSiblings`의 형제 조건에 번호 풀(경지구분 `\|\| DEFAULT_LAND_CLASS`, 성토 = `subCategory==='성토'` 또는 `F` 접두) 일치 추가. 같은 `log.id` 행은 종전대로 무조건 형제. `SoilLog`에 `landClass1` 필드 추가, `reception-number`에서 상수 import |
+| `src/soil/soil-script.ts` | MAJOR-2: `populateLandClass1Options`에서 `opt.selected` → `opt.defaultSelected`. `form.reset()`이 첫 옵션('개량제') 대신 농가의뢰로 돌아온다 |
+| 〃 | `cancelEditMode`·`resetFormKeepReceptionInfo`의 명시 복원 줄은 **남겼다**(이제 no-op이지만 무해하고, HTML에 정적 옵션이 생겨 populate가 건너뛰어지면 다시 필요해진다). 사실과 어긋나게 된 주석만 한 줄로 고쳤다 |
+| `tests/e2e/heuktoram-siblings.spec.js` | 신규 4건 — 셀 편집·붙여넣기·성토 분리, 그리고 같은 경지구분 가지번호(5 → 5-1, `landClass1` 누락 폴백) 동기화 유지(대조군) |
+| `tests/e2e/soil-landclass.spec.js` | 신규 1건 — UI로 연속 2회 등록(결과 모달 닫고 접수 화면 복귀). 첫 등록 후 폼 경지구분 = 농가의뢰, 다음 번호 = 2, 저장값 둘 다 농가의뢰, 목록(농가의뢰 탭)에 두 번째 시료 표시 |
+
+## 실행한 명령과 결과
+
+E2E는 종전처럼 임시 설정(포트 8927, `reuseExistingServer: false`, 스크래치패드에 둠 — 커밋 안 함)으로 돌렸다.
+
+| 명령 | 결과 |
+| --- | --- |
+| 수정 전 코드 + 신규 스펙 (`heuktoram-siblings` + `soil-landclass`, 8건) | 4 failed / 4 passed — 실패는 신규 4건(b에 `6.5`·`7.1`, 성토 f에 `6.2`가 저장됨, 폼 `#landClass1`이 `개량제`), 통과는 대조군 1 + 기존 3 |
+| `npm run build` (수정 후) | exit 0 (`built in 4.58s`) |
+| `npm run typecheck:gate` | 714 / baseline 714, exit 0 |
+| `npx vitest run` | 33 failed / 397 passed (430) — 실패는 기존과 같은 4파일(`encryption-manager` 23, `secure-storage` 8, `crypto-utils` 1, `path-security` 1). 신규 실패 0 |
+| 신규 스펙 2파일 (수정 후) | 8 passed |
+| `npx playwright test` 전체 (212건, `--workers=3`) | 5 failed / 207 passed — 실패 5건(`edit-test:5`, `form-submission:135`, `soil-form:54`, `soil-form:58`, `theme-toggle:5`)은 1라운드 보고서의 기존 실패와 같다 |
+
+## 변이 검증
+
+수정본을 보관하고 한 곳씩 되돌려 빌드한 뒤 두 스펙(8건)을 돌렸다.
+
+| 변이 | 되돌린 곳 | 결과 |
+| --- | --- | --- |
+| A | `poolOf`에서 경지구분 제거 | 셀 편집·붙여넣기 2건만 실패, 6 통과 |
+| B | `poolOf`에서 성토 구분 제거 | 성토 분리 1건만 실패, 7 통과 |
+| C | `defaultSelected` → `selected` | 연속 등록 1건만 실패, 7 통과 |
+
+변이 후 보관본으로 복원하고 `cmp`로 동일함을 확인했다.
+
+## 남은 위험
+
+- 흙토람 형제 판정은 `receptionBaseKey`를 쓰지 않고 같은 규칙을 로컬로 적었다. `receptionBaseKey`는 성토가 아닌 `F` 번호를 풀에서 빼 버려(null) 기존에 동기화되던 `F5`/`F5-1`(성토 표기 누락) 조합이 끊길 수 있어서다. 규칙이 두 곳이 됐다.
+- 성토 판정을 `subCategory==='성토' || F 접두`로 넓게 잡았다. 성토 표기 없는 `F` 번호와 성토 표기된 `F` 번호는 서로 형제로 남는다(의도). 실데이터에 그런 조합이 있는지는 재 보지 않았다.
+- 메인 프로젝트(`sample-log-electron`)의 같은 결함(리뷰 원문 「메인 프로젝트 판정」)은 범위 밖이라 건드리지 않았다.
+- 이 수정본은 아직 아무도 리뷰하지 않았다. 재리뷰는 코디네이터 몫이다.

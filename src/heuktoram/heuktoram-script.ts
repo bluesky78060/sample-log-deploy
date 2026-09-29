@@ -4,7 +4,7 @@
  * 흙토람 서식(.xlsx)으로 내보내는 페이지 스크립트
  */
 
-export {};
+import { DEFAULT_LAND_CLASS } from '../soil/reception-number';
 
 // ========================================
 // 타입 정의
@@ -43,6 +43,7 @@ interface SoilLog {
   addressDetail?: string;
   phoneNumber?: string;
   subCategory?: string;
+  landClass1?: string;
   purpose?: string;
   parcels?: SoilParcel[];
 }
@@ -1023,18 +1024,24 @@ class HeuktoramManager {
 
   /**
    * 같은 접수번호의 모든 행(본필지 + 하위필지)에 검정 결과 동기화
-   * 같은 log.id이거나, base 접수번호(468-1 → 468)가 같은 log도 sibling으로 처리
+   * 같은 log.id이거나, base 접수번호(468-1 → 468)와 번호 풀(경지구분·성토)이 같은 log를 sibling으로 처리.
+   * 접수번호는 경지구분·성토별 독립 시퀀스라 본번만 보면 다른 농가 시료에 값이 번진다.
    */
   private syncToSiblings(key: string, field: string, value: string): void {
     const editedRow = this.flatRows.find(r => r.key === key);
     if (!editedRow) return;
 
-    const editedBase = String(editedRow.log.receptionNumber ?? '').replace(/-\d+$/, '');
+    const baseOf = (log: SoilLog): string => String(log.receptionNumber ?? '').replace(/-\d+$/, '');
+    const poolOf = (log: SoilLog): string => {
+      const isFill = log.subCategory === '성토' || baseOf(log).startsWith('F');
+      return `${log.landClass1 || DEFAULT_LAND_CLASS}|${isFill}`;
+    };
+    const editedBase = baseOf(editedRow.log);
+    const editedPool = poolOf(editedRow.log);
     const siblingRows = this.flatRows.filter(r => {
       if (r.key === key) return false;
       if (r.log.id === editedRow.log.id) return true;
-      const rBase = String(r.log.receptionNumber ?? '').replace(/-\d+$/, '');
-      return !!editedBase && rBase === editedBase;
+      return !!editedBase && baseOf(r.log) === editedBase && poolOf(r.log) === editedPool;
     });
     for (const sibling of siblingRows) {
       if (!this.testResults[sibling.key]) this.testResults[sibling.key] = {};

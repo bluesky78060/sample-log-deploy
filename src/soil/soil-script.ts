@@ -813,7 +813,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
                 const opt = document.createElement('option');
                 opt.value = value;
                 opt.textContent = value;
-                if (value === LAND_CLASS1_DEFAULT) opt.selected = true;
+                // selected(property)가 아니라 defaultSelected(속성)여야 form.reset()이 첫 옵션 대신 기본값으로 돌아온다
+                if (value === LAND_CLASS1_DEFAULT) opt.defaultSelected = true;
                 frag.appendChild(opt);
             });
             this.landClass1Select.appendChild(frag);
@@ -2272,8 +2273,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         }
 
         this.form.reset();
-        // landClass1 복원: option.selected는 property로 설정되어 form.reset()이 첫 옵션으로
-        // 되돌리므로 기본값(농가의뢰)을 명시적으로 복원 (SAMPL-1-122 / 메인 SAMPL-1-121)
+        // reset 복원은 populateLandClass1Options의 defaultSelected가 맡는다. 이 줄은 방어용
         if (this.landClass1Select) this.landClass1Select.value = LAND_CLASS1_DEFAULT;
         const subCatSelect = document.getElementById('subCategory');
         if (subCatSelect) {
@@ -3722,8 +3722,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const receptionNumber = this.receptionNumberInput?.value;
         const date = this.dateInput?.value;
         this.form.reset();
-        // landClass1 복원: form.reset()이 첫 옵션으로 되돌리므로 기본값(농가의뢰)을 동기적으로
-        // 복원 (setTimeout 밖 — SAMPL-1-122 / 메인 SAMPL-1-121 버그 수정)
+        // reset 복원은 populateLandClass1Options의 defaultSelected가 맡는다. 이 줄은 방어용
         if (this.landClass1Select) this.landClass1Select.value = LAND_CLASS1_DEFAULT;
         setTimeout(() => {
             if (receptionNumber && this.receptionNumberInput) this.receptionNumberInput.value = receptionNumber;

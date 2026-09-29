@@ -84,3 +84,47 @@ test.describe('경지구분 1차 목록 탭', () => {
         await expect(page.locator('tr[data-id="b"]')).toHaveCount(0);
     });
 });
+
+test.describe('경지구분 1차 — 연속 등록', () => {
+    async function register(page, name) {
+        await page.fill('#name', name);
+        await page.fill('#phoneNumber', '010-1234-5678');
+        await page.selectOption('#purpose', '일반재배');
+        await page.locator('.lot-address-input').first().fill('내성리 1');
+        await page.click('#navSubmitBtn');
+        // 등록하면 결과 모달이 뜨고 목록으로 넘어간다 — 사용자처럼 닫고 접수 화면으로 돌아온다
+        await expect(page.locator('#closeResultBtn')).toBeEnabled({ timeout: 20000 });
+        await page.click('#closeResultBtn');
+        await page.click('.nav-btn[data-view="form"]');
+    }
+
+    async function readStored(page) {
+        return page.evaluate(() => {
+            const raw = localStorage.getItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`);
+            return (raw ? JSON.parse(raw) : []).map((l) => ({ name: l.name, landClass1: l.landClass1 }));
+        });
+    }
+
+    test('등록 후 폼이 기본 경지구분으로 돌아와 두 번째 시료도 농가의뢰로 저장되고 목록에 보인다', async ({ page }) => {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await seedAndReload(page, []);
+
+        await register(page, '연속첫째');
+        await expect.poll(async () => (await readStored(page)).length).toBe(1);
+        await expect(page.locator('#landClass1')).toHaveValue('농가의뢰');
+        await expect(page.locator('#receptionNumber')).toHaveValue('2');
+
+        await register(page, '연속둘째');
+        await expect.poll(async () => (await readStored(page)).length).toBe(2);
+        expect(await readStored(page)).toEqual([
+            { name: '연속첫째', landClass1: '농가의뢰' },
+            { name: '연속둘째', landClass1: '농가의뢰' },
+        ]);
+
+        await page.click('.nav-btn[data-view="list"]');
+        await expect(page.locator('#landClass1Tab')).toHaveValue('농가의뢰');
+        await expect(page.locator('#logTableBody')).toContainText('연속둘째');
+    });
+});
