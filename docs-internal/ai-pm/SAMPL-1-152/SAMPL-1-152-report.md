@@ -165,3 +165,4 @@ E2E는 종전처럼 임시 설정(포트 8927, `reuseExistingServer: false`, 스
 - **F 번호 판정**: 번호가 있는 행은 F 접두만으로 풀을 정하고, 구분과 어긋나면(`F3`+논, `7`+성토) 오류다. 위 표의 `isFillImportRow`(구분 `성토` 또는 F) 설명은 이것으로 대체된다.
 - 테스트 조정: R1은 토스트·미리보기 문구만 바꿨다. 「덮어쓰기가 성토 레코드의 구분을 일반으로 바꾸지 않는다」는 `F3`+논 행이 이제 오류라 **F 없는 옛 성토 `7`에 일반 행 `7`이 exact로 매칭되는 경우**로 바꿨다(보호 코드가 여전히 필요한 경로).
 - 최종 수치(두 티켓 공통 트리): build exit 0 · typecheck 714/714 · vitest 33 failed(기존 암호화)/402 passed · E2E 전체 219 passed / 5 failed(기존 5건). 변이 M2a~d·M3는 새 규칙에서 다시 돌려 각각 자기 테스트만 실패함을 확인했다.
+- AI PM: `complete_fix` 후 `submit_test` run 3(최종 트리) — build·type·integration pass, unit은 기존 암호화 33건을 사실대로 `fail`. 티켓은 다시 **`fixing`**이다.

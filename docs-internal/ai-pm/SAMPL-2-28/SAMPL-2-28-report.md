@@ -179,3 +179,8 @@ E2E는 임시 설정(포트 8927, `reuseExistingServer: false`, 스크래치패�
 - `isFillLog` 변경으로 **F 번호인데 구분이 성토가 아닌 기존 레코드**(P1로 생긴 것)가 이제 성토 풀에 든다. 채번·중복 판정·흙토람 형제 판정 모두 성토 쪽으로 본다. 그 레코드의 구분 값 자체는 고치지 않았다(데이터 이동 없음). 폼이 필지 카드 구분을 저장하는 원인(`soil-script.ts` 신규 등록의 `subCategory: parcel.category || …`)도 그대로다.
 - 번호가 정확히 같은 레코드가 여러 건이면(과거 중복 가져오기 흔적) 여전히 첫 건만 갱신한다(SAMPL-1-152 m-3, 범위 밖).
 - 이 수정본은 아직 아무도 리뷰하지 않았다.
+
+## AI PM submit_test (수정 라운드)
+
+`complete_fix` 후 `submit_test` run 2 — build·type·integration pass, unit은 기존 암호화 실패 33건을 사실대로 `fail`로 적었다(신규 실패 0).
+서버가 overall=fail로 판정해 티켓은 다시 **`fixing`**이다.
