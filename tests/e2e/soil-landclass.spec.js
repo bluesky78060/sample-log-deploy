@@ -151,7 +151,7 @@ test.describe('성토 채번 — F 번호 레코드의 구분이 성토가 아�
             return rn;
         }
 
-        // 필지 카드 구분이 논이어도 F 번호 레코드의 구분은 성토다(레코드 구분은 번호 풀을 따른다)
+        // 폼은 필지 카드의 구분을 저장하므로 F1 레코드의 구분이 '논'이 된다
         expect(await registerFill('성토1', '논')).toBe('F1');
         expect(await registerFill('성토2', null)).toBe('F2');
         const stored = await page.evaluate(() =>
@@ -194,23 +194,14 @@ test.describe('번호 풀과 구분의 정합 — F 없는 성토 레코드 (Fab
         expect(await storedNumbers(page)).toEqual(['1:n-a:논', '2:n-b:성토', '3:일반셋:논']);
     });
 
-    test('PB: 상단 논 + 필지 성토는 F 없는 성토를 만들지 않고 막는다; 상단 성토 + 필지 논은 F1/성토로 저장한다', async ({ page }) => {
+    test('PB: 폼이 만든 F 없는 성토(상단 논 + 필지 성토)가 있어도 다음 일반 추천은 막히지 않는다', async ({ page }) => {
+        // 폼은 필지 카드 구분을 레코드 구분으로 저장한다(폼 정합 검사는 SAMPL-1-184 로 분리). F-1 로 이 레코드가 일반 번호를 점유해야 막힘이 풀린다
         await seedAndReload(page, []);
-        await page.evaluate(() => {
-            window.__toasts = [];
-            const orig = window.showToast;
-            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
-        });
         expect(await fillForm(page, '필지성토', '논', '성토')).toBe('1');
         await page.click('#navSubmitBtn');
-        await expect.poll(() => page.evaluate(() => window.__toasts.join(' | '))).toContain('성토');
-        expect(await storedNumbers(page)).toEqual([]);
-
-        await page.locator('.parcel-category-select').first().selectOption('논');
-        await page.selectOption('#subCategory', '성토');
-        await expect(page.locator('#receptionNumber')).toHaveValue('F1');
-        await page.click('#navSubmitBtn');
         await expect(page.locator('#closeResultBtn')).toBeEnabled({ timeout: 20000 });
-        expect(await storedNumbers(page)).toEqual(['F1:필지성토:성토']);
+        expect(await storedNumbers(page)).toEqual(['1:필지성토:성토']);
+        await page.click('#closeResultBtn');
+        expect(await fillForm(page, '다음일반', '논')).toBe('2');
     });
 });
