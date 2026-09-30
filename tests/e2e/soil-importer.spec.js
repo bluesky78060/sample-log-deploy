@@ -823,3 +823,54 @@ test.describe('토양 가져오기 — 매칭 규칙 양방향 (SAMPL-2-28 리�
             .toEqual(['7:원래:논', '9:정상:논', 'F5:성토원래:성토']);
     });
 });
+
+test.describe('토양 가져오기 — 풀 기준 구분 보호와 정확 일치 중복 (Fable 검증 PC·PD)', () => {
+    const OLD = '2020-01-01T00:00:00.000Z';
+    const rec = (o) => ({ landClass1: '농가의뢰', subCategory: '논', purpose: '일반재배', createdAt: OLD, updatedAt: OLD, groupId: `g-${o.id}`, name: `n-${o.id}`, ...o });
+    const parcel = (id, lot, category = '논') => ({ id, lotAddress: lot, isMountain: false, category, purpose: '', note: '', crops: [], subLots: [] });
+
+    async function run(page, logs, text) {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+        await page.evaluate((data) => {
+            localStorage.clear();
+            localStorage.setItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`, JSON.stringify(data));
+        }, logs);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction((n) => (window.soilManager?.sampleLogs || []).length === n, logs.length);
+        await page.evaluate(() => {
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
+        });
+        const modal = await openWithPastedData(page, text);
+        await modal.locator('[data-el="autoNumber"]').uncheck();
+        await modal.locator('input[name="sriDup"][value="overwrite"]').check();
+        await modal.locator('[data-act="automap"]').click();
+        const rows = await modal.locator('.sri-pv-table tbody tr').allTextContents();
+        const importBtn = modal.locator('[data-act="import"]');
+        const enabled = await importBtn.isEnabled();
+        if (enabled) { await importBtn.click(); await expect(modal).toBeHidden(); }
+        const toast = await page.evaluate(() => window.__toasts.find((m) => m.startsWith('✅')) ?? null);
+        return { rows, enabled, toast, saved: await readPersistedRaw(page) };
+    }
+
+    test('PC: F1(논) 레코드에 F1/성토 행을 덮어쓰면 같은 풀이므로 구분이 성토로 고쳐진다', async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 'f1', receptionNumber: 'F1', subCategory: '논', parcels: [parcel('pf1', '원주소')] })],
+            ['접수번호\t성명\t지번주소\t구분', 'F1\t새이름\t새주소\t성토'].join('\n'));
+        expect(r.toast).toBe('✅ 1건 가져오기 완료 · 덮어씀 1건');
+        expect(r.saved.map((l) => `${l.id}:${l.receptionNumber}:${l.name}:${l.subCategory}:${l.parcels[0].category}`)).toEqual(['f1:F1:새이름:성토:성토']);
+    });
+
+    test('PD: 번호가 정확히 같은 레코드가 2건이면 어느 것도 덮지 않는다 (m-3)', async ({ page }) => {
+        const r = await run(page,
+            [rec({ id: 'a', receptionNumber: '7', parcels: [parcel('pa', 'x')] }), rec({ id: 'b', receptionNumber: '7', parcels: [parcel('pb', 'y')] })],
+            ['접수번호\t성명\t지번주소', '7\t새이름\t새주소', '9\t신규\t주소9'].join('\n'));
+        expect(r.rows[0]).toContain('같은 본번이 여러 건');
+        expect(r.toast).toBe('✅ 1건 가져오기 완료 · 같은 본번이 여러 건이라 건너뜀 1건');
+        expect(r.saved.map((l) => `${l.id}:${l.receptionNumber}:${l.name}`).sort()).toEqual(['a:7:n-a', 'b:7:n-b'].concat([r.saved.find((l) => l.name === '신규')].map((l) => `${l.id}:9:신규`)).sort());
+    });
+});

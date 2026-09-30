@@ -20,19 +20,19 @@ describe('collectExistingNumbers', () => {
         { receptionNumber: '5', landClass1: '농가의뢰' },
         { receptionNumber: '6-1', landClass1: '농가의뢰' },        // 서브넘버 → 기본번호로 접힘
         { receptionNumber: '7', landClass1: '공익직불제' },         // 다른 경지구분 → 제외
-        { receptionNumber: '8', landClass1: '농가의뢰', subCategory: '성토' }, // 성토 → 제외
+        { receptionNumber: '8', landClass1: '농가의뢰', subCategory: '성토' }, // F 없는 성토 → 일반 번호 점유
         { receptionNumber: 'F9', landClass1: '농가의뢰' },          // F 접두 → 제외
         { receptionNumber: 10, landClass1: '농가의뢰' },            // 숫자형도 처리
     ];
 
     it('같은 경지구분1차만 모으고 서브넘버는 기본번호로 접는다', () => {
         const s = collectExistingNumbers(logs, '농가의뢰');
-        expect([...s].sort()).toEqual(['10', '5', '6']);
+        expect([...s].sort()).toEqual(['10', '5', '6', '8']);
     });
 
-    it('성토·F접두를 제외한다 (매니저 getNextNumberForClass와 같은 조건)', () => {
+    it('F접두는 제외하고 F 없는 성토는 넣는다 (computeNextNumber와 같은 규칙)', () => {
         const s = collectExistingNumbers(logs, '농가의뢰');
-        expect(s.has('8')).toBe(false);  // 성토
+        expect(s.has('8')).toBe(true);   // F 없는 성토 — 폼 중복 검사가 본번만 보므로 일반 번호도 점유
         expect(s.has('F9')).toBe(false); // F 접두
         expect(s.has('9')).toBe(false);
     });
@@ -294,11 +294,11 @@ describe('collectExistingNumbers — 성토 시퀀스', () => {
         expect([...s].sort()).toEqual(['2', '3', '7']);
     });
 
-    it('두 시퀀스가 서로를 제외한다', () => {
+    it('F 번호는 일반 풀에 없고, 일반 번호는 성토 풀에 없다. F 없는 성토는 양쪽에 든다', () => {
         const normal = collectExistingNumbers(logs, '농가의뢰');
         const fill = collectExistingNumbers(logs, '농가의뢰', { fill: true });
-        expect([...normal]).toEqual(['5']);        // 성토 3건 전부 제외
-        expect(fill.has('5')).toBe(false);          // 일반 5는 성토 풀에 없다
+        expect([...normal].sort()).toEqual(['3', '5']); // F2·F7-1 제외, F 없는 성토 3은 일반 번호도 점유
+        expect(fill.has('5')).toBe(false);              // 일반 5는 성토 풀에 없다
     });
 
     it('경지구분 범위는 성토에도 적용된다', () => {

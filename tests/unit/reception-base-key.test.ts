@@ -4,10 +4,11 @@ import { collectExistingNumbers } from '../../src/soil/soil-import-preview'
 
 // SAMPL-2-28: 채번과 가져오기 중복 판정이 같은 분류 규칙을 쓰는지 본다
 describe('receptionBaseKey', () => {
-    it('일반 풀: 본번, F 접두·성토는 null', () => {
+    it('일반 풀: 본번, F 접두는 null, F 없는 성토는 일반 번호를 점유한다', () => {
         expect(receptionBaseKey({ receptionNumber: '5-2' }, false, DEFAULT_LAND_CLASS)).toBe('5')
         expect(receptionBaseKey({ receptionNumber: 'F5' }, false, DEFAULT_LAND_CLASS)).toBeNull()
-        expect(receptionBaseKey({ receptionNumber: '5', subCategory: '성토' }, false, DEFAULT_LAND_CLASS)).toBeNull()
+        expect(receptionBaseKey({ receptionNumber: 'F5', subCategory: '논' }, false, DEFAULT_LAND_CLASS)).toBeNull()
+        expect(receptionBaseKey({ receptionNumber: '5', subCategory: '성토' }, false, DEFAULT_LAND_CLASS)).toBe('5')
     })
 
     it('성토 풀: F를 뗀 본번, 일반은 null', () => {
@@ -76,6 +77,11 @@ describe('matchImportRow', () => {
         // 정확히 N인 레코드가 없으면 다른 가지번호가 있어도 새 레코드다
         expect(matchImportRow(logs, '9-2', L).kind).toBe('none')
         expect(matchImportRow(logs, '8-3', L).kind).toBe('none')
+    })
+
+    it('번호가 정확히 같은 레코드가 여러 건이면 고르지 않는다 (SAMPL-1-152 m-3)', () => {
+        const dup = [...logs, { receptionNumber: '5', landClass1: L }]
+        expect(matchImportRow(dup, '5', L).kind).toBe('ambiguous')
     })
 
     it('정확한 번호 탐색은 풀보다 먼저 한다', () => {

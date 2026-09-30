@@ -53,6 +53,9 @@ export function isFillLog(log: { receptionNumber?: string | number | null; subCa
  * 채번(computeNextNumber)과 가져오기 중복 판정(collectExistingNumbers)이 공유하는 분류 규칙.
  * 대상 풀이면 비교 키(본번, 성토는 F를 뗀 숫자부)를, 아니면 null을 돌려준다.
  * targetClass는 호출부가 확정해 넘긴다 — 빈 값을 기본값으로 폴백하는지가 두 호출부에서 다르다.
+ *
+ * F 없는 성토 레코드는 양쪽 풀에 든다. 일반 풀에서 빼면 일반 채번이 그 번호를 다시 내고,
+ * 폼 중복 검사는 본번만 보므로 같은 번호를 영구히 거부한다(등록 불가).
  */
 export function receptionBaseKey(
     log: ReceptionKeySource | null | undefined,
@@ -62,10 +65,10 @@ export function receptionBaseKey(
 ): string | null {
     if (!log || !log.receptionNumber) return null;
     if ((log.landClass1 || defaultClass) !== targetClass) return null;
-    if (fill !== isFillLog(log)) return null;
 
     const base = String(log.receptionNumber).split('-')[0].trim();
-    return fill ? base.replace('F', '') : base;
+    if (fill) return isFillLog(log) ? base.replace('F', '') : null;
+    return base.startsWith('F') ? null : base;
 }
 
 /**
@@ -133,7 +136,7 @@ export type ImportMatch<T> =
 
 /**
  * 가져오기 한 행이 덮어쓸 기존 레코드. 미리보기와 매니저가 이 함수 하나로 판정한다.
- * 1) 같은 경지구분에서 번호가 정확히 같은 레코드(풀 무관, 첫 건)
+ * 1) 같은 경지구분에서 번호가 정확히 같은 레코드(풀 무관). 여러 건이면 ambiguous
  * 2) 'N-M' 행: 같은 풀에 정확히 N인 레코드가 있으면 subrow, 없으면 none(새 가지번호 레코드)
  * 3) 'N' 행: 같은 풀의 가지번호 레코드 N-K가 한 건이면 그것, 여럿이면 ambiguous
  * 부모로 접는 것은 3)의 방향뿐이다 — 'N-M'을 N에 접으면 본필지가 하위필지 값으로 덮인다.
@@ -145,9 +148,10 @@ export function matchImportRow<T extends ReceptionKeySource>(
 ): ImportMatch<T> {
     const rn = String(receptionNumber ?? '').trim();
     if (!rn) return { kind: 'none' };
-    const exact = logs.find(l => (l.landClass1 || DEFAULT_LAND_CLASS) === landClass1
+    const exact = logs.filter(l => (l.landClass1 || DEFAULT_LAND_CLASS) === landClass1
         && String(l.receptionNumber ?? '').trim() === rn);
-    if (exact) return { kind: 'match', target: exact };
+    if (exact.length > 1) return { kind: 'ambiguous' };
+    if (exact.length === 1) return { kind: 'match', target: exact[0] };
 
     const fill = rn.startsWith('F');
     const key = receptionBaseKey({ receptionNumber: rn, landClass1 }, fill, landClass1);

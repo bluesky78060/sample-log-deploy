@@ -151,11 +151,66 @@ test.describe('성토 채번 — F 번호 레코드의 구분이 성토가 아�
             return rn;
         }
 
-        // 폼은 필지 카드의 구분을 저장하므로 F1 레코드의 구분이 '논'이 된다
+        // 필지 카드 구분이 논이어도 F 번호 레코드의 구분은 성토다(레코드 구분은 번호 풀을 따른다)
         expect(await registerFill('성토1', '논')).toBe('F1');
         expect(await registerFill('성토2', null)).toBe('F2');
         const stored = await page.evaluate(() =>
             JSON.parse(localStorage.getItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`) || '[]').map((l) => `${l.receptionNumber}:${l.name}`));
         expect(stored).toEqual(['F1:성토1', 'F2:성토2']);
+    });
+});
+
+test.describe('번호 풀과 구분의 정합 — F 없는 성토 레코드 (Fable 검증 PA·PB)', () => {
+    const OLD = '2020-01-01T00:00:00.000Z';
+    const rec = (id, receptionNumber, subCategory) => ({
+        id, receptionNumber, name: `n-${id}`, landClass1: '농가의뢰', subCategory, purpose: '일반재배', createdAt: OLD, updatedAt: OLD, groupId: `g-${id}`,
+        parcels: [{ id: `p-${id}`, lotAddress: '내성리 1', isMountain: false, subLots: [], crops: [], category: subCategory, purpose: '', note: '' }],
+    });
+
+    async function fillForm(page, name, top, parcelCategory) {
+        await page.click('.nav-btn[data-view="form"]');
+        await page.selectOption('#subCategory', top);
+        await page.fill('#name', name);
+        await page.fill('#phoneNumber', '010-1234-5678');
+        await page.selectOption('#purpose', '일반재배');
+        await page.locator('.lot-address-input').first().fill('내성리 1');
+        if (parcelCategory) await page.locator('.parcel-category-select').first().selectOption(parcelCategory);
+        return page.inputValue('#receptionNumber');
+    }
+    const storedNumbers = (page) => page.evaluate(() =>
+        JSON.parse(localStorage.getItem(`test_soilSampleLogs_${window.soilManager.selectedYear}`) || '[]').map((l) => `${l.receptionNumber}:${l.name}:${l.subCategory}`));
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/soil/');
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => typeof window.soilManager !== 'undefined');
+    });
+
+    test('PA: F 없는 성토 2가 있어도 일반 등록이 3번으로 이어진다 (전에는 2를 다시 내고 중복 검사가 막아 영구 정지)', async ({ page }) => {
+        await seedAndReload(page, [rec('a', '1', '논'), rec('b', '2', '성토')]);
+        expect(await fillForm(page, '일반셋', '논')).toBe('3');
+        await page.click('#navSubmitBtn');
+        await expect(page.locator('#closeResultBtn')).toBeEnabled({ timeout: 20000 });
+        expect(await storedNumbers(page)).toEqual(['1:n-a:논', '2:n-b:성토', '3:일반셋:논']);
+    });
+
+    test('PB: 상단 논 + 필지 성토는 F 없는 성토를 만들지 않고 막는다; 상단 성토 + 필지 논은 F1/성토로 저장한다', async ({ page }) => {
+        await seedAndReload(page, []);
+        await page.evaluate(() => {
+            window.__toasts = [];
+            const orig = window.showToast;
+            window.showToast = (msg, type) => { window.__toasts.push(msg); if (typeof orig === 'function') orig(msg, type); };
+        });
+        expect(await fillForm(page, '필지성토', '논', '성토')).toBe('1');
+        await page.click('#navSubmitBtn');
+        await expect.poll(() => page.evaluate(() => window.__toasts.join(' | '))).toContain('성토');
+        expect(await storedNumbers(page)).toEqual([]);
+
+        await page.locator('.parcel-category-select').first().selectOption('논');
+        await page.selectOption('#subCategory', '성토');
+        await expect(page.locator('#receptionNumber')).toHaveValue('F1');
+        await page.click('#navSubmitBtn');
+        await expect(page.locator('#closeResultBtn')).toBeEnabled({ timeout: 20000 });
+        expect(await storedNumbers(page)).toEqual(['F1:필지성토:성토']);
     });
 });

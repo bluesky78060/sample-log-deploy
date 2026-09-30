@@ -7,7 +7,7 @@ import type { SoilSample, SoilLog, SoilParcel, SoilCrop, SoilSubLot, SoilFlatRow
 import { BaseSampleManager, type BaseSearchFilter } from '../shared/BaseSampleManager';
 import {
     computeNextNumber, DEFAULT_LAND_CLASS as LAND_CLASS1_DEFAULT, LAND_CLASS1_OPTIONS,
-    matchImportRow, importedSubCategory, importRowConflict, type ImportMatch,
+    matchImportRow, importedSubCategory, importRowConflict, isFillImportRow, isFillLog, type ImportMatch,
 } from './reception-number';
 import {
     resolveParcelCategory as resolveParcelCategoryPure,
@@ -1089,8 +1089,9 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
     private _applyImportedValues(target: SoilLog, src: ImportedSoilRecord, nowISO: string): void {
         const t = target as unknown as Record<string, unknown>;
         const has = (v: unknown): boolean => v != null && String(v).trim() !== '' && String(v).trim() !== '-';
-        // 성토 여부가 바뀌면 F 시퀀스와 일반 시퀀스 사이를 옮겨 채번이 어긋난다 — 구분은 같은 쪽 안에서만 바꾼다
-        const keepSubCategory = has(src.subCategory) && (src.subCategory === '성토') !== (t.subCategory === '성토');
+        // 번호 풀(F/일반)이 바뀌면 채번이 어긋난다 — 구분은 같은 풀 안에서만 바꾼다. 풀은 isFillLog 기준(F1/논 레코드는 성토 풀)
+        const keepSubCategory = has(src.subCategory)
+            && isFillImportRow(src.receptionNumber != null ? String(src.receptionNumber) : '', src.subCategory) !== isFillLog(target);
 
         for (const key of IMPORT_OVERWRITE_FIELDS) {
             if (key === 'subCategory' && keepSubCategory) continue;
@@ -1132,6 +1133,25 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         t.area = area;
         t.cropsDisplay = name;
         parcel.crops = name !== '-' ? [{ ...(prev ?? {}), name, area }] : [];
+    }
+
+    /**
+     * 폼 값의 번호 풀·구분 정합. 가져오기의 importRowConflict와 같은 규칙 — 폼이 만든 레코드를 가져오기가
+     * 거부하면 안 된다. F 없는 성토 레코드는 일반 번호를 점유해 채번을 어지럽힌다. 어긋나면 사유, 맞으면 null.
+     */
+    private _formPoolConflict(receptionNumber: string, topSubCategory: string, parcels: ReadonlyArray<{ category?: string }>): string | null {
+        const conflict = importRowConflict(receptionNumber, topSubCategory === '-' ? '' : topSubCategory);
+        if (conflict) return `${conflict}. 구분을 바꾸면 접수번호가 다시 추천됩니다.`;
+        if (!receptionNumber.startsWith('F')) {
+            const idx = parcels.findIndex(p => p.category === '성토');
+            if (idx >= 0) return `필지 ${idx + 1}의 구분이 성토입니다. 성토 시료는 상단 구분을 성토로 선택해 F 번호로 접수하세요.`;
+        }
+        return null;
+    }
+
+    /** 레코드 구분은 번호 풀을 따른다 — F 번호면 필지 카드 구분과 무관하게 성토(필지 카드 값은 필지에 남는다) */
+    private _recordSubCategory(isFillNumber: boolean, parcelCategory: string | undefined, topSubCategory: string): string {
+        return isFillNumber ? '성토' : (parcelCategory || topSubCategory);
     }
 
     // ========================================
@@ -2031,6 +2051,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const baseNumber = isFillNumber
                 ? parseInt(baseReceptionNumber.replace('F', ''), 10) || 1
                 : parseInt(baseReceptionNumber, 10) || 1;
+            const poolConflict = this._formPoolConflict(String(baseReceptionNumber ?? ''), String(formData.get('subCategory') || ''), validParcels);
+            if (poolConflict) { this.showToast(poolConflict, 'warning'); return; }
 
             const commonData = {
                 date: formData.get('date'),
@@ -2058,7 +2080,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const newLogs = validParcels.map((parcel, index) => {
                 const num = baseNumber + index;
                 const receptionNumber = isFillNumber ? `F${num}` : String(num);
-                const parcelSubCategory = parcel.category || commonData.subCategory;
+                const parcelSubCategory = this._recordSubCategory(isFillNumber, parcel.category, String(commonData.subCategory));
                 const parcelPurpose = parcel.purpose || commonData.purpose;
 
                 // 기존 레코드가 있으면 id, createdAt 보존
@@ -2123,7 +2145,10 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
             const firstParcelCategory = validParcels[0]?.category;
             const firstParcelPurpose = validParcels[0]?.purpose;
             const mainSubCategory = formData.get('subCategory') || '-';
-            const effectiveSubCategory = firstParcelCategory || mainSubCategory;
+            const editedNumber = String(formData.get('receptionNumber') || '');
+            const poolConflict = this._formPoolConflict(editedNumber, String(mainSubCategory), validParcels);
+            if (poolConflict) { this.showToast(poolConflict, 'warning'); return; }
+            const effectiveSubCategory = this._recordSubCategory(editedNumber.startsWith('F'), firstParcelCategory, String(mainSubCategory));
             const effectivePurpose = firstParcelPurpose || formData.get('purpose');
 
             const updatedLog = {
@@ -2180,6 +2205,8 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const baseNumber = isFillNumber
             ? parseInt(baseReceptionNumber.replace('F', ''), 10) || 1
             : parseInt(baseReceptionNumber, 10) || 1;
+        const poolConflict = this._formPoolConflict(String(baseReceptionNumber ?? ''), String(formData.get('subCategory') || ''), validParcels);
+        if (poolConflict) { this.showToast(poolConflict, 'warning'); return; }
 
         const numbersToCheck = validParcels.map((_, index) => {
             const num = baseNumber + index;
@@ -2232,7 +2259,7 @@ class SoilSampleManager extends BaseSampleManager<SoilSample> {
         const newLogs = validParcels.map((parcel, index) => {
             const num = baseNumber + index;
             const receptionNumber = isFillNumber ? `F${num}` : String(num);
-            const parcelSubCategory = parcel.category || commonData.subCategory;
+            const parcelSubCategory = this._recordSubCategory(isFillNumber, parcel.category, String(commonData.subCategory));
             const parcelPurpose = parcel.purpose || commonData.purpose;
 
             return {

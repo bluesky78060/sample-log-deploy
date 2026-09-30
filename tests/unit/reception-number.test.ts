@@ -87,12 +87,15 @@ describe('computeNextNumber — 성토(F) 번호 체계 분리', () => {
         expect(next(logs, '농가의뢰', { fill: true })).toBe(4)
     })
 
-    it('일반 채번은 F 접두가 없는 성토 레코드도 제외', () => {
+    // F 없는 성토(레거시·필지 구분 성토)는 일반 번호를 점유한다 — 폼 중복 검사가 본번만 보므로
+    // 제외하면 일반 채번이 그 번호를 다시 내고 등록이 영구히 막힌다 (Fable 검증 PA/PG 재현)
+    it('일반 채번은 F 접두가 없는 성토 레코드의 번호를 건너뛴다', () => {
         const logs = [
             { receptionNumber: '1', landClass1: '농가의뢰' },
             { receptionNumber: '20', subCategory: '성토', landClass1: '농가의뢰' }
         ]
-        expect(next(logs, '농가의뢰')).toBe(2)
+        expect(next(logs, '농가의뢰')).toBe(21)
+        expect(next(logs, '농가의뢰', { fill: true })).toBe(21) // 성토 풀에도 든다
     })
 
     it('성토 채번도 경지구분별 독립', () => {
